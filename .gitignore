@@ -50,3 +50,9 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+#Demos projects, etc.
+**/build/*
+**/.vscode/*
+**/copy.bat
+/concept/esp_ariscop_project/*

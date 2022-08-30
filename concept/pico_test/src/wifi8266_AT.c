@@ -142,6 +142,7 @@ void main() {
     testaESP(UART_ID, SEC(5), "AT+CWMODE=1", true);
     printf("%s\n",strcmd); 
     //AT+CWMODE=1\r\n\r\nOK\r\n
+    //\n\r\nOK\r\n
     //OK
 
     strpointer = 0; 
@@ -150,6 +151,7 @@ void main() {
     testaESP(UART_ID, SEC(10), espComm, false);
     printf("%s\n",strcmd); 
     //AT+CWJAP="WiFi_Network","P@$$w0rd"\r\nWIFI DISCONNECT\r\nWIFI CONNECTED\r\nWIFI GOT IP\r\n\r\nOK\r\n
+    //WIFI DISCONNECT\r\nWIFI CONNECTED\r\nWIFI GOT IP\r\n\r\nOK\r\n
     //WIFI DISCONNECTWIFI CONNECTEDWIFI GOT IPOK || WIFI CONNECTEDWIFI GOT IPOK
     //WIFI DISCONNECT << Correct! now need more reads to check the WiFi Status || Can't read anything after that
 

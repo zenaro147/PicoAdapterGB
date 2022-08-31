@@ -53,11 +53,6 @@ void main() {
     ReadESPcmd(SEC(2));
     FlushCmdBuff();
 
-    // Set WiFi Mode to Station 
-    SendESPcmd(UART_ID,"AT+CWMODE=1");
-    ReadESPcmd(SEC(2));
-    FlushCmdBuff();
-
     // Set to Passive Mode to receive TCP info
     // AT+CIPRECVDATA=<size> | read the X amount of data from esp buffer
     // AT+CIPRECVLEN? | return the remaining  buffer size like this +CIPRECVLEN:636,0,0,0,0)

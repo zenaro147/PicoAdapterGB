@@ -60,6 +60,7 @@ void on_uart_rx(){
 
 void FlushCmdBuff(){
     memset(strcmd,'\0',sizeof(strcmd));
+    strpointer=0;
 }
 
 void SendESPcmd(uart_inst_t *uart, const char *command){
@@ -83,8 +84,6 @@ void ReadESPcmd(int timeout){
     //char * token2 = strtok(NULL, " ");
     //printf( " %s\n", token2 ); //printing the token
 }
-
-
 
 
 void main() {
@@ -137,13 +136,11 @@ void main() {
     FlushCmdBuff();
 
     // Disable echo
-    strpointer = 0;
     SendESPcmd(UART_ID,"ATE0");
     ReadESPcmd(SEC(2));
     FlushCmdBuff();
 
     // Set WiFi Mode to Station 
-    strpointer = 0;
     SendESPcmd(UART_ID,"AT+CWMODE=1");
     ReadESPcmd(SEC(2));
     FlushCmdBuff();
@@ -152,11 +149,9 @@ void main() {
     // AT+CIPRECVDATA=<size> | read the X amount of data from esp buffer
     // AT+CIPRECVLEN? | return the remaining  buffer size like this +CIPRECVLEN:636,0,0,0,0)
     // Also can read the actual size reading the +IPD value from "AT+CIPSEND" output: \r\n\r\nRecv 60 bytes\r\n\r\nSEND OK\r\n\r\n+IPD,636\r\nCLOSED\r\n
-    strpointer = 0;
     SendESPcmd(UART_ID, "AT+CIPRECVMODE=1");
     ReadESPcmd(SEC(2));
 
-    strpointer = 0; 
     char espComm[100] = {};
     sprintf(espComm,"AT+CWJAP=\"%s\",\"%s\"",WiFiSSID,WiFiPSK);
     SendESPcmd(UART_ID, espComm);

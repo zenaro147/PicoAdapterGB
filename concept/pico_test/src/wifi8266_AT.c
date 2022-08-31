@@ -34,6 +34,14 @@ volatile uint64_t last_readable = 0;
 char strcmd[BUFFER_SIZE];
 int strpointer = 0;
 
+void RunTimeout(int timeout){
+    time_us_now = time_us_64();
+    last_readable = time_us_now;
+    while ((time_us_now - last_readable) < timeout){
+        time_us_now = time_us_64();
+    }
+}
+
 // RX interrupt handler
 void on_uart_rx(){
     while (uart_is_readable(UART_ID)) {
@@ -61,15 +69,19 @@ void SendESPcmd(uart_inst_t *uart, const char *command){
 }
 
 void ReadESPcmd(int timeout){
-    //Just run a little timeout to give some time to fill the Buffer
-    time_us_now = time_us_64();
-    last_readable = time_us_now;
-    while ((time_us_now - last_readable) < timeout){
-        time_us_now = time_us_64();
-    }
-    printf("%s",strcmd);
+    RunTimeout(timeout); //Just run a little timeout to give some time to fill the Buffer
+
+    printf("%s",strcmd); // Data seems ok... need to parse this now
     // strstr
     // strtok
+
+    //char string[50] = "Hello world";
+    //// Extract the first token
+    //char * token = strtok(string, " ");
+    //printf( " %s\n", token ); //printing the token
+    //
+    //char * token2 = strtok(NULL, " ");
+    //printf( " %s\n", token2 ); //printing the token
 }
 
 
@@ -79,14 +91,6 @@ void main() {
     sleep_ms(2000); 
     // Enable UART so we can print
     stdio_init_all();
-
-   //char string[50] = "Hello world";
-   //// Extract the first token
-   //char * token = strtok(string, " ");
-   //printf( " %s\n", token ); //printing the token
-   //
-   //char * token2 = strtok(NULL, " ");
-   //printf( " %s\n", token2 ); //printing the token
 
     // For toggle_led
     gpio_init(LED_PIN);
@@ -124,9 +128,9 @@ void main() {
     uart_set_irq_enables(UART_ID, true, false);
 
 
- //
+ //////////////////////
  // CONFIGURE THE ESP
- //   
+ //////////////////////
     //test connection (return echo)
     SendESPcmd(UART_ID,"AT");
     ReadESPcmd(SEC(2));
@@ -161,9 +165,9 @@ void main() {
     ReadESPcmd(SEC(10)); // WIFI GOT IP
     ReadESPcmd(SEC(10)); // OK
     FlushCmdBuff();
-//
+//////////////////
 // END CONFIGURE
-//
+//////////////////
    
     printf("\nDone\n");
     LED_OFF;

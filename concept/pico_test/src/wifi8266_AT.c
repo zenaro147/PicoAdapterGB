@@ -5,12 +5,12 @@
 #include <string.h>
 #include "pico/stdlib.h"
 #include "hardware/uart.h"
-#include "hardware/gpio.h"
+#include "hardware/irq.h"
 
 #define WiFiSSID "WiFi_Network"
 #define WiFiPSK "P@$$w0rd"
 
-#define BUFFER_SIZE 255 //1024
+#define BUFFER_SIZE 2048 //1024 -- max receive from esp 2048 >> 255
 
 #define LED_PIN         25
 #define LED_SET(A)      (gpio_put(LED_PIN, (A)))
@@ -31,92 +31,77 @@ volatile uint64_t last_readable = 0;
 //#define PIN_SPI_SCK     18 //2
 //#define PIN_SPI_SOUT    19 //3 
 
-char strcmd[100];
+char strcmd[BUFFER_SIZE];
 int strpointer = 0;
 
-void testaESP(uart_inst_t *uart, int timeout, const char *command, bool ignoreEmpty){
-    char c;
-    int cmdLen = strlen(command);
-    int readData = 0;
-        
-    uart_puts(uart, command);
-    uart_puts(uart, "\r\n");
-
-    time_us_now = time_us_64();
-    last_readable = time_us_now;
-    while ((time_us_now - last_readable) < timeout){
-        time_us_now = time_us_64();
-        if(uart_is_readable(uart)){
-            c = uart_getc(uart);
-            if(c != command[0] && (uint8_t)c == 255){
-                cmdLen++; //Dev Note: The UART already has a "dummy data" feeded. This line just consider this to ignore the echo
-            }
-            
-            if (c == '\r'){
-                continue;
+// RX interrupt handler
+void on_uart_rx(){
+    while (uart_is_readable(UART_ID)) {
+        char ch = uart_getc(UART_ID);
+        if(ch == '\n' || (uint8_t)ch == 255){
+            continue;
+        }else{
+            if(ch == '\r'){
+                strcmd[strpointer++] = '|';
             }else{
-                if(c == '\n'){
-                    //if((strcmd[0] == '\0' && !ignoreEmpty) || (strcmd[0] != '\0' && strpointer != 0)){
-                    if(strcmd[0] == '\0' && !ignoreEmpty){
-                        printf("quit\n");
-                        break;
-                    }
-                }else{
-                    if(++readData > cmdLen){
-                        strcmd[strpointer++] = c;
-                    }
-                }
+                strcmd[strpointer++] = ch;
             }
         }
     }
-    //return strcmd;
 }
 
-
-bool BuffESPcmd(){
-
+void FlushCmdBuff(){
+    memset(strcmd,'\0',sizeof(strcmd));
 }
 
 void SendESPcmd(uart_inst_t *uart, const char *command){
-    char cmd[BUFFER_SIZE] = {};    
+    char cmd[300] = {}; //should handle the GET requests
     sprintf(cmd,"%s\r\n",command);
     uart_puts(uart, cmd);
 }
 
-void ReadESPcmd(){
-
+void ReadESPcmd(int timeout){
+    //Just run a little timeout to give some time to fill the Buffer
+    time_us_now = time_us_64();
+    last_readable = time_us_now;
+    while ((time_us_now - last_readable) < timeout){
+        time_us_now = time_us_64();
+    }
+    printf("%s",strcmd);
+    // strstr
+    // strtok
 }
-
-
-
 
 
 
 
 void main() {
-    sleep_ms(2000); //give some time to the ESP boot
-
+    sleep_ms(2000); 
     // Enable UART so we can print
     stdio_init_all();
+
+   //char string[50] = "Hello world";
+   //// Extract the first token
+   //char * token = strtok(string, " ");
+   //printf( " %s\n", token ); //printing the token
+   //
+   //char * token2 = strtok(NULL, " ");
+   //printf( " %s\n", token2 ); //printing the token
 
     // For toggle_led
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
     LED_ON;
-    //multicore_launch_core1(core1_context);
 
-    int baud = 0;
     // Set up our UART with the required speed.
-    baud = uart_init(UART_ID, BAUD_RATE);
-    bool test = false;
-    test = uart_is_enabled(UART_ID);
+    int baud = uart_init(UART_ID, BAUD_RATE);
+    bool test = uart_is_enabled(UART_ID);
 
     uart_set_fifo_enabled(UART_ID,false);
     uart_set_format(UART_ID,8,1,0);
     uart_set_hw_flow(UART_ID,false,false); 
 
     // Set the TX and RX pins by using the function select on the GPIO
-    // Set datasheet for more information on function select
     gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
     gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
 
@@ -124,42 +109,62 @@ void main() {
     //sleep_ms(5000); //Only use without PicoProble
     printf("Init Serial\n");
     printf("Baudrate: %i \n",baud);
-    printf("Enabled: %i \n",(uint8_t)test);  
-    
-    //Disable echo
-    testaESP(UART_ID, SEC(5), "AT", true);
-    printf("%s\n",strcmd); 
-    //�AT\r\n\r\nOK\r\n
-    //OK
-    
-    //strpointer = 0;
-    //testaESP(UART_ID, SEC(5), "ATE0", true);
-    //printf("%s\n",strcmd); 
-    //\n\r\nOK\r\n
-    //OK
+    printf("Enabled: %i \n",(uint8_t)test); 
 
+
+    // Set up a RX interrupt
+    // Select correct interrupt for the UART we are using
+    int UART_IRQ = UART_ID == uart0 ? UART0_IRQ : UART1_IRQ;
+
+    // Set up and enable the interrupt handlers
+    irq_set_exclusive_handler(UART_IRQ, on_uart_rx);
+    irq_set_enabled(UART_IRQ, true);
+
+    // Now enable the UART to send interrupts - RX only
+    uart_set_irq_enables(UART_ID, true, false);
+
+
+ //
+ // CONFIGURE THE ESP
+ //   
+    //test connection (return echo)
+    SendESPcmd(UART_ID,"AT");
+    ReadESPcmd(SEC(2));
+    FlushCmdBuff();
+
+    // Disable echo
     strpointer = 0;
-    testaESP(UART_ID, SEC(5), "AT+CWMODE=1", true);
-    printf("%s\n",strcmd); 
-    //AT+CWMODE=1\r\n\r\nOK\r\n
-    //\n\r\nOK\r\n
-    //OK
+    SendESPcmd(UART_ID,"ATE0");
+    ReadESPcmd(SEC(2));
+    FlushCmdBuff();
+
+    // Set WiFi Mode to Station 
+    strpointer = 0;
+    SendESPcmd(UART_ID,"AT+CWMODE=1");
+    ReadESPcmd(SEC(2));
+    FlushCmdBuff();
+
+    // Set to Passive Mode to receive TCP info
+    // AT+CIPRECVDATA=<size> | read the X amount of data from esp buffer
+    // AT+CIPRECVLEN? | return the remaining  buffer size like this +CIPRECVLEN:636,0,0,0,0)
+    // Also can read the actual size reading the +IPD value from "AT+CIPSEND" output: \r\n\r\nRecv 60 bytes\r\n\r\nSEND OK\r\n\r\n+IPD,636\r\nCLOSED\r\n
+    strpointer = 0;
+    SendESPcmd(UART_ID, "AT+CIPRECVMODE=1");
+    ReadESPcmd(SEC(2));
 
     strpointer = 0; 
     char espComm[100] = {};
     sprintf(espComm,"AT+CWJAP=\"%s\",\"%s\"",WiFiSSID,WiFiPSK);
-    testaESP(UART_ID, SEC(10), espComm, false);
-    printf("%s\n",strcmd); 
-    //AT+CWJAP="WiFi_Network","P@$$w0rd"\r\nWIFI DISCONNECT\r\nWIFI CONNECTED\r\nWIFI GOT IP\r\n\r\nOK\r\n
-    //WIFI DISCONNECT\r\nWIFI CONNECTED\r\nWIFI GOT IP\r\n\r\nOK\r\n
-    //WIFI DISCONNECTWIFI CONNECTEDWIFI GOT IPOK || WIFI CONNECTEDWIFI GOT IPOK
-    //WIFI DISCONNECT << Correct! now need more reads to check the WiFi Status || Can't read anything after that
-
-    char c;
-    while(uart_is_readable(UART_ID)){
-        printf("%c",uart_getc(UART_ID));
-    }
-
+    SendESPcmd(UART_ID, espComm);
+    ReadESPcmd(SEC(10)); // WIFI DISCONNECT
+    ReadESPcmd(SEC(10)); // WIFI CONNECTED
+    ReadESPcmd(SEC(10)); // WIFI GOT IP
+    ReadESPcmd(SEC(10)); // OK
+    FlushCmdBuff();
+//
+// END CONFIGURE
+//
+   
     printf("\nDone\n");
     LED_OFF;
 

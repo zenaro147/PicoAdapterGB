@@ -64,6 +64,12 @@ void ReadESPcmd(int timeout){
 }
 
 void ConnectESPWiFi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi){
+    // Set WiFi Mode to Station 
+    SendESPcmd(UART_ID,"AT+CWMODE=1");
+    ReadESPcmd(SEC(2));
+    FlushCmdBuff();
+
+    // Prepare the command to send
     char espComm[100] = {};
     memset(espComm,'\0',sizeof(espComm));
     sprintf(espComm,"AT+CWJAP=\"%s\",\"%s\"",SSID_WiFi,Pass_WiFi);

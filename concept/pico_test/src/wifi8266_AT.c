@@ -90,31 +90,9 @@ void main() {
         printf("ESP-01 Passive Mode: ERROR\n");
     }
 
-    if(ConnectESPWiFi(UART_ID, WiFiSSID, WiFiPSK)){
-        resp = ReadESPcmd(SEC(10));
-        while (true)
-        {
-            if(strcmp(resp, "WIFI DISCONNECT") == 0){
-                printf("ESP-01 Connecting Wifi: DISCONNECTED\n");
-            }else{
-                if(strcmp(resp, "WIFI CONNECTED") == 0){
-                    printf("ESP-01 Connecting Wifi: CONNECTED\n");
-                }else{
-                    if(strcmp(resp, "WIFI GOT IP") == 0){
-                        printf("ESP-01 Connecting Wifi: GOT IP\n");
-                    }else{
-                        if(strcmp(resp, "OK") == 0){
-                            printf("ESP-01 Connecting Wifi: OK\n");
-                            break;
-                        }else{
-                            printf("ESP-01 Connecting Wifi: ERROR\n");
-                            break;
-                        }                        
-                    }
-                }
-            }
-            resp = ReadESPcmd(SEC(5));
-        }
+    if(ConnectESPWiFi(UART_ID, WiFiSSID, WiFiPSK,SEC(10))){
+        bool reqStatus = SendESPGetReq(UART_ID, MAGB_HOST, MAGB_PORT, "/01/CGB-B9AJ/index.php");
+        
     }else{
         printf("ESP-01 Connecting Wifi: ERROR\n");
     }

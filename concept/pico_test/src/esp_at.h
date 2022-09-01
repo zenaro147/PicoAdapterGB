@@ -38,6 +38,7 @@ void on_uart_rx(){
     }
 }
 
+// Run a little timeout instead sleep (to prevent any block to the RX interrupt)
 void RunTimeout(int timeout){
     volatile uint64_t timenow = 0;
     volatile uint64_t last_read = 0;
@@ -48,11 +49,13 @@ void RunTimeout(int timeout){
     }
 }
 
+// Clean the RX buffer and ignore any data on it
 void FlushATBuff(){
     buffATrx_pointer=0;
     memset(buffATrx,'\0',sizeof(buffATrx));
 }
 
+// Send a AT command to the ESP (don't read anything back, for this use the ReadESPcmd function)
 void SendESPcmd(uart_inst_t *uart, const char *command){
     char cmd[300] = {}; //should handle the GET requests
     memset(cmd,'\0',sizeof(cmd));
@@ -60,6 +63,7 @@ void SendESPcmd(uart_inst_t *uart, const char *command){
     uart_puts(uart, cmd);
 }
 
+// Read the internal RX buffer with the received data from ESP
 char * ReadESPcmd(int timeout){
     char buff_answer[BUFF_AT_SIZE] = {};
     RunTimeout(timeout); // Just run a little timeout to give some time to fill the Buffer
@@ -95,6 +99,7 @@ char * ReadESPcmd(int timeout){
     }
 }
 
+// Provides the necessary commands to connect the ESP to a WiFi network
 bool ConnectESPWiFi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi){
     // Set WiFi Mode to Station 
     SendESPcmd(uart,"AT+CWMODE=1");
@@ -113,7 +118,9 @@ bool ConnectESPWiFi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi){
     }
 }
 
+// Establish a connection to the Host (Mobile Adapter GB server) and send the GET request to some URL
 bool SendESPGetReq(uart_inst_t * uart, char * magb_host, int magb_port, char * urlToRequest){
+    // Connect the ESP to the Host
     char cmdGetReq[100] = {};
     sprintf(cmdGetReq,"AT+CIPSTART=\"TCP\",\"%s\",%i",magb_host, magb_port);
     SendESPcmd(uart, cmdGetReq);
@@ -139,23 +146,25 @@ bool SendESPGetReq(uart_inst_t * uart, char * magb_host, int magb_port, char * u
         }        
     }
 
+    // Prepare the GET command to send
     memset(cmdGetReq, '\0', sizeof(cmdGetReq));
     sprintf(cmdGetReq,"GET %s HTTP/1.0\r\nHost: 192.168.0.126\r\n", urlToRequest);
     int cmdSize = strlen(cmdGetReq) + 2;
 
+    // Check if the GET command have less than 2048 bytes to send. This is the ESP limit
     if(cmdSize > 2048){        
         printf("ESP-01 Sending Request: ERROR - The request limit is 2048 bytes. Your request have: %i bytes\n", cmdSize);
     }else{
+        // Send the ammount of data we will send to ESP (the GET command size)
         char cmdSend[16] = {};
         sprintf(cmdSend,"AT+CIPSEND=%i", cmdSize);
-
         SendESPcmd(uart, cmdSend);
         resp = ReadESPcmd(2*1000*1000);
         if(strcmp(resp, "OK") == 0){
             printf("ESP-01 Sending Request: OK\nSending Request...\n");
-            FlushATBuff(); // Clean the > signal to receive the command
-            SendESPcmd(uart, cmdGetReq); //It have one more \r\n at the end, but the SendESPcmd already do this
-            //ERROR, SEND OK, SEND FAIL
+            FlushATBuff(); // Clean the '>' signal to receive the command
+            SendESPcmd(uart, cmdGetReq); // Finally send the GET request!It have one more \r\n at the end, but the SendESPcmd already do this.
+            //Possible returns: ERROR, SEND OK, SEND FAIL
             resp = ReadESPcmd(10*1000*1000); //10 sec, "Received Bytes message" (unused data, but feeds the buffer if necessary)
             resp = ReadESPcmd(1*1000*1000);
             if(strcmp(resp, "SEND OK") == 0){
@@ -166,6 +175,7 @@ bool SendESPGetReq(uart_inst_t * uart, char * magb_host, int magb_port, char * u
                     for(int i = 5; i < strlen(resp); i++){
                         numipd[i-5] = resp[i]; 
                     }
+                    //Set the IPD value into a variable to control the data to send
                     ipdVal = atoi(numipd);
                     printf("ESP-01 Bytes Received: %i\n", ipdVal);
                     FlushATBuff();
@@ -196,6 +206,7 @@ bool SendESPGetReq(uart_inst_t * uart, char * magb_host, int magb_port, char * u
     //    printf("%c",buffATrx[y]);
     //}
 
+// Initialize the ESP-01 UART communication
 void EspAT_Init(uart_inst_t * uart, int baudrate, int txpin, int rxpin){
     // Set up our UART with the required speed.
     int baud = uart_init(uart, baudrate);

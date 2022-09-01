@@ -15,7 +15,7 @@ bool ishttpRequest = false;
 void on_uart_rx(){
     while (uart_is_readable(use_uart0 ? uart0 : uart1)) {
         char ch = uart_getc(use_uart0 ? uart0 : uart1);
-        //if(!ishttpRequest){
+        if(!ishttpRequest){
             if(ch == '\n' || (buffATrx[buffATrx_pointer-1] == buffDelimiter && ch == '\r')){
                 continue;
             }else{
@@ -27,9 +27,9 @@ void on_uart_rx(){
                     buffATrx[buffATrx_pointer++] = ch;
                 }
             }
-        //}else{
-        //    buffATrx[buffATrx_pointer++] = ch;
-        //}
+        }else{
+            buffATrx[buffATrx_pointer++] = ch;
+        }
     }
 }
 

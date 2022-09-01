@@ -160,13 +160,13 @@ void main() {
     RunTimeout(SEC(2));    
     ishttpRequest=false;
     for(int y = 0; y < strlen(buffATrx); y++){
-        if (buffATrx[y] == buffDelimiter){
-            printf("\r");
-            printf("\n");
-        }else{
-            printf("%c",buffATrx[y]);
-        }
-        //printf("%c",buffATrx[y]);
+        //if (buffATrx[y] == buffDelimiter){
+        //    printf("\r");
+        //    printf("\n");
+        //}else{
+        //    printf("%c",buffATrx[y]);
+        //}
+        printf("%c",buffATrx[y]);
     }
 
     printf("\nDone\n");

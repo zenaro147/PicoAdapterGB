@@ -4,24 +4,32 @@
 #include "hardware/uart.h"
 #include "hardware/irq.h"
 
-#define BUFF_AT_SIZE 2048
+#define buffDelimiter '|'
+#define BUFF_AT_SIZE 512 //2048 is the maximun you can receive from esp01
 char buffATrx[BUFF_AT_SIZE] = {};
 int buffATrx_pointer = 0;
 bool use_uart0 = true;
+bool ishttpRequest = false;
 
 // RX interrupt handler
 void on_uart_rx(){
     while (uart_is_readable(use_uart0 ? uart0 : uart1)) {
         char ch = uart_getc(use_uart0 ? uart0 : uart1);
-        if(ch == '\n' || (uint8_t)ch == 255){
-            continue;
-        }else{
-            if(ch == '\r'){
-                buffATrx[buffATrx_pointer++] = '|';
+        //if(!ishttpRequest){
+            if(ch == '\n' || (buffATrx[buffATrx_pointer-1] == buffDelimiter && ch == '\r')){
+                continue;
             }else{
-                buffATrx[buffATrx_pointer++] = ch;
+                if(ch == '\r'){
+                    if (buffATrx_pointer > 0){
+                        buffATrx[buffATrx_pointer++] = buffDelimiter;
+                    }
+                }else{
+                    buffATrx[buffATrx_pointer++] = ch;
+                }
             }
-        }
+        //}else{
+        //    buffATrx[buffATrx_pointer++] = ch;
+        //}
     }
 }
 
@@ -35,7 +43,7 @@ void RunTimeout(int timeout){
     }
 }
 
-void FlushCmdBuff(){
+void FlushATBuff(){
     buffATrx_pointer=0;
     memset(buffATrx,'\0',sizeof(buffATrx));
 }
@@ -47,33 +55,60 @@ void SendESPcmd(uart_inst_t *uart, const char *command){
     uart_puts(uart, cmd);
 }
 
-void ReadESPcmd(int timeout){
+char * ReadESPcmd(int timeout){
+    char buff_answer[BUFF_AT_SIZE] = {};
     RunTimeout(timeout); // Just run a little timeout to give some time to fill the Buffer
+    if(strlen(buffATrx) > 0 && buffATrx_pointer > 0){
+        char buffATrx_cpy[BUFF_AT_SIZE] = {};
+        
+        memset(buff_answer,'\0',sizeof(buff_answer));
+        memcpy(buffATrx_cpy, buffATrx, sizeof(buffATrx));
+        
+        //Return the first anwser in buffer
+        int i = 0;
+        while (buffATrx[i] != buffDelimiter){
+            buff_answer[i] = buffATrx[i];
+            i++;
+        }
+        i++; //Skip the pipe delimiter to the next character
 
-    printf("test"); // Data seems ok... need to parse this now
-    // strstr
-    // strtok
+        if(buffATrx[i] != '\0'){        
+            memset(buffATrx,'\0',sizeof(buffATrx));
+            for(int x = i; x < strlen(buffATrx_cpy) ;x++){
+                buffATrx[x-i] = buffATrx_cpy[x];
+            }
+        }else{
+            FlushATBuff(); //Reset the Buffer if has no messages
+        }
+    }
 
-    //char string[50] = "Hello world";
-    //// Extract the first token
-    //char * token = strtok(string, " ");
-    //printf( " %s\n", token ); //printing the token
-    //
-    //char * token2 = strtok(NULL, " ");
-    //printf( " %s\n", token2 ); //printing the token
+    if(strlen(buff_answer) > 0){
+        char * answer_return = buff_answer;
+        return answer_return;
+    }else{
+        return "";
+    }
+
+    
+    
 }
 
-void ConnectESPWiFi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi){
+bool ConnectESPWiFi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi){
     // Set WiFi Mode to Station 
-    SendESPcmd(UART_ID,"AT+CWMODE=1");
-    ReadESPcmd(SEC(2));
-    FlushCmdBuff();
-
-    // Prepare the command to send
-    char espComm[100] = {};
-    memset(espComm,'\0',sizeof(espComm));
-    sprintf(espComm,"AT+CWJAP=\"%s\",\"%s\"",SSID_WiFi,Pass_WiFi);
-    SendESPcmd(uart, espComm);
+    SendESPcmd(uart,"AT+CWMODE=1");
+    char * resp = ReadESPcmd(2*1000*1000); // 2 seconds
+    if(strcmp(resp, "OK") == 0){
+        printf("ESP-01 Station Mode: OK\n");
+        // Prepare the command to send
+        char espComm[100] = {};
+        memset(espComm,'\0',sizeof(espComm));
+        sprintf(espComm,"AT+CWJAP=\"%s\",\"%s\"",SSID_WiFi,Pass_WiFi);
+        SendESPcmd(uart, espComm);
+        return true;
+    }else{        
+        printf("ESP-01 Station Mode: ERROR\n");
+        return false;
+    }
 }
 
 void EspAT_Init(uart_inst_t * uart, int baudrate, int txpin, int rxpin){

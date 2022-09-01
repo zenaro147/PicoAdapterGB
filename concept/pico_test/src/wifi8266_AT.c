@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "pico/stdlib.h"
 #include "hardware/uart.h"
 #include "hardware/irq.h"
@@ -26,7 +27,9 @@
 #define UART_TX_PIN 4
 #define UART_RX_PIN 5
 
-int ipdVal = 0;
+#define MAGB_HOST "192.168.0.126"
+#define MAGB_PORT 80
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void main() {
@@ -119,55 +122,27 @@ void main() {
 // END CONFIGURE
 //////////////////
    
-    SendESPcmd(UART_ID, "AT+CIPSTART=\"TCP\",\"192.168.0.126\",80");
-    resp = ReadESPcmd(SEC(10));
-    if(strcmp(resp, "CONNECT") == 0){
-        resp = ReadESPcmd(SEC(5));
-        if(strcmp(resp, "OK") == 0){
-            printf("ESP-01 Start Host Connection: OK\n");
-        }else{
-            if(strcmp(resp, "ALREADY CONNECTED") == 0) {            
-                printf("ESP-01 Start Host Connection: ALREADY CONNECTED\n");
-            }else{
-                printf("ESP-01 Start Host Connection: ERROR\n");
-            } 
-        }
-    }else{ 
-        if(strcmp(resp, "ALREADY CONNECTED") == 0) {            
-            printf("ESP-01 Start Host Connection: ALREADY CONNECTED\n");
-        }else{
-            printf("ESP-01 Start Host Connection: ERROR\n");
-        }        
-    }
 
-    SendESPcmd(UART_ID, "AT+CIPSEND=60");
-    resp = ReadESPcmd(SEC(2));
-    if(strcmp(resp, "OK") == 0){
-        printf("ESP-01 Sending Request: OK\nSending Request...\n");
-        FlushATBuff();
-        SendESPcmd(UART_ID, "GET /01/CGB-B9AJ/index.php HTTP/1.0\r\nHost: 192.168.0.126\r\n");
-        //ERROR, SEND OK, SEND FAIL
+    bool reqStatus = false;
+    reqStatus = SendESPGetReq(UART_ID, MAGB_HOST, MAGB_PORT, "/01/CGB-B9AJ/index.php");
 
-    }else{
-        printf("ESP-01 Sending Request: ERROR\n");      
-    }
-    RunTimeout(SEC(2));
-    FlushATBuff();
-    
-    
-    ishttpRequest=true;
-    SendESPcmd(UART_ID,"AT+CIPRECVDATA=300"); //Must igonre the OK at the end, and the +CIPRECVDATA,<size> at the beginning
-    RunTimeout(SEC(2));    
-    ishttpRequest=false;
-    for(int y = 0; y < strlen(buffATrx); y++){
-        //if (buffATrx[y] == buffDelimiter){
-        //    printf("\r");
-        //    printf("\n");
-        //}else{
-        //    printf("%c",buffATrx[y]);
-        //}
-        printf("%c",buffATrx[y]);
-    }
+    //Need a request data now. (from esp buffer)    
+    // AT+CIPRECVLEN? | return the remaining  buffer size like this +CIPRECVLEN:636,0,0,0,0 ... but the Variable ipdVal hold this value and need to subtract each reading
+    // AT+CIPRECVDATA=<size> | read the X amount of data from esp buffer
+
+    //ishttpRequest=true;
+    //SendESPcmd(UART_ID,"AT+CIPRECVDATA=300"); //Must igonre the OK at the end, and the +CIPRECVDATA,<size> at the beginning
+    //RunTimeout(SEC(2));    
+    //ishttpRequest=false;
+    //for(int y = 0; y < strlen(buffATrx); y++){
+    //    //if (buffATrx[y] == buffDelimiter){
+    //    //    printf("\r");
+    //    //    printf("\n");
+    //    //}else{
+    //    //    printf("%c",buffATrx[y]);
+    //    //}
+    //    printf("%c",buffATrx[y]);
+    //}
 
     printf("\nDone\n");
     LED_OFF;

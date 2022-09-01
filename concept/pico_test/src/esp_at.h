@@ -1,6 +1,9 @@
 #ifndef ESP_AT_H
 #define ESP_AT_H
 
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include "hardware/uart.h"
 #include "hardware/irq.h"
 
@@ -9,7 +12,9 @@
 char buffATrx[BUFF_AT_SIZE] = {};
 int buffATrx_pointer = 0;
 bool use_uart0 = true;
+
 bool ishttpRequest = false;
+int ipdVal = 0;
 
 // RX interrupt handler
 void on_uart_rx(){
@@ -88,9 +93,6 @@ char * ReadESPcmd(int timeout){
     }else{
         return "";
     }
-
-    
-    
 }
 
 bool ConnectESPWiFi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi){
@@ -110,6 +112,89 @@ bool ConnectESPWiFi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi){
         return false;
     }
 }
+
+bool SendESPGetReq(uart_inst_t * uart, char * magb_host, int magb_port, char * urlToRequest){
+    char cmdGetReq[100] = {};
+    sprintf(cmdGetReq,"AT+CIPSTART=\"TCP\",\"%s\",%i",magb_host, magb_port);
+    SendESPcmd(uart, cmdGetReq);
+    char * resp = ReadESPcmd(10*1000*1000); //10 seconds
+    if(strcmp(resp, "CONNECT") == 0){
+        resp = ReadESPcmd(5*1000*1000); //5 seconds
+        if(strcmp(resp, "OK") == 0){
+            printf("ESP-01 Start Host Connection: OK\n");
+        }else{
+            if(strcmp(resp, "ALREADY CONNECTED") == 0) {            
+                printf("ESP-01 Start Host Connection: ALREADY CONNECTED\n");
+            }else{
+                printf("ESP-01 Start Host Connection: ERROR\n");
+                return false;
+            } 
+        }
+    }else{ 
+        if(strcmp(resp, "ALREADY CONNECTED") == 0) {            
+            printf("ESP-01 Start Host Connection: ALREADY CONNECTED\n");
+        }else{
+            printf("ESP-01 Start Host Connection: ERROR\n");
+                return false;
+        }        
+    }
+
+    memset(cmdGetReq, '\0', sizeof(cmdGetReq));
+    sprintf(cmdGetReq,"GET %s HTTP/1.0\r\nHost: 192.168.0.126\r\n", urlToRequest);
+    int cmdSize = strlen(cmdGetReq) + 2;
+
+    if(cmdSize > 2048){        
+        printf("ESP-01 Sending Request: ERROR - The request limit is 2048 bytes. Your request have: %i bytes\n", cmdSize);
+    }else{
+        char cmdSend[16] = {};
+        sprintf(cmdSend,"AT+CIPSEND=%i", cmdSize);
+
+        SendESPcmd(uart, cmdSend);
+        resp = ReadESPcmd(2*1000*1000);
+        if(strcmp(resp, "OK") == 0){
+            printf("ESP-01 Sending Request: OK\nSending Request...\n");
+            FlushATBuff(); // Clean the > signal to receive the command
+            SendESPcmd(uart, cmdGetReq); //It have one more \r\n at the end, but the SendESPcmd already do this
+            //ERROR, SEND OK, SEND FAIL
+            resp = ReadESPcmd(10*1000*1000); //10 sec, "Received Bytes message" (unused data, but feeds the buffer if necessary)
+            resp = ReadESPcmd(1*1000*1000);
+            if(strcmp(resp, "SEND OK") == 0){
+                printf("ESP-01 Sending Request: SEND OK\n");
+                resp = ReadESPcmd(1*1000*1000);
+                if(strstr(resp, "+IPD") != NULL){
+                    char numipd[4] = {};
+                    for(int i = 5; i < strlen(resp); i++){
+                        numipd[i-5] = resp[i]; 
+                    }
+                    ipdVal = atoi(numipd);
+                    printf("ESP-01 Bytes Received: %i\n", ipdVal);
+                    FlushATBuff();
+                    return true;
+                }else{
+                    printf("ESP-01 Sending Request: ERROR\n");
+                }
+            }else{
+                printf("ESP-01 Sending Request: ERROR\n");
+            }
+        }else{
+            printf("ESP-01 Sending Request: ERROR\n");
+        }
+    }
+    return false;
+}    
+    //ishttpRequest=true;
+    //SendESPcmd(UART_ID,"AT+CIPRECVDATA=300"); //Must igonre the OK at the end, and the +CIPRECVDATA,<size> at the beginning
+    //RunTimeout(SEC(2));    
+    //ishttpRequest=false;
+    //for(int y = 0; y < strlen(buffATrx); y++){
+    //    //if (buffATrx[y] == buffDelimiter){
+    //    //    printf("\r");
+    //    //    printf("\n");
+    //    //}else{
+    //    //    printf("%c",buffATrx[y]);
+    //    //}
+    //    printf("%c",buffATrx[y]);
+    //}
 
 void EspAT_Init(uart_inst_t * uart, int baudrate, int txpin, int rxpin){
     // Set up our UART with the required speed.

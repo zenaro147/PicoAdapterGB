@@ -102,9 +102,9 @@ char * ReadESPcmd(int timeout){
 
 // Establish a connection to the Host (Mobile Adapter GB server) and send the GET request to some URL
 bool SendESPGetReq(uart_inst_t * uart, char * magb_host, int magb_port, char * urlToRequest){
-        // Connect the ESP to the Host
+    // Connect the ESP to the Host
+    char cmdGetReq[100] = {};
     if(!isConnectedHost){
-        char cmdGetReq[100] = {};
         sprintf(cmdGetReq,"AT+CIPSTART=\"TCP\",\"%s\",%i",magb_host, magb_port);
         SendESPcmd(uart, cmdGetReq);
         char * resp = ReadESPcmd(10*1000*1000); //10 seconds
@@ -145,7 +145,7 @@ bool SendESPGetReq(uart_inst_t * uart, char * magb_host, int magb_port, char * u
         char cmdSend[16] = {};
         sprintf(cmdSend,"AT+CIPSEND=%i", cmdSize);
         SendESPcmd(uart, cmdSend);
-        resp = ReadESPcmd(2*1000*1000);
+        char * resp = ReadESPcmd(2*1000*1000);
         if(strcmp(resp, "OK") == 0){
             printf("ESP-01 Sending Request: OK\nSending Request...\n");
             FlushATBuff(); // Clean the '>' signal to receive the command
@@ -191,9 +191,26 @@ void ReadESPGetReq(uart_inst_t * uart, int dataSize){
     }
 }
 
-// Retrieve the ammount of data remaining into ESP buffer
-void ReadESPGetReqBuffer(uart_inst_t * uart){
-    //Read the remaining data inside ESP buffer
+//Read the remaining data inside ESP buffer (must be used like this: ipdVal = ReadESPGetReqBuffer(UART_ID))
+int ReadESPGetReqBuffer(uart_inst_t * uart){
+    SendESPcmd(uart,"AT+CIPRECVLEN?");
+    char * resp = ReadESPcmd(2*1000*1000);
+    if(strstr(resp, "+CIPRECVLEN:") != NULL){
+        char numEspIpd[5] = {};
+        for(int i = 12; i < strlen(resp); i++){
+            if(resp[i] == ','){
+                break;
+            }
+            numEspIpd[i-12] = resp[i];
+        }
+        FlushATBuff();
+        uint8_t numEspIpd_val = 0;
+        numEspIpd_val = atoi(numEspIpd);
+        return numEspIpd_val; 
+    }else{        
+        printf("ESP-01 Host Status: ERROR\n");
+    }
+    return 0;   
 }
 
 // Return the status of the Host connection using TCP or UDP (must be used like this: isConnectedHost = GetESPHostConn(UART_ID))
@@ -209,10 +226,10 @@ bool GetESPHostConn(uart_inst_t * uart){
         uint8_t numstat_val = 0;
         numstat_val = atoi(numstat);
         if(numstat_val == 3){ // The ESP8266 Station has created a TCP or UDP transmission. 
-            printf("ESP-01 Host Status: TCP or UDP connected.\n");
+            printf("ESP-01 Host Status: TCP/UDP connected.\n");
             return true;
         }else{
-            printf("ESP-01 Host Status: TCP or UDP disconnected.\n");
+            printf("ESP-01 Host Status: TCP/UDP disconnected.\n");
         }
     }else{        
         printf("ESP-01 Host Status: ERROR\n");
@@ -224,6 +241,7 @@ void CloseESPGetReq(uart_inst_t * uart){
     SendESPcmd(uart,"AT+CIPCLOSE");
     RunTimeout(2*1000*1000); // 2 seconds
     FlushATBuff(); // Clean any output. We don't need it.
+    GetESPHostConn(uart);
 }
     //ishttpRequest=true;
     //SendESPcmd(UART_ID,"AT+CIPRECVDATA=300"); //Must igonre the OK at the end, and the +CIPRECVDATA,<size> at the beginning
@@ -303,7 +321,7 @@ bool ConnectESPWiFi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int 
                             return true;
                         }else{
                             printf("ESP-01 Connecting Wifi: ERROR\n");
-                            return false
+                            return false;
                         }                        
                     }
                 }

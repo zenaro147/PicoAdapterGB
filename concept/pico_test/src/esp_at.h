@@ -8,8 +8,9 @@
 #include "hardware/irq.h"
 
 #define buffDelimiter '|'
-#define BUFF_AT_SIZE 512 //2048 is the maximun you can receive from esp01
+#define BUFF_AT_SIZE 2048 //2048 is the maximun you can receive from esp01
 char buffATrx[BUFF_AT_SIZE] = {};
+char buffGETReq[BUFF_AT_SIZE] = {};
 int buffATrx_pointer = 0;
 bool use_uart0 = true;
 
@@ -66,10 +67,10 @@ void SendESPcmd(uart_inst_t *uart, const char *command){
 
 // Read the internal RX buffer with the received data from ESP
 char * ReadESPcmd(int timeout){
-    char buff_answer[BUFF_AT_SIZE] = {};
+    char buff_answer[BUFF_AT_SIZE/4] = {};
     RunTimeout(timeout); // Just run a little timeout to give some time to fill the Buffer
     if(strlen(buffATrx) > 0 && buffATrx_pointer > 0){
-        char buffATrx_cpy[BUFF_AT_SIZE] = {};
+        char buffATrx_cpy[sizeof(buffATrx)] = {};
         
         memset(buff_answer,'\0',sizeof(buff_answer));
         memcpy(buffATrx_cpy, buffATrx, sizeof(buffATrx));
@@ -102,6 +103,10 @@ char * ReadESPcmd(int timeout){
 
 // Establish a connection to the Host (Mobile Adapter GB server) and send the GET request to some URL
 bool SendESPGetReq(uart_inst_t * uart, char * magb_host, int magb_port, char * urlToRequest){
+    if(ipdVal != 0){
+        printf("ESP-01 Start Host Connection: You can't request more data now.\n");
+        return false;
+    }
     // Connect the ESP to the Host
     char cmdGetReq[100] = {};
     if(!isConnectedHost){
@@ -139,7 +144,6 @@ bool SendESPGetReq(uart_inst_t * uart, char * magb_host, int magb_port, char * u
     // Check if the GET command have less than 2048 bytes to send. This is the ESP limit
     if(cmdSize > 2048){
         printf("ESP-01 Sending Request: ERROR - The request limit is 2048 bytes. Your request have: %i bytes\n", cmdSize);
-        return false;
     }else{
         // Send the ammount of data we will send to ESP (the GET command size)
         char cmdSend[16] = {};
@@ -184,11 +188,31 @@ bool SendESPGetReq(uart_inst_t * uart, char * magb_host, int magb_port, char * u
 
 // Retrieve data from the ESP buffer (max Data Size = 2048)
 void ReadESPGetReq(uart_inst_t * uart, int dataSize){
-    if(dataSize > 2048){
-        //ERROR
+    if(ipdVal == 0){
+        printf("ESP-01 Read Request: You don't have data to read.\n");
     }else{
-        //CONTINUE
-    }
+        if(dataSize > 2048){
+            printf("ESP-01 Read Request: The maximum data to read is 2048.\n");
+        }else{
+            if(ipdVal-dataSize < 0){
+                dataSize=ipdVal;        
+                printf("ESP-01 Read Request: You request more data than it stored. Changing value.\n");
+            }
+            // Enable to raw parse the incomming data
+            char cmdRead[20]={};
+            sprintf(cmdRead,"AT+CIPRECVDATA=%i",dataSize);
+            ishttpRequest=true;
+            SendESPcmd(uart,cmdRead); //Must igonre the OK at the end, and the "+CIPRECVDATA,<size>:" at the beginning
+            RunTimeout(5*1000*1000); //5 sec. Give time to feed the buffer    
+            ishttpRequest=false;
+            int cmdReadSize = strlen(cmdRead)+1;
+            for(int i = cmdReadSize; i < strlen(buffATrx)-6; i++){
+                buffGETReq[i - cmdReadSize] = buffATrx[i];
+            }
+            FlushATBuff();
+            printf("ESP-01 Read Request: Done.\n");
+        } 
+    }    
 }
 
 //Read the remaining data inside ESP buffer (must be used like this: ipdVal = ReadESPGetReqBuffer(UART_ID))
@@ -204,7 +228,7 @@ int ReadESPGetReqBuffer(uart_inst_t * uart){
             numEspIpd[i-12] = resp[i];
         }
         FlushATBuff();
-        uint8_t numEspIpd_val = 0;
+        int numEspIpd_val = 0;
         numEspIpd_val = atoi(numEspIpd);
         return numEspIpd_val; 
     }else{        
@@ -243,19 +267,6 @@ void CloseESPGetReq(uart_inst_t * uart){
     FlushATBuff(); // Clean any output. We don't need it.
     GetESPHostConn(uart);
 }
-    //ishttpRequest=true;
-    //SendESPcmd(UART_ID,"AT+CIPRECVDATA=300"); //Must igonre the OK at the end, and the +CIPRECVDATA,<size> at the beginning
-    //RunTimeout(SEC(2));    
-    //ishttpRequest=false;
-    //for(int y = 0; y < strlen(buffATrx); y++){
-    //    //if (buffATrx[y] == buffDelimiter){
-    //    //    printf("\r");
-    //    //    printf("\n");
-    //    //}else{
-    //    //    printf("%c",buffATrx[y]);
-    //    //}
-    //    printf("%c",buffATrx[y]);
-    //}
 
 // Initialize the ESP-01 UART communication
 void EspAT_Init(uart_inst_t * uart, int baudrate, int txpin, int rxpin){

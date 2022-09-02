@@ -14,6 +14,7 @@
 #include "libmobile/inet_pton.h"
 
 //Flash reprograming example https://github.com/raspberrypi/pico-examples/blob/master/flash/program/flash_program.c
+//https://www.makermatrix.com/blog/read-and-write-data-with-the-pi-pico-onboard-flash/
 
 //God, what I need to do now? =(
 

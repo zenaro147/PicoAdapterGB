@@ -14,6 +14,7 @@ char buffGETReq[BUFF_AT_SIZE] = {};
 int buffATrx_pointer = 0;
 bool use_uart0 = true;
 
+bool isConnectedWiFi = false;
 bool ishttpRequest = false;
 int ipdVal = 0;
 bool isConnectedHost = false;

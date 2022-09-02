@@ -90,37 +90,19 @@ void main() {
         printf("ESP-01 Passive Mode: ERROR\n");
     }
 
-    if(ConnectESPWiFi(UART_ID, WiFiSSID, WiFiPSK,SEC(10))){
-        bool reqStatus = SendESPGetReq(UART_ID, MAGB_HOST, MAGB_PORT, "/01/CGB-B9AJ/index.php");
-        ReadESPGetReq(UART_ID,700); //The value will be stored into buffGETReq array
-    }else{
+    isConnectedWiFi = ConnectESPWiFi(UART_ID, WiFiSSID, WiFiPSK,SEC(10));
+    if(!isConnectedWiFi){
         printf("ESP-01 Connecting Wifi: ERROR\n");
     }
+    LED_OFF; 
 //////////////////
 // END CONFIGURE
 //////////////////
-   
-    //Need a request data now. (from esp buffer)    
-    // AT+CIPRECVLEN? | return the remaining  buffer size like this +CIPRECVLEN:636,0,0,0,0 ... but the Variable ipdVal hold this value and need to subtract each reading
-    // AT+CIPRECVDATA=<size> | read the X amount of data from esp buffer
-
-    //ishttpRequest=true;
-    //SendESPcmd(UART_ID,"AT+CIPRECVDATA=300"); //Must igonre the OK at the end, and the +CIPRECVDATA,<size> at the beginning
-    //RunTimeout(SEC(2));    
-    //ishttpRequest=false;
-    //for(int y = 0; y < strlen(buffATrx); y++){
-    //    //if (buffATrx[y] == buffDelimiter){
-    //    //    printf("\r");
-    //    //    printf("\n");
-    //    //}else{
-    //    //    printf("%c",buffATrx[y]);
-    //    //}
-    //    printf("%c",buffATrx[y]);
-    //}
-
-    printf("\nDone\n");
-    LED_OFF;
-
+    if(isConnectedWiFi){
+        bool reqStatus = SendESPGetReq(UART_ID, MAGB_HOST, MAGB_PORT, "/01/CGB-B9AJ/index.php");
+        ReadESPGetReq(UART_ID,700); //The value will be stored into buffGETReq array
+    }
+    
     while (true) {
         sleep_ms(1000);
     }

@@ -23,6 +23,9 @@
 struct mobile_adapter adapter;
 
 //SPDR = mobile_transfer(&adapter, SPDR);
+
+//Need to write the config file into flash (192 bytes)
+
 void main(){
 
     //mobile_init(&adapter, NULL, NULL);

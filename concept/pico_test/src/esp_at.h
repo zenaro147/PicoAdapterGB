@@ -10,8 +10,9 @@
 #define buffDelimiter '|'
 #define BUFF_AT_SIZE 2048 //2048 is the maximun you can receive from esp01
 char buffATrx[BUFF_AT_SIZE] = {};
-char buffGETReq[BUFF_AT_SIZE] = {};
 int buffATrx_pointer = 0;
+char buffGETReq[BUFF_AT_SIZE] = {};
+int buffGETReq_pointer = 0;
 bool use_uart0 = true;
 
 bool isConnectedWiFi = false;
@@ -201,13 +202,14 @@ void ReadESPGetReq(uart_inst_t * uart, int dataSize){
             }
             // Enable to raw parse the incomming data
             char cmdRead[20]={};
+            buffGETReq_pointer=dataSize;
             sprintf(cmdRead,"AT+CIPRECVDATA=%i",dataSize);
             ishttpRequest=true;
             SendESPcmd(uart,cmdRead); //Must igonre the OK at the end, and the "+CIPRECVDATA,<size>:" at the beginning
             RunTimeout(5*1000*1000); //5 sec. Give time to feed the buffer    
             ishttpRequest=false;
             int cmdReadSize = strlen(cmdRead)+1;
-            for(int i = cmdReadSize; i < strlen(buffATrx)-6; i++){
+            for(int i = cmdReadSize; i < buffATrx_pointer-6; i++){
                 buffGETReq[i - cmdReadSize] = buffATrx[i];
             }
             FlushATBuff();

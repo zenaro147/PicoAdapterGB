@@ -11,18 +11,16 @@
 #include "hardware/flash.h"
 
 #include "esp_at.h"
+#include "flash_eeprom.h"
 #include "libmobile/mobile.h"
 #include "libmobile/inet_pton.h"
 
 //Flash reprograming example https://github.com/raspberrypi/pico-examples/blob/master/flash/program/flash_program.c
 //https://www.makermatrix.com/blog/read-and-write-data-with-the-pi-pico-onboard-flash/
 
-//God, what I need to do now? =(
-
-
 struct mobile_adapter adapter;
 
-//SPDR = mobile_transfer(&adapter, SPDR);
+//SPDR = mobile_transfer(&adapter, SPDR); // how arduino handle the data
 
 //Need to write the config file into flash (192 bytes)
 
@@ -31,7 +29,6 @@ void main(){
     //mobile_init(&adapter, NULL, NULL);
 
     while (true) {
-        sleep_ms(1000);
         //mobile_loop(&adapter);
     }
 

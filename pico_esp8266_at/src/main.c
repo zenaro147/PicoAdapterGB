@@ -10,6 +10,7 @@
 #include "hardware/spi.h"
 #include "hardware/flash.h"
 
+#include "esp_at.h"
 #include "libmobile/mobile.h"
 #include "libmobile/inet_pton.h"
 

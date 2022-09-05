@@ -199,6 +199,8 @@ void ReadESPGetReq(uart_inst_t * uart, int dataSize){
             if(ipdVal-dataSize < 0){
                 dataSize=ipdVal;        
                 printf("ESP-01 Read Request: You request more data than it stored. Changing value.\n");
+            }else{
+                ipdVal = ipdVal - dataSize;
             }
             // Enable to raw parse the incomming data
             char cmdRead[20]={};

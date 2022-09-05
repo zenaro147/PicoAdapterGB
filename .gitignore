@@ -55,5 +55,5 @@ dkms.conf
 **/build/*
 **/.vscode/*
 **/copy.bat
-/concept/esp_ariscop_project/*
+/concept/esp_ariscop_project*
 **/src/examples/*

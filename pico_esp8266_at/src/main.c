@@ -18,8 +18,17 @@
 
 //God, what I need to do now? =(
 
+
+struct mobile_adapter adapter;
+
+//SPDR = mobile_transfer(&adapter, SPDR);
 void main(){
+
+    //mobile_init(&adapter, NULL, NULL);
+
     while (true) {
         sleep_ms(1000);
+        //mobile_loop(&adapter);
     }
+
 }

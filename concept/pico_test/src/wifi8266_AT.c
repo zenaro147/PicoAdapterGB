@@ -99,7 +99,9 @@ void main() {
 // END CONFIGURE
 //////////////////
     if(isConnectedWiFi){
-        bool reqStatus = SendESPGetReq(UART_ID, MAGB_HOST, MAGB_PORT, "/01/CGB-B9AJ/index.php");
+        //bool reqStatus = SendESPGetReq(UART_ID, MAGB_HOST, MAGB_PORT, "/01/CGB-B9AJ/index.php");
+        bool reqStatus = SendESPGetReq(UART_ID, MAGB_HOST, MAGB_PORT, "/cgb/download?name=/01/CGB-BXTJ/tamago/tamago0a.pkm"); 
+        //bool reqStatus = SendESPGetReq(UART_ID, MAGB_HOST, MAGB_PORT, "/01/CGB-BXTJ/tamago/tamago0a.pkm");        
         ReadESPGetReq(UART_ID,700); //The value will be stored into buffGETReq array
     }
     

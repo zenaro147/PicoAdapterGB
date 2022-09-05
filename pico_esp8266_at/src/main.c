@@ -15,16 +15,20 @@
 #include "libmobile/mobile.h"
 #include "libmobile/inet_pton.h"
 
-//Flash reprograming example https://github.com/raspberrypi/pico-examples/blob/master/flash/program/flash_program.c
-//https://www.makermatrix.com/blog/read-and-write-data-with-the-pi-pico-onboard-flash/
-
 struct mobile_adapter adapter;
 
 //SPDR = mobile_transfer(&adapter, SPDR); // how arduino handle the data
 
-//Need to write the config file into flash (192 bytes)
+
 
 void main(){
+    stdio_init_all();
+
+
+    FormatFlashConfig();
+    SaveFlashConfig();
+ 
+
 
     //mobile_init(&adapter, NULL, NULL);
 

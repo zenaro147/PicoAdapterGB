@@ -9,7 +9,7 @@
 #define FLASH_TARGET_OFFSET (FLASH_DATA_WRITE * 1024)
 const uint8_t *flash_target_contents = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET);
 
-//256 bytes for the Mobile Adapter GB config and 64bytes to WiFi Config
+//256 bytes for the Mobile Adapter GB config and 256 bytes to WiFi Config and other stuffs
 unsigned char dummy_config[FLASH_DATA_WRITE] = {
     // Mobile Adapter GB config
     0x4D, 0x41, 0x01, 0x00, 0xD2, 0xC4, 0x03, 0xB7, 0xD2, 0x8D, 0x70, 0xA3,	0x67, 0x39, 0x38, 0x37,
@@ -74,7 +74,7 @@ void SaveFlashConfig(){
 void FormatFlashConfig(){
     printf("\nErasing target region...\n");
     flash_range_erase(FLASH_TARGET_OFFSET, FLASH_SECTOR_SIZE);
-    
+
     printf("Done. Read back target region:\n");
     print_buf(flash_target_contents, FLASH_DATA_WRITE);
 }

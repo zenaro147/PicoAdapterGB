@@ -5,12 +5,12 @@
 //Flash reprograming example https://github.com/raspberrypi/pico-examples/blob/master/flash/program/flash_program.c
 //https://www.makermatrix.com/blog/read-and-write-data-with-the-pi-pico-onboard-flash/
 
-#define FLASH_DATA_WRITE (FLASH_PAGE_SIZE * 2)
-#define FLASH_TARGET_OFFSET (FLASH_DATA_WRITE * 1024)
+#define FLASH_DATA_SIZE (FLASH_PAGE_SIZE * 2)
+#define FLASH_TARGET_OFFSET (FLASH_DATA_SIZE * 1024)
 const uint8_t *flash_target_contents = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET);
 
 //256 bytes for the Mobile Adapter GB config and 256 bytes to WiFi Config and other stuffs
-unsigned char dummy_config[FLASH_DATA_WRITE] = {
+unsigned char dummy_config[FLASH_DATA_SIZE] = {
     // Mobile Adapter GB config
     0x4D, 0x41, 0x01, 0x00, 0xD2, 0xC4, 0x03, 0xB7, 0xD2, 0x8D, 0x70, 0xA3,	0x67, 0x39, 0x38, 0x37,
     0x32, 0x37, 0x38, 0x31, 0x38, 0x33, 0x00, 0x00,	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -30,9 +30,9 @@ unsigned char dummy_config[FLASH_DATA_WRITE] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
     //WiFi Config and other stuffs
-	0x57, 0x69, 0x46, 0x69, 0x5F, 0x4E, 0x65, 0x74, 0x77, 0x6F, 0x72, 0x6B,	0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x50, 0x40, 0x24, 0x24,	0x77, 0x30, 0x72, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x53, 0x53, 0x49, 0x44, 0x57, 0x69, 0x46, 0x69, 0x5F, 0x4E, 0x65, 0x74, 0x77, 0x6F, 0x72, 0x6B,	
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x50, 0x41, 0x53, 0x53, 0x50, 0x40, 0x24, 0x24,	0x77, 0x30, 0x72, 0x64, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -48,35 +48,47 @@ unsigned char dummy_config[FLASH_DATA_WRITE] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-void print_buf(const uint8_t *buf, size_t len) {
-    for (size_t i = 0; i < len; ++i) {
-        printf("%02x", buf[i]);
-        if (i % 16 == 15)
-            printf("\n");
-        else
-            printf(" ");
+//Read flash memory and set the configs
+// 0 = No config
+// 1 = Have only Mobile Adapter Config
+// 2 = Have Mobile Adapter and Wifi Config
+// 3 = Have only WiFi Config
+uint8_t ReadFlashConfig(uint8_t * buff){
+    printf("Reading the target region... ");
+    uint8_t data_return = 0;
+    char checkWiFi[5];
+    memcpy(buff,flash_target_contents,FLASH_DATA_SIZE);    
+    if((char)buff[0] == 0x4D && (char)buff[1] == 0x41){
+        data_return = 1;
     }
+
+    sprintf(checkWiFi,"%c%c%c%c",(char)buff[256],(char)buff[257],(char)buff[258],(char)buff[259]);
+    if(strcmp(checkWiFi,"SSID") == 0){
+        sprintf(checkWiFi,"%c%c%c%c",(char)buff[288],(char)buff[289],(char)buff[290],(char)buff[291]);
+        if(strcmp(checkWiFi,"PASS") == 0){
+            if(data_return == 1){
+                data_return = 2;
+            }else{
+                data_return = 3;
+                //FormatFlashConfig();
+            }
+        }
+    }
+    printf("Done.\n");
+    return data_return;
 }
 
-void ReadFlashConfig(){
-    printf("Reading the target region:\n");
-    print_buf(flash_target_contents, FLASH_DATA_WRITE);
-}
-
-void SaveFlashConfig(){    
-    printf("\nProgramming target region...\n");
-    flash_range_program(FLASH_TARGET_OFFSET, dummy_config, FLASH_DATA_WRITE);
-
-    printf("Done. Read back target region:\n");
-    print_buf(flash_target_contents, FLASH_DATA_WRITE);
+void SaveFlashConfig(uint8_t * buff){
+    FormatFlashConfig();
+    printf("Programming target region... ");
+    flash_range_program(FLASH_TARGET_OFFSET, dummy_config, FLASH_DATA_SIZE);
+    printf("Done.\n");
 }
 
 void FormatFlashConfig(){
-    printf("\nErasing target region...\n");
+    printf("Erasing target region... ");
     flash_range_erase(FLASH_TARGET_OFFSET, FLASH_SECTOR_SIZE);
-
-    printf("Done. Read back target region:\n");
-    print_buf(flash_target_contents, FLASH_DATA_WRITE);
+    printf("Done.\n");
 }
 
 #endif

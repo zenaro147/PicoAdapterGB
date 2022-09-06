@@ -12,21 +12,50 @@
 
 #include "esp_at.h"
 #include "flash_eeprom.h"
+
 #include "libmobile/mobile.h"
-#include "libmobile/inet_pton.h"
 
 struct mobile_adapter adapter;
 
 //SPDR = mobile_transfer(&adapter, SPDR); // how arduino handle the data
 
+uint8_t config_eeprom[FLASH_DATA_SIZE] = {};
+bool haveAdapterConfig = false;
+bool haveWifiConfig = false;
 
 
 void main(){
     stdio_init_all();
 
+    uint8_t setConfig = ReadFlashConfig(config_eeprom); 
+    switch (setConfig){
+        case 0:
+            haveAdapterConfig = false;
+            haveWifiConfig = false;
+        break;
+        case 1:
+            haveAdapterConfig = true;
+            haveWifiConfig = false;
+        break;
+        case 2:
+            haveAdapterConfig = true;
+            haveWifiConfig = true;
+        break;
+        case 3:
+            haveAdapterConfig = false;
+            haveWifiConfig = true;
+        break;
+        default:
+        break;
+    }
 
-    FormatFlashConfig();
-    SaveFlashConfig();
+    //if(!alreadyHaveConfig){
+    //    FormatFlashConfig();
+    //}
+    
+
+    //FormatFlashConfig();
+    //SaveFlashConfig();
  
 
 

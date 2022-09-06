@@ -47,17 +47,7 @@ void main(){
         break;
         default:
         break;
-    }
-
-    //if(!alreadyHaveConfig){
-    //    FormatFlashConfig();
-    //}
-    
-
-    //FormatFlashConfig();
-    //SaveFlashConfig();
- 
-
+    }  
 
     //mobile_init(&adapter, NULL, NULL);
 

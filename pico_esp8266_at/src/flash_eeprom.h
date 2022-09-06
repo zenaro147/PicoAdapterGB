@@ -48,6 +48,12 @@ unsigned char dummy_config[FLASH_DATA_SIZE] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
+void FormatFlashConfig(){
+    printf("Erasing target region... ");
+    flash_range_erase(FLASH_TARGET_OFFSET, FLASH_SECTOR_SIZE);
+    printf("Done.\n");
+}
+
 //Read flash memory and set the configs
 // 0 = No config
 // 1 = Have only Mobile Adapter Config
@@ -82,12 +88,6 @@ void SaveFlashConfig(uint8_t * buff){
     FormatFlashConfig();
     printf("Programming target region... ");
     flash_range_program(FLASH_TARGET_OFFSET, dummy_config, FLASH_DATA_SIZE);
-    printf("Done.\n");
-}
-
-void FormatFlashConfig(){
-    printf("Erasing target region... ");
-    flash_range_erase(FLASH_TARGET_OFFSET, FLASH_SECTOR_SIZE);
     printf("Done.\n");
 }
 

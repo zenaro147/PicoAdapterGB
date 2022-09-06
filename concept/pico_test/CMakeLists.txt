@@ -6,7 +6,9 @@ include(pico_sdk_import.cmake)
 project(blink)
 pico_sdk_init()
 #add_executable(blink src/gbsniffer.c)
-add_executable(blink src/wifi8266_AT.c)
+add_executable(blink src/gbsniffer2.c)
+#add_executable(blink src/gbsniffer3.c)
+#add_executable(blink src/wifi8266_AT.c)
  
 # Pull in our pico_stdlib which pulls in commonly used features
 target_link_libraries(blink pico_stdlib)

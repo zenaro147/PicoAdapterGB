@@ -33,7 +33,7 @@
  
 bool speed_240_MHz = false;
 volatile uint64_t time_us_now = 0;
-bool firstDataSet = false;
+volatile uint64_t last_watchdog;
 
 //Test array data
 uint8_t image_data[8] = {9,8,7,6,5,4,3,2};
@@ -51,51 +51,52 @@ static uint8_t process_data(uint8_t data_in) {
     return image_data[array_pointer++];
 }
 
-static inline void trigger_spi(spi_inst_t *spi, uint baudrate, bool mode) {
-    if(mode){
-        // Initialize SPI pins (only first time)
-        gpio_set_function(PIN_SPI_SCK, GPIO_FUNC_SPI), gpio_pull_up(PIN_SPI_SCK);
-        gpio_set_function(PIN_SPI_SIN, GPIO_FUNC_SPI);
-        gpio_set_function(PIN_SPI_SOUT, GPIO_FUNC_SPI);        
+static void gpio_callback(uint gpio, uint32_t events) {
+    static uint8_t recv_data = 0;
+    static uint8_t send_data = 0;
+    static uint8_t recv_bits = 0;
+
+    // on the falling edge set sending bit
+    if (events & GPIO_IRQ_EDGE_FALL) {
+        gpio_put(PIN_SPI_SOUT, send_data), send_data <<= 1;
+        return;
+    }
+    // on the rising edge read received bit
+    recv_data = (recv_data << 1) | (gpio_get(PIN_SPI_SIN) & 0x01);
+
+    time_us_now = time_us_64();
+    if ((time_us_now - last_watchdog) > SEC(15)) {
+        LED_OFF;
+        last_watchdog = time_us_now;
     }
 
-    //spi_init
-    reset_block(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
-    unreset_block_wait(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
-
-    spi_set_baudrate(spi, baudrate);
-    spi_set_format(spi, 8, SPI_CPOL_1, SPI_CPHA_1, SPI_MSB_FIRST);
-    hw_set_bits(&spi_get_hw(spi)->dmacr, SPI_SSPDMACR_TXDMAE_BITS | SPI_SSPDMACR_RXDMAE_BITS);
-    spi_set_slave(spi, true);
-
-    hw_set_bits(&spi_get_hw(spi)->cr1, SPI_SSPCR1_SSE_BITS);
-    
-    // Set the first data into the buffer
-    //spi_get_hw(spi)->dr = set_initial_data();        
+    if (++recv_bits != 8) return;
+    recv_bits = 0;
+    send_data = process_data(recv_data);
 }
 
+static inline void setup_sio() {
+    // init SIO pins
+    gpio_init(PIN_SPI_SCK), gpio_pull_up(PIN_SPI_SCK);
+    gpio_set_dir(PIN_SPI_SCK, GPIO_IN);
+
+    gpio_init(PIN_SPI_SIN);
+    gpio_set_dir(PIN_SPI_SIN, GPIO_IN);
+
+    gpio_init(PIN_SPI_SOUT);
+    gpio_set_dir(PIN_SPI_SOUT, GPIO_OUT);
+    gpio_put(PIN_SPI_SOUT, 0);
+}
 
 void core1_context() {
     irq_set_mask_enabled(0xffffffff, false);
-    //Enable SPI
-    trigger_spi(SPI_PORT,SPI_BAUDRATE,true);
-
-    uint64_t last_readable = time_us_64();
-    firstDataSet = true; //Just make sure to set the data only one
-
+    
+    setup_sio();
+    bool new, old = gpio_get(PIN_SPI_SCK);
     while (true) {
-        time_us_now = time_us_64();
-        if (spi_is_readable(SPI_PORT)) {
-            last_readable = time_us_now;
-            if (firstDataSet){
-                firstDataSet = false;
-            }
-            spi_get_hw(SPI_PORT)->dr = process_data(spi_get_hw(SPI_PORT)->dr);
-        }
-        if (time_us_now - last_readable > MS(300) && !firstDataSet) {
-            trigger_spi(SPI_PORT,SPI_BAUDRATE,false);
-            last_readable = time_us_now;
-            firstDataSet = true;
+        if ((new = gpio_get(PIN_SPI_SCK)) != old) {
+            gpio_callback(PIN_SPI_SCK, (new) ? GPIO_IRQ_EDGE_RISE : GPIO_IRQ_EDGE_FALL);
+            old = new;
         }
     }
 }

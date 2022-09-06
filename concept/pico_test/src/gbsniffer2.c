@@ -51,7 +51,7 @@ static uint8_t process_data(uint8_t data_in) {
     return image_data[array_pointer++];
 }
 
-static inline void trigger_spi(spi_inst_t *spi, bool mode) {
+static inline void trigger_spi(spi_inst_t *spi, uint baudrate, bool mode) {
    
     if(mode){
         // Initialize SPI pins (only first time)
@@ -78,7 +78,7 @@ static inline void trigger_spi(spi_inst_t *spi, bool mode) {
 void core1_context() {
     irq_set_mask_enabled(0xffffffff, false);
     //Enable SPI
-    trigger_spi(SPI_PORT,true);
+    trigger_spi(SPI_PORT,SPI_BAUDRATE,true);
 
     uint64_t last_readable = time_us_64();
     firstDataSet = true; //Just make sure to set the data only one
@@ -92,8 +92,8 @@ void core1_context() {
             }
             spi_get_hw(SPI_PORT)->dr = process_data(spi_get_hw(SPI_PORT)->dr);
         }
-        if (time_us_now - last_readable > MS(200) && !firstDataSet) {
-            trigger_spi(SPI_PORT,false);
+        if (time_us_now - last_readable > MS(300) && !firstDataSet) {
+            trigger_spi(SPI_PORT,SPI_BAUDRATE,false);
             last_readable = time_us_now;
             firstDataSet = true;
         }

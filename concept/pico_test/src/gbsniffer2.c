@@ -9,6 +9,9 @@
 #include "hardware/irq.h"
 #include "hardware/spi.h"
 
+#include "hardware/resets.h"
+#include "hardware/clocks.h"
+
 #define USE_MULTICORE 1
 
 #define LED_PIN         25
@@ -49,25 +52,26 @@ static uint8_t process_data(uint8_t data_in) {
 }
 
 static inline void trigger_spi(spi_inst_t *spi, bool mode) {
-    // deinit SPI
-    spi_deinit(spi);        
-    // init SPI
-    spi_init(SPI_PORT, SPI_BAUDRATE);
-    // Initialize SPI as Slave
-    spi_set_slave(SPI_PORT, true);
-    // Set SPI format
-    spi_set_format(SPI_PORT, 8,SPI_CPOL_1, SPI_CPHA_1, SPI_MSB_FIRST);
+   
     if(mode){
         // Initialize SPI pins (only first time)
         gpio_set_function(PIN_SPI_SCK, GPIO_FUNC_SPI), gpio_pull_up(PIN_SPI_SCK);
-        gpio_set_function(PIN_SPI_SIN, GPIO_FUNC_SPI), gpio_pull_up(PIN_SPI_SIN);
-        gpio_set_function(PIN_SPI_SOUT, GPIO_FUNC_SPI), gpio_pull_down(PIN_SPI_SOUT);        
+        gpio_set_function(PIN_SPI_SIN, GPIO_FUNC_SPI);
+        gpio_set_function(PIN_SPI_SOUT, GPIO_FUNC_SPI);        
     }
-    // Set the first data into the buffer
-    spi_get_hw(SPI_PORT)->dr = set_initial_data();    
-    // Reset SPI to apply new settings    
-    hw_clear_bits(&spi_get_hw(spi)->cr1, SPI_SSPCR1_SSE_BITS);
+
+    reset_block(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
+    unreset_block_wait(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
+
+    spi_set_baudrate(spi, baudrate);
+    spi_set_format(spi, 8, SPI_CPOL_1, SPI_CPHA_1, SPI_MSB_FIRST);
+    hw_set_bits(&spi_get_hw(spi)->dmacr, SPI_SSPDMACR_TXDMAE_BITS | SPI_SSPDMACR_RXDMAE_BITS);
+    spi_set_slave(spi, true);
+
     hw_set_bits(&spi_get_hw(spi)->cr1, SPI_SSPCR1_SSE_BITS);
+    
+    // Set the first data into the buffer
+    //spi_get_hw(spi)->dr = set_initial_data();        
 }
 
 

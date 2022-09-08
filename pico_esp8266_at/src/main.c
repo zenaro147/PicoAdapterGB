@@ -87,6 +87,7 @@ unsigned long millis_latch = 0;
 #define A_UNUSED __attribute__((unused))
 
 void mobile_board_serial_disable(A_UNUSED void *user) {
+    firstDataSet = false;
     spi_deinit(SPI_PORT);
 }
 
@@ -140,7 +141,7 @@ void core1_context() {
     firstDataSet = true; //Just make sure to set the data only one time
 
     while (true) {
-        time_us_now = time_us_64();
+        //time_us_now = time_us_64();
         if (spi_is_readable(SPI_PORT)) {
             last_readable = time_us_now;
             if (firstDataSet){
@@ -149,12 +150,12 @@ void core1_context() {
             //spi_get_hw(SPI_PORT)->dr = process_data(spi_get_hw(SPI_PORT)->dr);
             spi_get_hw(SPI_PORT)->dr = mobile_transfer(&adapter, spi_get_hw(SPI_PORT)->dr);
         }
-        if (time_us_now - last_readable > MS(200) && !firstDataSet) {
-            printf("Reset SPI by Timeout\n");
-            trigger_spi(SPI_PORT,SPI_BAUDRATE,false);
-            last_readable = time_us_now;
-            firstDataSet = true;
-        }
+        //if (time_us_now - last_readable > MS(200) && !firstDataSet) {
+        //    printf("Reset SPI by Timeout\n");
+        //    trigger_spi(SPI_PORT,SPI_BAUDRATE,false);
+        //    last_readable = time_us_now;
+        //    firstDataSet = true;
+        //}
     }
 }
 

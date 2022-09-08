@@ -29,12 +29,16 @@
 #define PIN_SPI_SCK     18
 #define PIN_SPI_SOUT    19 
 
+
+#define CONFIG_OFFSET_MAGB          0 // Up to 256ytes
+#define CONFIG_OFFSET_WIFI_SSID     260 //28bytes (+4 to identify the config, "SSID" in ascii)
+#define CONFIG_OFFSET_WIFI_PASS     292 //28bytes (+4 to identify the config, "PASS" in ascii)
+#define CONFIG_OFFSET_WIFI_SIZE     28 //28bytes (+4 to identify the config, "SSID" in ascii)
+char WiFiSSID[28] = "";
+char WiFiPASS[28] = "";
+
 bool speed_240_MHz = false;
 bool firstDataSet = false;
-
-//Test array data
-uint8_t image_data[8] = {9,8,7,6,5,4,3,2};
-int array_pointer = 0;
 
 uint8_t config_eeprom[FLASH_DATA_SIZE] = {};
 bool haveAdapterConfig = false;
@@ -44,6 +48,13 @@ struct mobile_adapter adapter;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 static uint8_t set_initial_data() {
     return 0xD2;
+}
+
+static uint8_t process_data(uint8_t data_in) {
+    unsigned char data_out;
+    data_out = mobile_transfer(&adapter, spi_get_hw(SPI_PORT)->dr);
+    printf("IN: %02x OUT: %02x\n",data_in,data_out); 
+    return data_out;
 }
 
 static inline void trigger_spi(spi_inst_t *spi, uint baudrate, bool mode) {
@@ -85,20 +96,38 @@ void mobile_board_serial_enable(A_UNUSED void *user) {
 
 bool mobile_board_config_read(A_UNUSED void *user, void *dest, const uintptr_t offset, const size_t size) {
     //for (size_t i = 0; i < size; i++) ((char *)dest)[i] = EEPROM.read(offset + i);
+    ReadFlashConfig(config_eeprom);
+    for(int i = 0; i < size; i++){
+        ((char *)dest)[i] = (char)config_eeprom[i];
+    }
     return true;
 }
 
 bool mobile_board_config_write(A_UNUSED void *user, const void *src, const uintptr_t offset, const size_t size) {
-    //for (size_t i = 0; i < size; i++) EEPROM.write(offset + i, ((char *)src)[i]);
+    //for (size_t i = 0; i < size; i++) EEPROM.write(offset + i, ((char *)src)[i]);    
+    for(int i = 0; i < size; i++){
+        config_eeprom[i] = ((uint8_t *)src)[i];
+    }
+    SaveFlashConfig(config_eeprom);
     return true;
 }
 
-void mobile_board_time_latch(A_UNUSED void *user) {
-    //millis_latch = millis();
+void mobile_board_time_latch(void *user, enum mobile_timers timer) {
+    //millis_latch = millis();    
+
+    //struct mobile_user *mobile = (struct mobile_user *)user;
+    //mobile->bgb_clock_latch[timer] = mobile->bgb_clock;
+    millis_latch = time_us_64();
 }
 
-bool mobile_board_time_check_ms(A_UNUSED void *user, unsigned ms) {
+bool mobile_board_time_check_ms(void *user, enum mobile_timers timer, unsigned ms) {
     //return (millis() - millis_latch) > (unsigned long)ms;
+    
+    //struct mobile_user *mobile = (struct mobile_user *)user;
+    //return
+        //((mobile->bgb_clock - mobile->bgb_clock_latch[timer]) & 0x7FFFFFFF) >=
+        //(uint32_t)((double)ms * (1 << 21) / 1000);
+    return (time_us_64() - millis_latch) > MS(ms);
 }
 
 void core1_context() {
@@ -121,6 +150,7 @@ void core1_context() {
             spi_get_hw(SPI_PORT)->dr = mobile_transfer(&adapter, spi_get_hw(SPI_PORT)->dr);
         }
         if (time_us_now - last_readable > MS(200) && !firstDataSet) {
+            printf("Reset SPI by Timeout\n");
             trigger_spi(SPI_PORT,SPI_BAUDRATE,false);
             last_readable = time_us_now;
             firstDataSet = true;
@@ -132,6 +162,9 @@ void main(){
     speed_240_MHz = set_sys_clock_khz(240000, false);
 
     stdio_init_all();
+
+    memset(WiFiSSID,0x00,sizeof(WiFiSSID));
+    memset(WiFiPASS,0x00,sizeof(WiFiSSID));
 
     uint8_t setConfig = ReadFlashConfig(config_eeprom); 
     switch (setConfig){
@@ -153,6 +186,14 @@ void main(){
         break;
         default:
         break;
+    }
+    if(haveWifiConfig){
+        for(int i = CONFIG_OFFSET_WIFI_SSID; i < CONFIG_OFFSET_WIFI_SSID+CONFIG_OFFSET_WIFI_SIZE; i++){
+            WiFiSSID[i-CONFIG_OFFSET_WIFI_SSID] = (char)config_eeprom[i];
+        }
+        for(int i = CONFIG_OFFSET_WIFI_PASS; i < CONFIG_OFFSET_WIFI_PASS+CONFIG_OFFSET_WIFI_SIZE; i++){
+            WiFiPASS[i-CONFIG_OFFSET_WIFI_PASS] = (char)config_eeprom[i];
+        }
     }
 
     multicore_launch_core1(core1_context);

@@ -6,7 +6,18 @@ include(pico_sdk_import.cmake)
 project(PicoAdapterGB)
 pico_sdk_init()
 
-add_executable(${PROJECT_NAME} src/main.c)
+file (GLOB_RECURSE LibMobile_SOURCES CONFIGURE_DEPENDS "src/libmobile/*.c")
+file (GLOB_RECURSE LibMobile_HEADERS CONFIGURE_DEPENDS "src/libmobile/*.h")
+
+set (LibMobile_INCLUDE_DIRS "")
+foreach (_headerFile ${LibMobile_HEADERS})
+    get_filename_component(_dir ${_headerFile} PATH)
+    list (APPEND LibMobile_INCLUDE_DIRS ${_dir})
+endforeach()
+list (REMOVE_DUPLICATES LibMobile_INCLUDE_DIRS)
+
+add_executable(${PROJECT_NAME} src/main.c ${LibMobile_SOURCES})
+target_include_directories(${PROJECT_NAME} PRIVATE ${LibMobile_INCLUDE_DIRS})
  
 # Pull in our pico_stdlib which pulls in commonly used features
 target_link_libraries(${PROJECT_NAME} pico_stdlib pico_multicore hardware_spi hardware_uart hardware_flash)

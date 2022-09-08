@@ -57,33 +57,24 @@ static uint8_t process_data(uint8_t data_in) {
     return data_out;
 }
 
-static inline void trigger_spi(spi_inst_t *spi, uint baudrate, bool mode) {
-    if(mode){
-        // Initialize SPI pins (only first time)
-        gpio_set_function(PIN_SPI_SCK, GPIO_FUNC_SPI), gpio_pull_up(PIN_SPI_SCK);
-        gpio_set_function(PIN_SPI_SIN, GPIO_FUNC_SPI);
-        gpio_set_function(PIN_SPI_SOUT, GPIO_FUNC_SPI);        
-    }
-
+static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
     //spi_init
     reset_block(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
     unreset_block_wait(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
 
     spi_set_baudrate(spi, baudrate);
-    spi_set_format(spi, 8, SPI_CPOL_1, SPI_CPHA_1, SPI_MSB_FIRST);
+    spi_set_format(spi, 8, SPI_CPOL_1, SPI_CPOL_1, SPI_MSB_FIRST);
     hw_set_bits(&spi_get_hw(spi)->dmacr, SPI_SSPDMACR_TXDMAE_BITS | SPI_SSPDMACR_RXDMAE_BITS);
     spi_set_slave(spi, true);
-
-    hw_set_bits(&spi_get_hw(spi)->cr1, SPI_SSPCR1_SSE_BITS);
     
     // Set the first data into the buffer
-    //spi_get_hw(spi)->dr = set_initial_data();
     spi_get_hw(spi)->dr = 0xD2;
+    firstDataSet = true;
+
+    hw_set_bits(&spi_get_hw(spi)->cr1, SPI_SSPCR1_SSE_BITS);
 }
 
-
 unsigned long millis_latch = 0;
-
 #define A_UNUSED __attribute__((unused))
 
 void mobile_board_serial_disable(A_UNUSED void *user) {
@@ -92,11 +83,10 @@ void mobile_board_serial_disable(A_UNUSED void *user) {
 }
 
 void mobile_board_serial_enable(A_UNUSED void *user) {
-    trigger_spi(SPI_PORT,SPI_BAUDRATE,false);
+    trigger_spi(SPI_PORT,SPI_BAUDRATE);
 }
 
 bool mobile_board_config_read(A_UNUSED void *user, void *dest, const uintptr_t offset, const size_t size) {
-    //for (size_t i = 0; i < size; i++) ((char *)dest)[i] = EEPROM.read(offset + i);
     ReadFlashConfig(config_eeprom);
     for(int i = 0; i < size; i++){
         ((char *)dest)[i] = (char)config_eeprom[i];
@@ -105,11 +95,10 @@ bool mobile_board_config_read(A_UNUSED void *user, void *dest, const uintptr_t o
 }
 
 bool mobile_board_config_write(A_UNUSED void *user, const void *src, const uintptr_t offset, const size_t size) {
-    //for (size_t i = 0; i < size; i++) EEPROM.write(offset + i, ((char *)src)[i]);    
     for(int i = 0; i < size; i++){
         config_eeprom[i] = ((uint8_t *)src)[i];
     }
-    SaveFlashConfig(config_eeprom);
+    //SaveFlashConfig(config_eeprom);
     return true;
 }
 
@@ -134,28 +123,14 @@ bool mobile_board_time_check_ms(void *user, enum mobile_timers timer, unsigned m
 void core1_context() {
     irq_set_mask_enabled(0xffffffff, false);
 
-    //Enable SPI
-    trigger_spi(SPI_PORT,SPI_BAUDRATE,true);
-
-    uint64_t time_us_now, last_readable = time_us_64();
-    firstDataSet = true; //Just make sure to set the data only one time
+    //uint64_t time_us_now, last_readable = time_us_64();
+    //firstDataSet = true; //Just make sure to set the data only one time
 
     while (true) {
-        //time_us_now = time_us_64();
         if (spi_is_readable(SPI_PORT)) {
-            last_readable = time_us_now;
-            if (firstDataSet){
-                firstDataSet = false;
-            }
-            //spi_get_hw(SPI_PORT)->dr = process_data(spi_get_hw(SPI_PORT)->dr);
             spi_get_hw(SPI_PORT)->dr = mobile_transfer(&adapter, spi_get_hw(SPI_PORT)->dr);
+            //spi_get_hw(SPI_PORT)->dr = process_data(spi_get_hw(SPI_PORT)->dr);
         }
-        //if (time_us_now - last_readable > MS(200) && !firstDataSet) {
-        //    printf("Reset SPI by Timeout\n");
-        //    trigger_spi(SPI_PORT,SPI_BAUDRATE,false);
-        //    last_readable = time_us_now;
-        //    firstDataSet = true;
-        //}
     }
 }
 
@@ -163,6 +138,11 @@ void main(){
     speed_240_MHz = set_sys_clock_khz(240000, false);
 
     stdio_init_all();
+
+    // Initialize SPI pins (only first time)
+    gpio_set_function(PIN_SPI_SCK, GPIO_FUNC_SPI), gpio_pull_up(PIN_SPI_SCK);
+    gpio_set_function(PIN_SPI_SIN, GPIO_FUNC_SPI);
+    gpio_set_function(PIN_SPI_SOUT, GPIO_FUNC_SPI);  
 
     memset(WiFiSSID,0x00,sizeof(WiFiSSID));
     memset(WiFiPASS,0x00,sizeof(WiFiSSID));
@@ -188,6 +168,7 @@ void main(){
         default:
         break;
     }
+
     if(haveWifiConfig){
         for(int i = CONFIG_OFFSET_WIFI_SSID; i < CONFIG_OFFSET_WIFI_SSID+CONFIG_OFFSET_WIFI_SIZE; i++){
             WiFiSSID[i-CONFIG_OFFSET_WIFI_SSID] = (char)config_eeprom[i];

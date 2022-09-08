@@ -51,9 +51,10 @@ unsigned char dummy_config[FLASH_DATA_SIZE] = {
 void FormatFlashConfig(){
     printf("Erasing target region... ");
     flash_range_erase(FLASH_TARGET_OFFSET, FLASH_SECTOR_SIZE);
-    uint8_t data_zero[FLASH_DATA_SIZE];
-    memset(data_zero,0x00,sizeof(data_zero));
-    flash_range_program(FLASH_TARGET_OFFSET, data_zero, FLASH_DATA_SIZE);
+    //uint8_t data_zero[FLASH_DATA_SIZE];
+    //memset(data_zero,0x00,sizeof(data_zero));
+    //flash_range_program(FLASH_TARGET_OFFSET, data_zero, FLASH_DATA_SIZE);  
+    //flash_range_program(FLASH_TARGET_OFFSET, dummy_config, FLASH_DATA_SIZE);
     printf("Done.\n");
 }
 
@@ -94,5 +95,4 @@ void SaveFlashConfig(uint8_t * buff){
     //flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);
     printf("Done.\n");
 }
-
 #endif

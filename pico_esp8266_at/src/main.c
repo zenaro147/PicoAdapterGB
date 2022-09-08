@@ -123,6 +123,8 @@ bool mobile_board_time_check_ms(void *user, enum mobile_timers timer, unsigned m
 void core1_context() {
     irq_set_mask_enabled(0xffffffff, false);
 
+    trigger_spi(SPI_PORT,SPI_BAUDRATE);
+
     //uint64_t time_us_now, last_readable = time_us_64();
     //firstDataSet = true; //Just make sure to set the data only one time
 
@@ -139,7 +141,7 @@ void main(){
 
     stdio_init_all();
 
-    // Initialize SPI pins (only first time)
+    // Initialize SPI pins
     gpio_set_function(PIN_SPI_SCK, GPIO_FUNC_SPI), gpio_pull_up(PIN_SPI_SCK);
     gpio_set_function(PIN_SPI_SIN, GPIO_FUNC_SPI);
     gpio_set_function(PIN_SPI_SOUT, GPIO_FUNC_SPI);  
@@ -148,7 +150,7 @@ void main(){
     memset(WiFiPASS,0x00,sizeof(WiFiSSID));
     memset(config_eeprom,0x00,sizeof(config_eeprom));
     //SaveFlashConfig("test");
-    
+    FormatFlashConfig();
 
     uint8_t setConfig = ReadFlashConfig(config_eeprom); 
     switch (setConfig){

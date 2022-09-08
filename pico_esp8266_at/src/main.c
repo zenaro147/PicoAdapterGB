@@ -98,7 +98,7 @@ bool mobile_board_config_write(A_UNUSED void *user, const void *src, const uintp
     for(int i = 0; i < size; i++){
         config_eeprom[i] = ((uint8_t *)src)[i];
     }
-    //SaveFlashConfig(config_eeprom);
+    SaveFlashConfig(config_eeprom);
     return true;
 }
 
@@ -146,6 +146,9 @@ void main(){
 
     memset(WiFiSSID,0x00,sizeof(WiFiSSID));
     memset(WiFiPASS,0x00,sizeof(WiFiSSID));
+    memset(config_eeprom,0x00,sizeof(config_eeprom));
+    //SaveFlashConfig("test");
+    
 
     uint8_t setConfig = ReadFlashConfig(config_eeprom); 
     switch (setConfig){

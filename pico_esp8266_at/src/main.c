@@ -69,7 +69,7 @@ struct mobile_adapter adapter;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////
-//Debug Functions
+//Self-made Debug Functions
 ///////////////////////////////////////
 
 static uint8_t process_data(uint8_t data_in) {
@@ -105,11 +105,6 @@ static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
     hw_set_bits(&spi_get_hw(spi)->cr1, SPI_SSPCR1_SSE_BITS);
 }
 
-
-
-
-
-
 ///////////////////////////////////////
 // Mobile Adapter GB Functions
 ///////////////////////////////////////
@@ -130,28 +125,34 @@ void mobile_board_serial_disable(A_UNUSED void *user) {
 }
 
 void mobile_board_serial_enable(A_UNUSED void *user) {
+    
+    
     //struct mobile_user *mobile = (struct mobile_user *)user;
     //pthread_mutex_unlock(&mobile->mutex_serial);
     trigger_spi(SPI_PORT,SPI_BAUDRATE);
 }
 
 bool mobile_board_config_read(A_UNUSED void *user, void *dest, const uintptr_t offset, const size_t size) {
+    //for (size_t i = 0; i < size; i++) ((char *)dest)[i] = EEPROM.read(offset + i);
+    
     //struct mobile_user *mobile = (struct mobile_user *)user;
     //fseek(mobile->config, offset, SEEK_SET);
     //return fread(dest, 1, size, mobile->config) == size;    
     ReadFlashConfig(config_eeprom);
     for(int i = 0; i < size; i++){
-        ((char *)dest)[i] = (char)config_eeprom[i];
+        ((char *)dest)[i] = (char)config_eeprom[offset + i];
     }
     return true;
 }
 
 bool mobile_board_config_write(A_UNUSED void *user, const void *src, const uintptr_t offset, const size_t size) {
+    //for (size_t i = 0; i < size; i++) EEPROM.write(offset + i, ((char *)src)[i]);
+    
     //struct mobile_user *mobile = (struct mobile_user *)user;
     //fseek(mobile->config, offset, SEEK_SET);
     //return fwrite(src, 1, size, mobile->config) == size;
     for(int i = 0; i < size; i++){
-        config_eeprom[i] = ((uint8_t *)src)[i];
+        config_eeprom[offset + i] = ((uint8_t *)src)[i];
     }
     SaveFlashConfig(config_eeprom);
     return true;
@@ -211,8 +212,8 @@ void main(){
     memset(WiFiSSID,0x00,sizeof(WiFiSSID));
     memset(WiFiPASS,0x00,sizeof(WiFiSSID));
     memset(config_eeprom,0x00,sizeof(config_eeprom));
-    //SaveFlashConfig("test");
-    FormatFlashConfig();
+    SaveFlashConfig("test");
+    //FormatFlashConfig();
 
     uint8_t setConfig = ReadFlashConfig(config_eeprom); 
     switch (setConfig){
@@ -245,8 +246,8 @@ void main(){
         }
     }else{
         //Set a Default value (need to create a method to configure this setttings later. Maybe a dual boot with a custom GB rom?)
-        sprintf(WiFiSSID,"SSIDWiFi_Network");
-        sprintf(WiFiPASS,"PASSP@$$w0rd");
+        sprintf(WiFiSSID,"SSID%s","WiFi_Network");
+        sprintf(WiFiPASS,"PASS%s","P@$$w0rd");
         for(int i = CONFIG_OFFSET_WIFI_SSID-4; i < CONFIG_OFFSET_WIFI_SSID+CONFIG_OFFSET_WIFI_SIZE; i++){
             config_eeprom[i] = WiFiSSID[i-CONFIG_OFFSET_WIFI_SSID];
         }

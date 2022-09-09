@@ -54,6 +54,18 @@ bool haveAdapterConfig = false;
 bool haveWifiConfig = false;
 
 struct mobile_adapter adapter;
+//struct mobile_adapter_config adapter_config = MOBILE_ADAPTER_CONFIG_DEFAULT;
+//struct mobile_user {
+//    pthread_mutex_t mutex_serial;
+//    pthread_mutex_t mutex_cond;
+//    pthread_cond_t cond;
+//    struct mobile_adapter adapter;
+//    enum mobile_action action;
+//    FILE *config;
+//    _Atomic uint32_t bgb_clock;
+//    _Atomic uint32_t bgb_clock_latch[MOBILE_MAX_TIMERS];
+//    int sockets[MOBILE_MAX_CONNECTIONS];
+//};
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////
@@ -105,16 +117,28 @@ static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
 unsigned long millis_latch = 0;
 #define A_UNUSED __attribute__((unused))
 
+void mobile_board_debug_log(void *user, const char *line){
+    (void)user;
+    fprintf(stderr, "%s\n", line);
+}
+
 void mobile_board_serial_disable(A_UNUSED void *user) {
+    //struct mobile_user *mobile = (struct mobile_user *)user;
+    //pthread_mutex_lock(&mobile->mutex_serial);
     firstDataSet = false;
     spi_deinit(SPI_PORT);
 }
 
 void mobile_board_serial_enable(A_UNUSED void *user) {
+    //struct mobile_user *mobile = (struct mobile_user *)user;
+    //pthread_mutex_unlock(&mobile->mutex_serial);
     trigger_spi(SPI_PORT,SPI_BAUDRATE);
 }
 
 bool mobile_board_config_read(A_UNUSED void *user, void *dest, const uintptr_t offset, const size_t size) {
+    //struct mobile_user *mobile = (struct mobile_user *)user;
+    //fseek(mobile->config, offset, SEEK_SET);
+    //return fread(dest, 1, size, mobile->config) == size;    
     ReadFlashConfig(config_eeprom);
     for(int i = 0; i < size; i++){
         ((char *)dest)[i] = (char)config_eeprom[i];
@@ -123,6 +147,9 @@ bool mobile_board_config_read(A_UNUSED void *user, void *dest, const uintptr_t o
 }
 
 bool mobile_board_config_write(A_UNUSED void *user, const void *src, const uintptr_t offset, const size_t size) {
+    //struct mobile_user *mobile = (struct mobile_user *)user;
+    //fseek(mobile->config, offset, SEEK_SET);
+    //return fwrite(src, 1, size, mobile->config) == size;
     for(int i = 0; i < size; i++){
         config_eeprom[i] = ((uint8_t *)src)[i];
     }
@@ -148,6 +175,13 @@ bool mobile_board_time_check_ms(void *user, enum mobile_timers timer, unsigned m
     return (time_us_64() - millis_latch) > MS(ms);
 }
 
+bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){}
+void mobile_board_sock_close(void *user, unsigned conn){}
+int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){}
+bool mobile_board_sock_listen(void *user, unsigned conn){}
+bool mobile_board_sock_accept(void *user, unsigned conn){}
+int mobile_board_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){}
+int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){}
 
 ///////////////////////////////////////
 // Mais Functions and Core 1 Loop
@@ -225,6 +259,7 @@ void main(){
     //Need to AT the AT functions to connect to the WiFi
     //////////////////////////////////
 
+    //mobile_init(&mobile->adapter, mobile, &adapter_config);
     mobile_init(&adapter, NULL, NULL);
     multicore_launch_core1(core1_context);
 

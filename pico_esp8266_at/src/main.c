@@ -1,3 +1,12 @@
+////////////////////////////////////
+// - Need to fix the "eeprom" issue during the config request (maybe put the config at the end of the flash?)
+// - Add the mobile_board_sock_* functions to handle the Request functions (only the necessary for now) - https://discord.com/channels/375413108467957761/541384270636384259/1017548420866654280
+// -- Docs about AT commands 
+// ---- https://www.espressif.com/sites/default/files/documentation/4a-esp8266_at_instruction_set_en.pdf
+// ---- https://github.com/espressif/ESP8266_AT/wiki/ATE
+// ---- https://docs.espressif.com/projects/esp-at/en/latest/esp32/AT_Command_Set/Basic_AT_Commands.htm
+////////////////////////////////////
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,8 +43,8 @@
 #define CONFIG_OFFSET_WIFI_SSID     260 //28bytes (+4 to identify the config, "SSID" in ascii)
 #define CONFIG_OFFSET_WIFI_PASS     292 //28bytes (+4 to identify the config, "PASS" in ascii)
 #define CONFIG_OFFSET_WIFI_SIZE     28 //28bytes (+4 to identify the config, "SSID" in ascii)
-char WiFiSSID[28] = "";
-char WiFiPASS[28] = "";
+char WiFiSSID[32] = "";
+char WiFiPASS[32] = "";
 
 bool speed_240_MHz = false;
 bool firstDataSet = false;
@@ -46,15 +55,25 @@ bool haveWifiConfig = false;
 
 struct mobile_adapter adapter;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-static uint8_t set_initial_data() {
-    return 0xD2;
-}
+
+///////////////////////////////////////
+//Debug Functions
+///////////////////////////////////////
 
 static uint8_t process_data(uint8_t data_in) {
     unsigned char data_out;
     data_out = mobile_transfer(&adapter, spi_get_hw(SPI_PORT)->dr);
     printf("IN: %02x OUT: %02x\n",data_in,data_out); 
     return data_out;
+}
+
+///////////////////////////////////////
+// SPI Functions
+///////////////////////////////////////
+
+static uint8_t set_initial_data() {
+    //Keeping this function if needs to do something during this call 
+    return 0xD2;
 }
 
 static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
@@ -68,11 +87,20 @@ static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
     spi_set_slave(spi, true);
     
     // Set the first data into the buffer
-    spi_get_hw(spi)->dr = 0xD2;
+    spi_get_hw(spi)->dr = set_initial_data();
     firstDataSet = true;
 
     hw_set_bits(&spi_get_hw(spi)->cr1, SPI_SSPCR1_SSE_BITS);
 }
+
+
+
+
+
+
+///////////////////////////////////////
+// Mobile Adapter GB Functions
+///////////////////////////////////////
 
 unsigned long millis_latch = 0;
 #define A_UNUSED __attribute__((unused))
@@ -120,14 +148,14 @@ bool mobile_board_time_check_ms(void *user, enum mobile_timers timer, unsigned m
     return (time_us_64() - millis_latch) > MS(ms);
 }
 
+
+///////////////////////////////////////
+// Mais Functions and Core 1 Loop
+///////////////////////////////////////
+
 void core1_context() {
     irq_set_mask_enabled(0xffffffff, false);
-
-    trigger_spi(SPI_PORT,SPI_BAUDRATE);
-
-    //uint64_t time_us_now, last_readable = time_us_64();
-    //firstDataSet = true; //Just make sure to set the data only one time
-
+    //trigger_spi(SPI_PORT,SPI_BAUDRATE);
     while (true) {
         if (spi_is_readable(SPI_PORT)) {
             spi_get_hw(SPI_PORT)->dr = mobile_transfer(&adapter, spi_get_hw(SPI_PORT)->dr);
@@ -143,8 +171,8 @@ void main(){
 
     // Initialize SPI pins
     gpio_set_function(PIN_SPI_SCK, GPIO_FUNC_SPI), gpio_pull_up(PIN_SPI_SCK);
-    gpio_set_function(PIN_SPI_SIN, GPIO_FUNC_SPI);
-    gpio_set_function(PIN_SPI_SOUT, GPIO_FUNC_SPI);  
+    gpio_set_function(PIN_SPI_SIN, GPIO_FUNC_SPI), gpio_pull_up(PIN_SPI_SIN);
+    gpio_set_function(PIN_SPI_SOUT, GPIO_FUNC_SPI), gpio_pull_down(PIN_SPI_SOUT);
 
     memset(WiFiSSID,0x00,sizeof(WiFiSSID));
     memset(WiFiPASS,0x00,sizeof(WiFiSSID));
@@ -181,11 +209,24 @@ void main(){
         for(int i = CONFIG_OFFSET_WIFI_PASS; i < CONFIG_OFFSET_WIFI_PASS+CONFIG_OFFSET_WIFI_SIZE; i++){
             WiFiPASS[i-CONFIG_OFFSET_WIFI_PASS] = (char)config_eeprom[i];
         }
+    }else{
+        //Set a Default value (need to create a method to configure this setttings later. Maybe a dual boot with a custom GB rom?)
+        sprintf(WiFiSSID,"SSIDWiFi_Network");
+        sprintf(WiFiPASS,"PASSP@$$w0rd");
+        for(int i = CONFIG_OFFSET_WIFI_SSID-4; i < CONFIG_OFFSET_WIFI_SSID+CONFIG_OFFSET_WIFI_SIZE; i++){
+            config_eeprom[i] = WiFiSSID[i-CONFIG_OFFSET_WIFI_SSID];
+        }
+        for(int i = CONFIG_OFFSET_WIFI_PASS-4; i < CONFIG_OFFSET_WIFI_PASS+CONFIG_OFFSET_WIFI_SIZE; i++){
+            config_eeprom[i] = WiFiPASS[i-CONFIG_OFFSET_WIFI_PASS];
+        }
     }
 
-    multicore_launch_core1(core1_context);
-    
+    //////////////////////////////////
+    //Need to AT the AT functions to connect to the WiFi
+    //////////////////////////////////
+
     mobile_init(&adapter, NULL, NULL);
+    multicore_launch_core1(core1_context);
 
     while (true) {
         mobile_loop(&adapter);

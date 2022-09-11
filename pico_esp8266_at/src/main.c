@@ -207,7 +207,7 @@ void main(){
     memset(WiFiSSID,0x00,sizeof(WiFiSSID));
     memset(WiFiPASS,0x00,sizeof(WiFiSSID));
     memset(config_eeprom,0x00,sizeof(config_eeprom));
-    SaveFlashConfig("test");
+    //SaveFlashConfig("test");
     //FormatFlashConfig();
 
     uint8_t setConfig = ReadFlashConfig(config_eeprom); 

@@ -47,11 +47,11 @@ char WiFiSSID[32] = "";
 char WiFiPASS[32] = "";
 
 bool speed_240_MHz = false;
-bool firstDataSet = false;
 
 uint8_t config_eeprom[FLASH_DATA_SIZE] = {};
 bool haveAdapterConfig = false;
 bool haveWifiConfig = false;
+bool haveConfigToWrite = false;
 
 struct mobile_adapter adapter;
 //struct mobile_adapter_config adapter_config = MOBILE_ADAPTER_CONFIG_DEFAULT;
@@ -100,7 +100,6 @@ static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
     
     // Set the first data into the buffer
     spi_get_hw(spi)->dr = set_initial_data();
-    firstDataSet = true;
 
     hw_set_bits(&spi_get_hw(spi)->cr1, SPI_SSPCR1_SSE_BITS);
 }
@@ -120,13 +119,15 @@ void mobile_board_debug_log(void *user, const char *line){
 void mobile_board_serial_disable(A_UNUSED void *user) {
     //struct mobile_user *mobile = (struct mobile_user *)user;
     //pthread_mutex_lock(&mobile->mutex_serial);
-    firstDataSet = false;
     spi_deinit(SPI_PORT);
+    
+    if(haveConfigToWrite){
+        SaveFlashConfig(config_eeprom);
+        haveConfigToWrite = false;
+    }
 }
 
-void mobile_board_serial_enable(A_UNUSED void *user) {
-    
-    
+void mobile_board_serial_enable(A_UNUSED void *user) {  
     //struct mobile_user *mobile = (struct mobile_user *)user;
     //pthread_mutex_unlock(&mobile->mutex_serial);
     trigger_spi(SPI_PORT,SPI_BAUDRATE);
@@ -137,8 +138,7 @@ bool mobile_board_config_read(A_UNUSED void *user, void *dest, const uintptr_t o
     
     //struct mobile_user *mobile = (struct mobile_user *)user;
     //fseek(mobile->config, offset, SEEK_SET);
-    //return fread(dest, 1, size, mobile->config) == size;    
-    ReadFlashConfig(config_eeprom);
+    //return fread(dest, 1, size, mobile->config) == size;
     for(int i = 0; i < size; i++){
         ((char *)dest)[i] = (char)config_eeprom[offset + i];
     }
@@ -154,7 +154,7 @@ bool mobile_board_config_write(A_UNUSED void *user, const void *src, const uintp
     for(int i = 0; i < size; i++){
         config_eeprom[offset + i] = ((uint8_t *)src)[i];
     }
-    SaveFlashConfig(config_eeprom);
+    haveConfigToWrite = true;
     return true;
 }
 

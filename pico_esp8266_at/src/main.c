@@ -120,11 +120,6 @@ void mobile_board_serial_disable(A_UNUSED void *user) {
     //struct mobile_user *mobile = (struct mobile_user *)user;
     //pthread_mutex_lock(&mobile->mutex_serial);
     spi_deinit(SPI_PORT);
-    
-    if(haveConfigToWrite){
-        SaveFlashConfig(config_eeprom);
-        haveConfigToWrite = false;
-    }
 }
 
 void mobile_board_serial_enable(A_UNUSED void *user) {  
@@ -266,5 +261,10 @@ void main(){
 
     while (true) {
         mobile_loop(&adapter);
+
+        if(haveConfigToWrite && !spi_is_readable(SPI_PORT)){
+            SaveFlashConfig(config_eeprom);
+            haveConfigToWrite = false;
+        }
     }
 }

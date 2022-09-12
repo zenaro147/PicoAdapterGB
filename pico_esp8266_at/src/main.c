@@ -26,18 +26,24 @@
 
 #include "libmobile/mobile.h"
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+bool speed_240_MHz = false;
 
 #define MKS(A)                  (A)
 #define MS(A)                   ((A) * 1000)
 #define SEC(A)                  ((A) * 1000 * 1000)
 
-// SPI mode
+// SPI pins
 #define SPI_PORT        spi0
 #define SPI_BAUDRATE    64 * 1024 * 8
 #define PIN_SPI_SIN     16
 #define PIN_SPI_SCK     18
 #define PIN_SPI_SOUT    19 
 
+//UART pins
+#define UART_ID uart1
+#define BAUD_RATE 115200
+#define UART_TX_PIN 4
+#define UART_RX_PIN 5
 
 #define CONFIG_OFFSET_MAGB          0 // Up to 256ytes
 #define CONFIG_OFFSET_WIFI_SSID     260 //28bytes (+4 to identify the config, "SSID" in ascii)
@@ -45,8 +51,10 @@
 #define CONFIG_OFFSET_WIFI_SIZE     28 //28bytes (+4 to identify the config, "SSID" in ascii)
 char WiFiSSID[32] = "";
 char WiFiPASS[32] = "";
+bool isESPDetected = false;
 
-bool speed_240_MHz = false;
+#define MAGB_HOST "192.168.0.126"
+#define MAGB_PORT 80
 
 uint8_t config_eeprom[FLASH_DATA_SIZE] = {};
 bool haveAdapterConfig = false;
@@ -117,23 +125,14 @@ void mobile_board_debug_log(void *user, const char *line){
 }
 
 void mobile_board_serial_disable(A_UNUSED void *user) {
-    //struct mobile_user *mobile = (struct mobile_user *)user;
-    //pthread_mutex_lock(&mobile->mutex_serial);
     spi_deinit(SPI_PORT);
 }
 
 void mobile_board_serial_enable(A_UNUSED void *user) {  
-    //struct mobile_user *mobile = (struct mobile_user *)user;
-    //pthread_mutex_unlock(&mobile->mutex_serial);
     trigger_spi(SPI_PORT,SPI_BAUDRATE);
 }
 
 bool mobile_board_config_read(A_UNUSED void *user, void *dest, const uintptr_t offset, const size_t size) {
-    //for (size_t i = 0; i < size; i++) ((char *)dest)[i] = EEPROM.read(offset + i);
-    
-    //struct mobile_user *mobile = (struct mobile_user *)user;
-    //fseek(mobile->config, offset, SEEK_SET);
-    //return fread(dest, 1, size, mobile->config) == size;
     for(int i = 0; i < size; i++){
         ((char *)dest)[i] = (char)config_eeprom[offset + i];
     }
@@ -141,11 +140,6 @@ bool mobile_board_config_read(A_UNUSED void *user, void *dest, const uintptr_t o
 }
 
 bool mobile_board_config_write(A_UNUSED void *user, const void *src, const uintptr_t offset, const size_t size) {
-    //for (size_t i = 0; i < size; i++) EEPROM.write(offset + i, ((char *)src)[i]);
-    
-    //struct mobile_user *mobile = (struct mobile_user *)user;
-    //fseek(mobile->config, offset, SEEK_SET);
-    //return fwrite(src, 1, size, mobile->config) == size;
     for(int i = 0; i < size; i++){
         config_eeprom[offset + i] = ((uint8_t *)src)[i];
     }
@@ -154,20 +148,10 @@ bool mobile_board_config_write(A_UNUSED void *user, const void *src, const uintp
 }
 
 void mobile_board_time_latch(void *user, enum mobile_timers timer) {
-    //millis_latch = millis();    
-
-    //struct mobile_user *mobile = (struct mobile_user *)user;
-    //mobile->bgb_clock_latch[timer] = mobile->bgb_clock;
     millis_latch = time_us_64();
 }
 
 bool mobile_board_time_check_ms(void *user, enum mobile_timers timer, unsigned ms) {
-    //return (millis() - millis_latch) > (unsigned long)ms;
-    
-    //struct mobile_user *mobile = (struct mobile_user *)user;
-    //return
-        //((mobile->bgb_clock - mobile->bgb_clock_latch[timer]) & 0x7FFFFFFF) >=
-        //(uint32_t)((double)ms * (1 << 21) / 1000);
     return (time_us_64() - millis_latch) > MS(ms);
 }
 
@@ -180,7 +164,7 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
 int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){}
 
 ///////////////////////////////////////
-// Mais Functions and Core 1 Loop
+// Main Functions and Core 1 Loop
 ///////////////////////////////////////
 
 void core1_context() {
@@ -251,20 +235,79 @@ void main(){
         }
     }
 
-    //////////////////////////////////
-    //Need to AT the AT functions to connect to the WiFi
-    //////////////////////////////////
-
-    //mobile_init(&mobile->adapter, mobile, &adapter_config);
-    mobile_init(&adapter, NULL, NULL);
-    multicore_launch_core1(core1_context);
-
-    while (true) {
-        mobile_loop(&adapter);
-
-        if(haveConfigToWrite && !spi_is_readable(SPI_PORT)){
-            SaveFlashConfig(config_eeprom);
-            haveConfigToWrite = false;
+//////////////////////
+// CONFIGURE THE ESP
+//////////////////////
+    isESPDetected = EspAT_Init(UART_ID, BAUD_RATE, UART_TX_PIN, UART_RX_PIN);
+    if(isESPDetected){
+        //test connection - Check 2 times in case the ESP return some echo 
+        FlushATBuff(); // Reset RX Buffer
+        SendESPcmd(UART_ID,"AT");
+        char * resp = ReadESPcmd(SEC(1));
+        if(strcmp(resp, "OK") == 0){
+            printf("ESP-01 Connectivity: OK\n");
+        }else{        
+            printf("ESP-01 Connectivity: ERROR || Retrying...\n");
+            resp = ReadESPcmd(SEC(1));
+            if(strcmp(resp, "OK") == 0){
+                printf("ESP-01 Connectivity: OK\n");
+            }else{        
+                printf("ESP-01 Connectivity: ERROR\n");
+            }
         }
+
+        // Disable echo - Check 2 times in case the ESP return some echo 
+        SendESPcmd(UART_ID,"ATE0");
+        resp = ReadESPcmd(SEC(2));
+        if(strcmp(resp, "OK") == 0){
+            printf("ESP-01 Disable Echo: OK\n");
+        }else{        
+            printf("ESP-01 Disable Echo: ERROR || Retrying...\n");
+            resp = ReadESPcmd(SEC(2));
+            if(strcmp(resp, "OK") == 0){
+                printf("ESP-01 Disable Echo: OK\n");
+            }else{        
+                printf("ESP-01 Disable Echo: ERROR\n");
+            }
+        }
+
+        // Set to Passive Mode to receive TCP info
+        // AT+CIPRECVDATA=<size> | read the X amount of data from esp buffer
+        // AT+CIPRECVLEN? | return the remaining  buffer size like this +CIPRECVLEN:636,0,0,0,0)
+        // Also can read the actual size reading the +IPD value from "AT+CIPSEND" output: \r\n\r\nRecv 60 bytes\r\n\r\nSEND OK\r\n\r\n+IPD,636\r\nCLOSED\r\n
+        SendESPcmd(UART_ID, "AT+CIPRECVMODE=1");
+        resp = ReadESPcmd(SEC(2));
+        if(strcmp(resp, "OK") == 0){
+            printf("ESP-01 Passive Mode: OK\n");
+        }else{        
+            printf("ESP-01 Passive Mode: ERROR\n");
+        }
+
+        isConnectedWiFi = ConnectESPWiFi(UART_ID, WiFiSSID, WiFiPASS,SEC(10));
+        if(!isConnectedWiFi){
+            printf("ESP-01 Connecting Wifi: ERROR\n");
+        }
+    }
+//////////////////
+// END CONFIGURE
+//////////////////
+    if(isConnectedWiFi){
+        //mobile_init(&mobile->adapter, mobile, &adapter_config);
+        mobile_init(&adapter, NULL, NULL);
+        multicore_launch_core1(core1_context);
+
+        while (true) {
+            mobile_loop(&adapter);
+
+            if(haveConfigToWrite && !spi_is_readable(SPI_PORT)){
+                SaveFlashConfig(config_eeprom);
+                haveConfigToWrite = false;
+            }
+        }
+
+        //bool reqStatus = SendESPGetReq(UART_ID, MAGB_HOST, MAGB_PORT, "/01/CGB-B9AJ/index.php");
+        //bool reqStatus = SendESPGetReq(UART_ID, MAGB_HOST, MAGB_PORT, "/cgb/download?name=/01/CGB-BXTJ/tamago/tamago0a.pkm"); 
+        //bool reqStatus = SendESPGetReq(UART_ID, MAGB_HOST, MAGB_PORT, "/01/CGB-BXTJ/tamago/tamago0a.pkm");        
+        //ReadESPGetReq(UART_ID,700); //The value will be stored into buffGETReq array
     }
 }

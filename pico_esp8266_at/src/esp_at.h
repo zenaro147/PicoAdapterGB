@@ -43,7 +43,7 @@ void on_uart_rx(){
 }
 
 // Run a little timeout instead sleep (to prevent any block to the RX interrupt)
-void RunTimeout(int timeout){
+void Delay_Timer(int timeout){
     volatile uint64_t timenow = 0;
     volatile uint64_t last_read = 0;
     timenow = time_us_64();
@@ -70,7 +70,7 @@ void SendESPcmd(uart_inst_t *uart, const char *command){
 // Read the internal RX buffer with the received data from ESP
 char * ReadESPcmd(int timeout){
     char buff_answer[BUFF_AT_SIZE/4] = {};
-    RunTimeout(timeout); // Just run a little timeout to give some time to fill the Buffer
+    Delay_Timer(timeout); // Just run a little timeout to give some time to fill the Buffer
     if(strlen(buffATrx) > 0 && buffATrx_pointer > 0){
         char buffATrx_cpy[sizeof(buffATrx)] = {};
         
@@ -85,13 +85,15 @@ char * ReadESPcmd(int timeout){
         }
         i++; //Skip the pipe delimiter to the next character
 
-        if(buffATrx[i] != '\0'){        
+        if(buffATrx[i] != '\0'){
+            //Remove the answer from RX buffer and let only the unread messages
             memset(buffATrx,'\0',sizeof(buffATrx));
             for(int x = i; x < strlen(buffATrx_cpy) ;x++){
                 buffATrx[x-i] = buffATrx_cpy[x];
             }
         }else{
-            FlushATBuff(); //Reset the Buffer if has no messages
+            //Reset the Buffer if has no messages
+            FlushATBuff(); 
         }
     }
 
@@ -208,7 +210,7 @@ void ReadESPGetReq(uart_inst_t * uart, int dataSize){
             sprintf(cmdRead,"AT+CIPRECVDATA=%i",dataSize);
             ishttpRequest=true;
             SendESPcmd(uart,cmdRead); //Must igonre the OK at the end, and the "+CIPRECVDATA,<size>:" at the beginning
-            RunTimeout(5*1000*1000); //5 sec. Give time to feed the buffer    
+            Delay_Timer(5*1000*1000); //5 sec. Give time to feed the buffer    
             ishttpRequest=false;
             int cmdReadSize = strlen(cmdRead)+1;
             for(int i = cmdReadSize; i < buffATrx_pointer-6; i++){
@@ -268,30 +270,26 @@ bool GetESPHostConn(uart_inst_t * uart){
 
 void CloseESPGetReq(uart_inst_t * uart){
     SendESPcmd(uart,"AT+CIPCLOSE");
-    RunTimeout(2*1000*1000); // 2 seconds
+    Delay_Timer(2*1000*1000); // 2 seconds
     FlushATBuff(); // Clean any output. We don't need it.
     GetESPHostConn(uart);
 }
 
 // Initialize the ESP-01 UART communication
-void EspAT_Init(uart_inst_t * uart, int baudrate, int txpin, int rxpin){
+bool EspAT_Init(uart_inst_t * uart, int baudrate, int txpin, int rxpin){
     // Set up our UART with the required speed.
     int baud = uart_init(uart, baudrate);
     bool isenabled = uart_is_enabled(uart);
 
-    if(uart == uart0){
-        use_uart0 = true;
-    }else{
-        use_uart0 = false;
-    }
-
-    uart_set_fifo_enabled(uart,false);
-    uart_set_format(uart,8,1,0);
-    uart_set_hw_flow(uart,false,false); 
-
+    use_uart0 = (uart == uart0 ? true : false);
+    
     // Set the TX and RX pins by using the function select on the GPIO
     gpio_set_function(txpin, GPIO_FUNC_UART);
     gpio_set_function(rxpin, GPIO_FUNC_UART);
+
+    uart_set_fifo_enabled(uart,false);
+    uart_set_format(uart,8,1,0);
+    uart_set_hw_flow(uart,false,false);     
 
     // Set up a RX interrupt
     // Select correct interrupt for the UART we are using
@@ -305,14 +303,18 @@ void EspAT_Init(uart_inst_t * uart, int baudrate, int txpin, int rxpin){
     uart_set_irq_enables(uart, true, false);
 
     printf("Uart Baudrate: %i \n",baud);
-    printf("Uart Enabled: %i \n",(uint8_t)isenabled); 
+    printf("Uart Enabled: %i \n",(uint8_t)isenabled);
+    return isenabled;
 }
 
 // Provides the necessary commands to connect the ESP to a WiFi network
 bool ConnectESPWiFi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int timeout){
-    // Set WiFi Mode to Station 
+    
+    //AT+CIPMUX=1
+    
+    // Set WiFi Mode to Station mode Only
     SendESPcmd(uart,"AT+CWMODE=1");
-    char * resp = ReadESPcmd(2*1000*1000); // 2 seconds
+    char * resp = ReadESPcmd(1*1000*1000); // 1 second
     if(strcmp(resp, "OK") == 0){
         printf("ESP-01 Station Mode: OK\n");
         // Prepare the command to send
@@ -321,28 +323,15 @@ bool ConnectESPWiFi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int 
         sprintf(espComm,"AT+CWJAP=\"%s\",\"%s\"",SSID_WiFi,Pass_WiFi);
         SendESPcmd(uart, espComm);
 
-        resp = ReadESPcmd(timeout); // 10 seconds
+        resp = ReadESPcmd(timeout);
         while (true){
-            if(strcmp(resp, "WIFI DISCONNECT") == 0){
-                printf("ESP-01 Connecting Wifi: DISCONNECTED\n");
+            printf("ESP-01 Connecting Wifi: %s\n", resp);
+            if(strcmp(resp, "OK") == 0){
+                return true;
             }else{
-                if(strcmp(resp, "WIFI CONNECTED") == 0){
-                    printf("ESP-01 Connecting Wifi: CONNECTED\n");
-                }else{
-                    if(strcmp(resp, "WIFI GOT IP") == 0){
-                        printf("ESP-01 Connecting Wifi: GOT IP\n");
-                    }else{
-                        if(strcmp(resp, "OK") == 0){
-                            printf("ESP-01 Connecting Wifi: OK\n");
-                            return true;
-                        }else{
-                            printf("ESP-01 Connecting Wifi: ERROR\n");
-                            return false;
-                        }                        
-                    }
-                }
+                return false;
             }
-            resp = ReadESPcmd(2*1000*1000); // 2 seconds
+            resp = ReadESPcmd(1*1000*1000); // 2 seconds
         }
     }else{        
         printf("ESP-01 Station Mode: ERROR\n");

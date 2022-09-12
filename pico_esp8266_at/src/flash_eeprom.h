@@ -91,8 +91,8 @@ uint8_t ReadFlashConfig(uint8_t * buff){
 void SaveFlashConfig(uint8_t * buff){
     printf("Programming target region... ");
     //FormatFlashConfig();
-    flash_range_program(FLASH_TARGET_OFFSET, dummy_config, FLASH_DATA_SIZE);
-    //flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);
+    //flash_range_program(FLASH_TARGET_OFFSET, dummy_config, FLASH_DATA_SIZE);
+    flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);
     printf("Done.\n");
 }
 #endif

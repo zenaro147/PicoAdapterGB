@@ -8,8 +8,8 @@ Based on: [Libmobile](https://github.com/REONTeam/libmobile-atmega) by [REON Tea
 * Gameboy can recognize Pico as a Mobile Device
 * Can read the Mobile Adapter config on flash (since Pico don't have an EEPROM)
 * The Pokemon Crystal sefl-trade using Mobile Adapter (just to test the trade function)
+* Save Mobile Trainer Config into Flash (eeprom-like)
 
 ### What need to do:
-* Find the right time to write the config into flash again
 * Implement all mobile_board_sock_* functions to communicate with remote servers
-* Basically, everything!
+* Basically, everything!😅

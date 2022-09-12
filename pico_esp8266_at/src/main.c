@@ -115,7 +115,22 @@ static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
 ///////////////////////////////////////
 // Mobile Adapter GB Functions
 ///////////////////////////////////////
+/*
+you don't need to support everything it says right out of the gate, for example IPv6 isn't used currently.
+and UDP is only necessary for DNS
+similarly the bind() functionality is only used for receiving calls.
+so you can just check for all the things you don't support and return errors for now 
+This API might not map exactly to the AT commands the ESP has but it should be close-ish
+For example, sock_open() should do nothing in your case but initialize a structure that keeps track of the socket's type, and then when sock_connect() is called, AT+CIPSTART needs to be called with the socket type specified in sock_open() and the address specified in sock_connect().
+Same for sock_listen() but the AT command would be AT+CIPSERVER
+sock_accept() would check if anything has connected to the AT+CIPSERVER socket
+All of sock_connect(), sock_listen() and sock_accept() are for TCP
+For UDP the destination address is specified in sock_send(), and apparently this mirrors the AT+CIPSENDEX command.
+Similarly for TCP connections sock_send() is an AT+CIPSEND command.
+sock_recv() would depend on whether you're using active or passive mode for receiving, but I'm seeing there's no passive mode reception command for UDP which might be an issue.
+sock_recv() is also a funky one because it needs to signal to libmobile whether the connection has been closed (if it's a TCP connection) and it needs to know where the message came from (especially for UDP sockets) 
 
+*/
 unsigned long millis_latch = 0;
 #define A_UNUSED __attribute__((unused))
 

@@ -325,11 +325,24 @@ bool ConnectESPWiFi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int 
 
         resp = ReadESPcmd(timeout);
         while (true){
-            printf("ESP-01 Connecting Wifi: %s\n", resp);
-            if(strcmp(resp, "OK") == 0){
-                return true;
+            if(strcmp(resp, "WIFI DISCONNECT") == 0){
+                printf("ESP-01 Connecting Wifi: DISCONNECTED\n");
             }else{
-                return false;
+                if(strcmp(resp, "WIFI CONNECTED") == 0){
+                    printf("ESP-01 Connecting Wifi: CONNECTED\n");
+                }else{
+                    if(strcmp(resp, "WIFI GOT IP") == 0){
+                        printf("ESP-01 Connecting Wifi: GOT IP\n");
+                    }else{
+                        if(strcmp(resp, "OK") == 0){
+                            printf("ESP-01 Connecting Wifi: OK\n");
+                            return true;
+                        }else{
+                            printf("ESP-01 Connecting Wifi: ERROR\n");
+                            return false;
+                        }                        
+                    }
+                }
             }
             resp = ReadESPcmd(1*1000*1000); // 2 seconds
         }

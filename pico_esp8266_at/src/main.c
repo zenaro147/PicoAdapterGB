@@ -155,13 +155,57 @@ bool mobile_board_time_check_ms(void *user, enum mobile_timers timer, unsigned m
     return (time_us_64() - millis_latch) > MS(ms);
 }
 
-bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){}
-void mobile_board_sock_close(void *user, unsigned conn){}
-int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){}
-bool mobile_board_sock_listen(void *user, unsigned conn){}
-bool mobile_board_sock_accept(void *user, unsigned conn){}
-int mobile_board_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){}
-int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){}
+
+bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
+    //Mobile Adapter connection
+    // conn = 1
+    // socktype = (unknown: 0x2)
+    // addrtype = (MOBILE_ADDRTYPE_IPV4 | unknown: 0x94) 
+    // bindport = 536878812
+    return false;
+}
+void mobile_board_sock_close(void *user, unsigned conn){
+    //conn = 1
+    sleep_ms(1);
+}
+int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
+    // conn = 1
+    // addr = 0x2 
+    //      Type: (unknown: 0x4) 
+    //      _addr4 - type:(unknown: 0x4) / port:3473408 / host:0 0 1 0)
+    //      _addr6 - type:(unknown: 0x4) / port:3473408 / host:---)
+    return -1;
+}
+bool mobile_board_sock_listen(void *user, unsigned conn){
+    //conn = 1
+    return false;
+}
+bool mobile_board_sock_accept(void *user, unsigned conn){
+    //conn = 1
+    return false;
+}
+int mobile_board_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){
+    //user = 0x200001d5 <flash_enable_xip_via_boot2+8> ????
+    //conn = 1
+    //data = 0x2
+    //size = 268437649
+    // addr = 0x200010bc <adapter> 
+    //      Type: MOBILE_ADDRTYPE_NONE
+    //      _addr4 - type:MOBILE_ADDRTYPE_NONE / port:1 / host:21 0 0 0)
+    //      _addr6 - type:MOBILE_ADDRTYPE_NONE / port:1 / host:---)
+    return -1;
+}
+int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
+    //user = 0x200001d5 <flash_enable_xip_via_boot2+8>
+    //conn = 1
+    //data = 0x2
+    //size = 268437649
+    // addr = 0x200010bc <adapter> 
+    //      Type: MOBILE_ADDRTYPE_NONE
+    //      _addr4 - type:MOBILE_ADDRTYPE_NONE / port:1 / host:21 0 0 0)
+    //      _addr6 - type:MOBILE_ADDRTYPE_NONE / port:1 / host:---)
+    return -1;
+}
 
 ///////////////////////////////////////
 // Main Functions and Core 1 Loop
@@ -299,10 +343,10 @@ void main(){
         while (true) {
             mobile_loop(&adapter);
 
-            if(haveConfigToWrite && !spi_is_readable(SPI_PORT)){
-                SaveFlashConfig(config_eeprom);
-                haveConfigToWrite = false;
-            }
+            //if(haveConfigToWrite && !spi_is_readable(SPI_PORT)){
+            //    SaveFlashConfig(config_eeprom);
+            //    haveConfigToWrite = false;
+            //}
         }
 
         //bool reqStatus = SendESPGetReq(UART_ID, MAGB_HOST, MAGB_PORT, "/01/CGB-B9AJ/index.php");

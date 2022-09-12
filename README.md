@@ -11,5 +11,5 @@ Based on: [Libmobile](https://github.com/REONTeam/libmobile-atmega) by [REON Tea
 
 ### What need to do:
 * Find the right time to write the config into flash again
-* Implement all mobile_board_sock_* functions
+* Implement all mobile_board_sock_* functions to communicate with remote servers
 * Basically, everything!

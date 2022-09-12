@@ -310,7 +310,8 @@ bool EspAT_Init(uart_inst_t * uart, int baudrate, int txpin, int rxpin){
 // Provides the necessary commands to connect the ESP to a WiFi network
 bool ConnectESPWiFi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int timeout){
     
-    //AT+CIPMUX=1
+    //AT+CIPMUX=1 -- enable multi connections
+    //AT+CIPSTO=0 -- set Server timeout (0~7200)
     
     // Set WiFi Mode to Station mode Only
     SendESPcmd(uart,"AT+CWMODE=1");

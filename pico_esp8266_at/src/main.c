@@ -45,9 +45,11 @@ bool speed_240_MHz = false;
 #define UART_TX_PIN 4
 #define UART_RX_PIN 5
 
-
 volatile uint64_t time_us_now = 0;
 uint64_t last_readable = 0;
+
+#define MAGB_HOST "192.168.0.126"
+#define MAGB_PORT 80
 
 #define CONFIG_OFFSET_MAGB          0 // Up to 256ytes
 #define CONFIG_OFFSET_WIFI_SSID     260 //28bytes (+4 to identify the config, "SSID" in ascii)
@@ -56,9 +58,6 @@ uint64_t last_readable = 0;
 char WiFiSSID[32] = "";
 char WiFiPASS[32] = "";
 bool isESPDetected = false;
-
-#define MAGB_HOST "192.168.0.126"
-#define MAGB_PORT 80
 
 uint8_t config_eeprom[FLASH_DATA_SIZE] = {};
 bool haveAdapterConfig = false;

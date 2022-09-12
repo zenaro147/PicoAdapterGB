@@ -1,7 +1,7 @@
 # [W.I.P.] PicoAdapterGB
 Raspberry Pi Pico Code for Mobile Adapter GB emulation with real HW!
 
-Based on: [Libmobile](https://github.com/REONTeam/libmobile-atmega) by [REON Team](https://github.com/REONTeam) and following the [BGB Implementation](https://github.com/REONTeam/libmobile-bgb) and [Atmega Implementation](https://github.com/REONTeam/ArduinoAdapterGB)
+Based on: [Libmobile](https://github.com/REONTeam/libmobile-atmega) by [REON Team](https://github.com/REONTeam) and following the [BGB Implementation](https://github.com/REONTeam/libmobile-bgb) and [Atmega Implementation](https://github.com/REONTeam/libmobile-atmega)
 
 ### What works:
 * ESP01 can connect to a WiFi Network

@@ -45,6 +45,10 @@ bool speed_240_MHz = false;
 #define UART_TX_PIN 4
 #define UART_RX_PIN 5
 
+
+volatile uint64_t time_us_now = 0;
+uint64_t last_readable = 0;
+
 #define CONFIG_OFFSET_MAGB          0 // Up to 256ytes
 #define CONFIG_OFFSET_WIFI_SSID     260 //28bytes (+4 to identify the config, "SSID" in ascii)
 #define CONFIG_OFFSET_WIFI_PASS     292 //28bytes (+4 to identify the config, "PASS" in ascii)
@@ -159,6 +163,7 @@ bool mobile_board_config_write(A_UNUSED void *user, const void *src, const uintp
         config_eeprom[offset + i] = ((uint8_t *)src)[i];
     }
     haveConfigToWrite = true;
+    last_readable = time_us_64();
     return true;
 }
 
@@ -354,14 +359,24 @@ void main(){
         //mobile_init(&mobile->adapter, mobile, &adapter_config);
         mobile_init(&adapter, NULL, NULL);
         multicore_launch_core1(core1_context);
-
         while (true) {
             mobile_loop(&adapter);
 
-            //if(haveConfigToWrite && !spi_is_readable(SPI_PORT)){
-            //    SaveFlashConfig(config_eeprom);
-            //    haveConfigToWrite = false;
-            //}
+            if(haveConfigToWrite){
+                time_us_now = time_us_64();
+                if (time_us_now - last_readable > SEC(5)){
+                    if(!spi_is_readable(SPI_PORT)){
+                        multicore_reset_core1();
+                        SaveFlashConfig(config_eeprom);
+                        haveConfigToWrite = false;
+                        time_us_now = 0;
+                        last_readable = 0;                    
+                        multicore_launch_core1(core1_context);
+                    }else{
+                        last_readable = time_us_now;
+                    }
+                }
+            }
         }
 
         //bool reqStatus = SendESPGetReq(UART_ID, MAGB_HOST, MAGB_PORT, "/01/CGB-B9AJ/index.php");

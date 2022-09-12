@@ -65,7 +65,7 @@ bool haveWifiConfig = false;
 bool haveConfigToWrite = false;
 
 struct mobile_adapter adapter;
-//struct mobile_adapter_config adapter_config = MOBILE_ADAPTER_CONFIG_DEFAULT;
+struct mobile_adapter_config adapter_config = MOBILE_ADAPTER_CONFIG_DEFAULT;
 //struct mobile_user {
 //    pthread_mutex_t mutex_serial;
 //    pthread_mutex_t mutex_cond;
@@ -177,10 +177,11 @@ bool mobile_board_time_check_ms(void *user, enum mobile_timers timer, unsigned m
 
 bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
     //Mobile Adapter connection
-    // conn = 1
-    // socktype = (unknown: 0x2)
-    // addrtype = (MOBILE_ADDRTYPE_IPV4 | unknown: 0x94) 
-    // bindport = 536878812
+    // user = 0x0
+    // conn = 0
+    // socktype = MOBILE_SOCKTYPE_UDP
+    // addrtype = MOBILE_ADDRTYPE_IPV4
+    // bindport = 0
     return false;
 }
 void mobile_board_sock_close(void *user, unsigned conn){
@@ -354,7 +355,9 @@ void main(){
 //////////////////
     if(isConnectedWiFi){
         //mobile_init(&mobile->adapter, mobile, &adapter_config);
-        mobile_init(&adapter, NULL, NULL);
+        //mobile_init(&adapter, NULL, NULL);
+        mobile_init(&adapter, NULL, &adapter_config);
+
         multicore_launch_core1(core1_context);
         while (true) {
             mobile_loop(&adapter);

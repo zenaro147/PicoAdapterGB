@@ -66,8 +66,9 @@ bool haveConfigToWrite = false;
 struct mobile_adapter_config adapter_config = MOBILE_ADAPTER_CONFIG_DEFAULT;
 
 struct esp_sock_config {
-    struct mobile_addr srvaddr;
-    enum mobile_socktype socktype;
+    unsigned char host_ipv4[MOBILE_HOSTLEN_IPV4];
+    unsigned char host_ipv6[MOBILE_HOSTLEN_IPV6];
+    unsigned char host_type[3];
     bool sock_status;
 };
 
@@ -176,7 +177,21 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
     // socktype = MOBILE_SOCKTYPE_UDP
     // addrtype = MOBILE_ADDRTYPE_IPV4
     // bindport = 0
-    return false;
+
+    switch (socktype) {
+        case MOBILE_SOCKTYPE_TCP: sprintf(mobile->esp_sockets[conn].host_type,"TCP");
+        case MOBILE_SOCKTYPE_UDP: sprintf(mobile->esp_sockets[conn].host_type,"UDP");
+        default: return false;
+    }
+
+    switch (addrtype) {
+        case MOBILE_ADDRTYPE_IPV4: sprintf(mobile->esp_sockets[conn].host_type,"TCP");
+        case MOBILE_ADDRTYPE_IPV6: sprintf(mobile->esp_sockets[conn].host_type,"UDP");
+        default: return false;
+    }
+    
+
+    return true;
 }
 void mobile_board_sock_close(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;

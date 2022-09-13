@@ -59,36 +59,27 @@ char WiFiSSID[32] = "";
 char WiFiPASS[32] = "";
 bool isESPDetected = false;
 
-uint8_t config_eeprom[FLASH_DATA_SIZE] = {};
 bool haveAdapterConfig = false;
 bool haveWifiConfig = false;
 bool haveConfigToWrite = false;
 
-struct mobile_adapter adapter;
 struct mobile_adapter_config adapter_config = MOBILE_ADAPTER_CONFIG_DEFAULT;
-//struct mobile_user {
-//    pthread_mutex_t mutex_serial;
-//    pthread_mutex_t mutex_cond;
-//    pthread_cond_t cond;
-//    struct mobile_adapter adapter;
-//    enum mobile_action action;
-//    FILE *config;
-//    _Atomic uint32_t bgb_clock;
-//    _Atomic uint32_t bgb_clock_latch[MOBILE_MAX_TIMERS];
-//    int sockets[MOBILE_MAX_CONNECTIONS];
-//};
+
+struct esp_sock_config {
+    struct mobile_addr srvaddr;
+    enum mobile_socktype socktype;
+    bool sock_status;
+};
+
+struct mobile_user {
+    struct mobile_adapter adapter;
+    enum mobile_action action;
+    uint8_t config_eeprom[FLASH_DATA_SIZE];
+    int sockets[MOBILE_MAX_CONNECTIONS];
+    struct esp_sock_config esp_sockets[MOBILE_MAX_CONNECTIONS];
+};
+struct mobile_user *mobile;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-///////////////////////////////////////
-//Self-made Debug Functions
-///////////////////////////////////////
-
-static uint8_t process_data(uint8_t data_in) {
-    unsigned char data_out;
-    data_out = mobile_transfer(&adapter, spi_get_hw(SPI_PORT)->dr);
-    printf("IN: %02x OUT: %02x\n",data_in,data_out); 
-    return data_out;
-}
 
 ///////////////////////////////////////
 // SPI Functions
@@ -150,34 +141,37 @@ void mobile_board_serial_enable(A_UNUSED void *user) {
     trigger_spi(SPI_PORT,SPI_BAUDRATE);
 }
 
-bool mobile_board_config_read(A_UNUSED void *user, void *dest, const uintptr_t offset, const size_t size) {
+bool mobile_board_config_read(void *user, void *dest, const uintptr_t offset, const size_t size) {
+    struct mobile_user *mobile = (struct mobile_user *)user;
     for(int i = 0; i < size; i++){
-        ((char *)dest)[i] = (char)config_eeprom[offset + i];
+        ((char *)dest)[i] = (char)mobile->config_eeprom[offset + i];
     }
     return true;
 }
 
-bool mobile_board_config_write(A_UNUSED void *user, const void *src, const uintptr_t offset, const size_t size) {
+bool mobile_board_config_write(void *user, const void *src, const uintptr_t offset, const size_t size) {
+    struct mobile_user *mobile = (struct mobile_user *)user;
     for(int i = 0; i < size; i++){
-        config_eeprom[offset + i] = ((uint8_t *)src)[i];
+        mobile->config_eeprom[offset + i] = ((uint8_t *)src)[i];
     }
     haveConfigToWrite = true;
     last_readable = time_us_64();
     return true;
 }
 
-void mobile_board_time_latch(void *user, enum mobile_timers timer) {
+void mobile_board_time_latch(A_UNUSED void *user, enum mobile_timers timer) {
     millis_latch = time_us_64();
 }
 
-bool mobile_board_time_check_ms(void *user, enum mobile_timers timer, unsigned ms) {
+bool mobile_board_time_check_ms(A_UNUSED void *user, enum mobile_timers timer, unsigned ms) {
     return (time_us_64() - millis_latch) > MS(ms);
 }
 
 
 bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
+    struct mobile_user *mobile = (struct mobile_user *)user;
     //Mobile Adapter connection
-    // user = 0x0
+    // user = 0x20001ae8
     // conn = 0
     // socktype = MOBILE_SOCKTYPE_UDP
     // addrtype = MOBILE_ADDRTYPE_IPV4
@@ -185,10 +179,12 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
     return false;
 }
 void mobile_board_sock_close(void *user, unsigned conn){
+    struct mobile_user *mobile = (struct mobile_user *)user;
     //conn = 1
     sleep_ms(1);
 }
 int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
+    struct mobile_user *mobile = (struct mobile_user *)user;
     // conn = 1
     // addr = 0x2 
     //      Type: (unknown: 0x4) 
@@ -197,14 +193,17 @@ int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_add
     return -1;
 }
 bool mobile_board_sock_listen(void *user, unsigned conn){
+    struct mobile_user *mobile = (struct mobile_user *)user;
     //conn = 1
     return false;
 }
 bool mobile_board_sock_accept(void *user, unsigned conn){
+    struct mobile_user *mobile = (struct mobile_user *)user;
     //conn = 1
     return false;
 }
 int mobile_board_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){
+    struct mobile_user *mobile = (struct mobile_user *)user;
     //user = 0x200001d5 <flash_enable_xip_via_boot2+8> ????
     //conn = 1
     //data = 0x2
@@ -216,6 +215,7 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
     return -1;
 }
 int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
+    struct mobile_user *mobile = (struct mobile_user *)user;
     //user = 0x200001d5 <flash_enable_xip_via_boot2+8>
     //conn = 1
     //data = 0x2
@@ -233,16 +233,16 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
 
 void core1_context() {
     irq_set_mask_enabled(0xffffffff, false);
-    //trigger_spi(SPI_PORT,SPI_BAUDRATE);
     while (true) {
         if (spi_is_readable(SPI_PORT)) {
-            spi_get_hw(SPI_PORT)->dr = mobile_transfer(&adapter, spi_get_hw(SPI_PORT)->dr);
-            //spi_get_hw(SPI_PORT)->dr = process_data(spi_get_hw(SPI_PORT)->dr);
+            spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, spi_get_hw(SPI_PORT)->dr);
         }
     }
 }
 
 void main(){
+    mobile = malloc(sizeof(struct mobile_user));
+
     speed_240_MHz = set_sys_clock_khz(240000, false);
 
     stdio_init_all();
@@ -254,9 +254,9 @@ void main(){
 
     memset(WiFiSSID,0x00,sizeof(WiFiSSID));
     memset(WiFiPASS,0x00,sizeof(WiFiSSID));
-    memset(config_eeprom,0x00,sizeof(config_eeprom));
+    memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
 
-    uint8_t setConfig = ReadFlashConfig(config_eeprom); 
+    uint8_t setConfig = ReadFlashConfig(mobile->config_eeprom); 
     switch (setConfig){
         case 0:
             haveAdapterConfig = false;
@@ -280,20 +280,20 @@ void main(){
 
     if(haveWifiConfig){
         for(int i = CONFIG_OFFSET_WIFI_SSID; i < CONFIG_OFFSET_WIFI_SSID+CONFIG_OFFSET_WIFI_SIZE; i++){
-            WiFiSSID[i-CONFIG_OFFSET_WIFI_SSID] = (char)config_eeprom[i];
+            WiFiSSID[i-CONFIG_OFFSET_WIFI_SSID] = (char)mobile->config_eeprom[i];
         }
         for(int i = CONFIG_OFFSET_WIFI_PASS; i < CONFIG_OFFSET_WIFI_PASS+CONFIG_OFFSET_WIFI_SIZE; i++){
-            WiFiPASS[i-CONFIG_OFFSET_WIFI_PASS] = (char)config_eeprom[i];
+            WiFiPASS[i-CONFIG_OFFSET_WIFI_PASS] = (char)mobile->config_eeprom[i];
         }
     }else{
         //Set a Default value (need to create a method to configure this setttings later. Maybe a dual boot with a custom GB rom?)
         sprintf(WiFiSSID,"SSID%s","WiFi_Network");
         sprintf(WiFiPASS,"PASS%s","P@$$w0rd");
         for(int i = CONFIG_OFFSET_WIFI_SSID-4; i < CONFIG_OFFSET_WIFI_SSID+CONFIG_OFFSET_WIFI_SIZE; i++){
-            config_eeprom[i] = WiFiSSID[i-CONFIG_OFFSET_WIFI_SSID];
+            mobile->config_eeprom[i] = WiFiSSID[i-CONFIG_OFFSET_WIFI_SSID];
         }
         for(int i = CONFIG_OFFSET_WIFI_PASS-4; i < CONFIG_OFFSET_WIFI_PASS+CONFIG_OFFSET_WIFI_SIZE; i++){
-            config_eeprom[i] = WiFiPASS[i-CONFIG_OFFSET_WIFI_PASS];
+            mobile->config_eeprom[i] = WiFiPASS[i-CONFIG_OFFSET_WIFI_PASS];
         }
     }
 
@@ -356,18 +356,22 @@ void main(){
     if(isConnectedWiFi){
         //mobile_init(&mobile->adapter, mobile, &adapter_config);
         //mobile_init(&adapter, NULL, NULL);
-        mobile_init(&adapter, NULL, &adapter_config);
 
+        mobile->action = MOBILE_ACTION_NONE;
+        for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++) mobile->sockets[i] = -1;
+
+        mobile_init(&mobile->adapter, mobile, &adapter_config);
         multicore_launch_core1(core1_context);
+
         while (true) {
-            mobile_loop(&adapter);
+            mobile_loop(&mobile->adapter);
 
             if(haveConfigToWrite){
                 time_us_now = time_us_64();
                 if (time_us_now - last_readable > SEC(5)){
                     if(!spi_is_readable(SPI_PORT)){
                         multicore_reset_core1();
-                        SaveFlashConfig(config_eeprom);
+                        SaveFlashConfig(mobile->config_eeprom);
                         haveConfigToWrite = false;
                         time_us_now = 0;
                         last_readable = 0;                    

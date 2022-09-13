@@ -17,7 +17,7 @@ bool use_uart0 = true;
 
 bool isConnectedWiFi = false;
 bool ishttpRequest = false;
-int ipdVal = 0;
+int ipdVal[5] = 0;
 bool isConnectedHost = false;
 
 // RX interrupt handler
@@ -106,7 +106,7 @@ char * ReadESPcmd(int timeout){
 }
 
 // Establish a connection to the Host (Mobile Adapter GB server) and send the GET request to some URL
-bool SendESPGetReq(uart_inst_t * uart, char * magb_host, int magb_port, char * urlToRequest){
+bool SendESPGetReq(uart_inst_t * uart, uint8_t connID, char * sock_typte, char * conn_host, int conn_port, char * urlToRequest){
     if(ipdVal != 0){
         printf("ESP-01 Start Host Connection: You can't request more data now.\n");
         return false;
@@ -114,7 +114,7 @@ bool SendESPGetReq(uart_inst_t * uart, char * magb_host, int magb_port, char * u
     // Connect the ESP to the Host
     char cmdGetReq[100] = {};
     if(!isConnectedHost){
-        sprintf(cmdGetReq,"AT+CIPSTART=\"TCP\",\"%s\",%i",magb_host, magb_port);
+        sprintf(cmdGetReq,"AT+CIPSTART=%i,\"%s\",\"%s\",%i", connID, sock_typte, conn_host, conn_port);
         SendESPcmd(uart, cmdGetReq);
         char * resp = ReadESPcmd(10*1000*1000); //10 seconds
         if(strcmp(resp, "CONNECT") == 0){
@@ -142,7 +142,7 @@ bool SendESPGetReq(uart_inst_t * uart, char * magb_host, int magb_port, char * u
 
     // Prepare the GET command to send
     memset(cmdGetReq, '\0', sizeof(cmdGetReq));
-    sprintf(cmdGetReq,"GET %s HTTP/1.0\r\nHost: 192.168.0.126\r\n", urlToRequest);
+    sprintf(cmdGetReq,"GET %s HTTP/1.0\r\nHost: %s\r\n", conn_host, urlToRequest);
     int cmdSize = strlen(cmdGetReq) + 2;
 
     // Check if the GET command have less than 2048 bytes to send. This is the ESP limit
@@ -151,7 +151,7 @@ bool SendESPGetReq(uart_inst_t * uart, char * magb_host, int magb_port, char * u
     }else{
         // Send the ammount of data we will send to ESP (the GET command size)
         char cmdSend[16] = {};
-        sprintf(cmdSend,"AT+CIPSEND=%i", cmdSize);
+        sprintf(cmdSend,"AT+CIPSEND=%i,%i", connID, cmdSize);
         SendESPcmd(uart, cmdSend);
         char * resp = ReadESPcmd(2*1000*1000);
         if(strcmp(resp, "OK") == 0){
@@ -166,11 +166,11 @@ bool SendESPGetReq(uart_inst_t * uart, char * magb_host, int magb_port, char * u
                 resp = ReadESPcmd(1*1000*1000);
                 if(strstr(resp, "+IPD") != NULL){
                     char numipd[4] = {};
-                    for(int i = 5; i < strlen(resp); i++){
+                    for(int i = 7; i < strlen(resp); i++){
                         numipd[i-5] = resp[i]; 
                     }
                     //Set the IPD value into a variable to control the data to send
-                    ipdVal = atoi(numipd);
+                    ipdVal[connID] = atoi(numipd);
                     printf("ESP-01 Bytes Received: %i\n", ipdVal);
                     resp = ReadESPcmd(1*1000*1000);
                     if(strcmp(resp, "CLOSED") == 0){
@@ -191,23 +191,23 @@ bool SendESPGetReq(uart_inst_t * uart, char * magb_host, int magb_port, char * u
 }
 
 // Retrieve data from the ESP buffer (max Data Size = 2048)
-void ReadESPGetReq(uart_inst_t * uart, int dataSize){
-    if(ipdVal == 0){
+void ReadESPGetReq(uart_inst_t * uart, uint8_t connID, int dataSize){
+    if(ipdVal[connID] == 0){
         printf("ESP-01 Read Request: You don't have data to read.\n");
     }else{
         if(dataSize > 2048){
             printf("ESP-01 Read Request: The maximum data to read is 2048.\n");
         }else{
-            if(ipdVal-dataSize < 0){
-                dataSize=ipdVal;        
+            if(ipdVal[connID]-dataSize < 0){
+                dataSize=ipdVal[connID];        
                 printf("ESP-01 Read Request: You request more data than it stored. Changing value.\n");
             }else{
-                ipdVal = ipdVal - dataSize;
+                ipdVal[connID] = ipdVal[connID] - dataSize;
             }
             // Enable to raw parse the incomming data
             char cmdRead[20]={};
             buffGETReq_pointer=dataSize;
-            sprintf(cmdRead,"AT+CIPRECVDATA=%i",dataSize);
+            sprintf(cmdRead,"AT+CIPRECVDATA=%i,%i",connID,dataSize);
             ishttpRequest=true;
             SendESPcmd(uart,cmdRead); //Must igonre the OK at the end, and the "+CIPRECVDATA,<size>:" at the beginning
             Delay_Timer(5*1000*1000); //5 sec. Give time to feed the buffer    
@@ -223,21 +223,22 @@ void ReadESPGetReq(uart_inst_t * uart, int dataSize){
 }
 
 //Read the remaining data inside ESP buffer (must be used like this: ipdVal = ReadESPGetReqBuffer(UART_ID))
-int ReadESPGetReqBuffer(uart_inst_t * uart){
+int ReadESPGetReqBuffer(uart_inst_t * uart, uint8_t connIDReq){
+    uint8_t connID = 0;
     SendESPcmd(uart,"AT+CIPRECVLEN?");
     char * resp = ReadESPcmd(2*1000*1000);
     if(strstr(resp, "+CIPRECVLEN:") != NULL){
-        char numEspIpd[5] = {};
-        for(int i = 12; i < strlen(resp); i++){
-            if(resp[i] == ','){
-                break;
+        // Extract the first token
+        char * token = strtok(resp, ":");
+        // loop through the string to extract all other tokens
+        while(token != NULL) {
+            if(strcmp(token, "+CIPRECVLEN") != 0){
+                ipdVal[connID++] = atoi(token);
             }
-            numEspIpd[i-12] = resp[i];
+            token = strtok(NULL, ",");
         }
         FlushATBuff();
-        int numEspIpd_val = 0;
-        numEspIpd_val = atoi(numEspIpd);
-        return numEspIpd_val; 
+        return ipdVal[connIDReq]; 
     }else{        
         printf("ESP-01 Host Status: ERROR\n");
     }
@@ -257,10 +258,10 @@ bool GetESPHostConn(uart_inst_t * uart){
         uint8_t numstat_val = 0;
         numstat_val = atoi(numstat);
         if(numstat_val == 3){ // The ESP8266 Station has created a TCP or UDP transmission. 
-            printf("ESP-01 Host Status: TCP/UDP connected.\n");
+            printf("ESP-01 Host Status: TCP/UDP still connected.\n");
             return true;
         }else{
-            printf("ESP-01 Host Status: TCP/UDP disconnected.\n");
+            printf("ESP-01 Host Status: All TCP/UDP disconnected.\n");
         }
     }else{        
         printf("ESP-01 Host Status: ERROR\n");
@@ -268,8 +269,10 @@ bool GetESPHostConn(uart_inst_t * uart){
     return false;    
 }
 
-void CloseESPGetReq(uart_inst_t * uart){
-    SendESPcmd(uart,"AT+CIPCLOSE");
+void CloseESPGetReq(uart_inst_t * uart, uint8_t connID){
+    char cmd[15];
+    sprintf(cmd,"AT+CIPCLOSE=%i",connID)
+    SendESPcmd(uart,cmd);
     Delay_Timer(2*1000*1000); // 2 seconds
     FlushATBuff(); // Clean any output. We don't need it.
     GetESPHostConn(uart);

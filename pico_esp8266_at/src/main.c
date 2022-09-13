@@ -339,9 +339,6 @@ void main(){
         mobile_init(&mobile->adapter, mobile, &adapter_config);
         multicore_launch_core1(core1_context);
 
-        bool reqStatus = SendESPGetReq(UART_ID, 0, "TCP", MAGB_HOST, MAGB_PORT, "/01/CGB-B9AJ/index.php");
-        ReadESPGetReq(UART_ID,0,700); //The value will be stored into buffGETReq array
-
         while (true) {
             mobile_loop(&mobile->adapter);
 

@@ -105,41 +105,43 @@ char * ReadESPcmd(int timeout){
     }
 }
 
-// Establish a connection to the Host (Mobile Adapter GB server) and send the GET request to some URL
-bool SendESPGetReq(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, char * urlToRequest){
+bool OpenESPSockConn(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port){
     if(ipdVal[connID] != 0){
         printf("ESP-01 Start Host Connection: You can't request more data now.\n");
         return false;
     }
-    // Connect the ESP to the Host
-    char cmdGetReq[100] = {};
-    if(!isConnectedHost){
-        sprintf(cmdGetReq,"AT+CIPSTART=%i,\"%s\",\"%s\",%i", connID, sock_type, conn_host, conn_port);
-        SendESPcmd(uart, cmdGetReq);
-        char * resp = ReadESPcmd(10*1000*1000); //10 seconds
-        if(strstr(resp, "CONNECT") != NULL){
-            resp = ReadESPcmd(5*1000*1000); //5 seconds
-            if(strcmp(resp, "OK") == 0){
-                printf("ESP-01 Start Host Connection: OK\n");
-            }else{
-                if(strcmp(resp, "ALREADY CONNECTED") == 0) {
-                    printf("ESP-01 Start Host Connection: ALREADY CONNECTED\n");
-                }else{
-                    printf("ESP-01 Start Host Connection: ERROR\n");
-                    return false;
-                } 
-            }
-        }else{ 
-            if(strcmp(resp, "ALREADY CONNECTED") == 0) {            
+    
+    char cmdSckt[100];
+    sprintf(cmdSckt,"AT+CIPSTART=%i,\"%s\",\"%s\",%i", connID, sock_type, conn_host, conn_port);
+    SendESPcmd(uart, cmdSckt);
+    char * resp = ReadESPcmd(10*1000*1000); //10 seconds
+    if(strstr(resp, "CONNECT") != NULL){
+        resp = ReadESPcmd(5*1000*1000); //5 seconds
+        if(strcmp(resp, "OK") == 0){
+            printf("ESP-01 Start Host Connection: OK\n");
+        }else{
+            if(strcmp(resp, "ALREADY CONNECTED") == 0) {
                 printf("ESP-01 Start Host Connection: ALREADY CONNECTED\n");
             }else{
                 printf("ESP-01 Start Host Connection: ERROR\n");
                 return false;
-            }        
+            } 
         }
-        isConnectedHost = true;
+    }else{
+        if(strcmp(resp, "ALREADY CONNECTED") == 0) {            
+            printf("ESP-01 Start Host Connection: ALREADY CONNECTED\n");
+        }else{
+            printf("ESP-01 Start Host Connection: ERROR\n");
+            return false;
+        }        
     }
+    return true;
+}
 
+// Establish a connection to the Host (Mobile Adapter GB server) and send the GET request to some URL
+bool SendESPGetReq(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, char * urlToRequest){
+    // Connect the ESP to the Host
+    char cmdGetReq[100] = {};
     // Prepare the GET command to send
     memset(cmdGetReq, '\0', sizeof(cmdGetReq));
     sprintf(cmdGetReq,"GET %s HTTP/1.0\r\nHost: %s\r\n", urlToRequest, conn_host);
@@ -222,8 +224,8 @@ void ReadESPGetReq(uart_inst_t * uart, uint8_t connID, int dataSize){
     }    
 }
 
-//Read the remaining data inside ESP buffer (must be used like this: ipdVal = ReadESPGetReqBuffer(UART_ID))
-int ReadESPGetReqBuffer(uart_inst_t * uart, uint8_t connIDReq){
+//Read the remaining data inside ESP buffer (must be used like this: ipdVal = ReadESPGetReqBuffSize(UART_ID))
+int ReadESPGetReqBuffSize(uart_inst_t * uart, uint8_t connIDReq){
     uint8_t connID = 0;
     SendESPcmd(uart,"AT+CIPRECVLEN?");
     char * resp = ReadESPcmd(2*1000*1000);

@@ -17,7 +17,7 @@ bool use_uart0 = true;
 
 bool isConnectedWiFi = false;
 bool ishttpRequest = false;
-int ipdVal[5] = 0;
+int ipdVal[5] = {0,0,0,0,0};
 bool isConnectedHost = false;
 
 // RX interrupt handler
@@ -106,18 +106,18 @@ char * ReadESPcmd(int timeout){
 }
 
 // Establish a connection to the Host (Mobile Adapter GB server) and send the GET request to some URL
-bool SendESPGetReq(uart_inst_t * uart, uint8_t connID, char * sock_typte, char * conn_host, int conn_port, char * urlToRequest){
-    if(ipdVal != 0){
+bool SendESPGetReq(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, char * urlToRequest){
+    if(ipdVal[connID] != 0){
         printf("ESP-01 Start Host Connection: You can't request more data now.\n");
         return false;
     }
     // Connect the ESP to the Host
     char cmdGetReq[100] = {};
     if(!isConnectedHost){
-        sprintf(cmdGetReq,"AT+CIPSTART=%i,\"%s\",\"%s\",%i", connID, sock_typte, conn_host, conn_port);
+        sprintf(cmdGetReq,"AT+CIPSTART=%i,\"%s\",\"%s\",%i", connID, sock_type, conn_host, conn_port);
         SendESPcmd(uart, cmdGetReq);
         char * resp = ReadESPcmd(10*1000*1000); //10 seconds
-        if(strcmp(resp, "CONNECT") == 0){
+        if(strstr(resp, "CONNECT") != NULL){
             resp = ReadESPcmd(5*1000*1000); //5 seconds
             if(strcmp(resp, "OK") == 0){
                 printf("ESP-01 Start Host Connection: OK\n");
@@ -142,7 +142,7 @@ bool SendESPGetReq(uart_inst_t * uart, uint8_t connID, char * sock_typte, char *
 
     // Prepare the GET command to send
     memset(cmdGetReq, '\0', sizeof(cmdGetReq));
-    sprintf(cmdGetReq,"GET %s HTTP/1.0\r\nHost: %s\r\n", conn_host, urlToRequest);
+    sprintf(cmdGetReq,"GET %s HTTP/1.0\r\nHost: %s\r\n", urlToRequest, conn_host);
     int cmdSize = strlen(cmdGetReq) + 2;
 
     // Check if the GET command have less than 2048 bytes to send. This is the ESP limit
@@ -150,7 +150,7 @@ bool SendESPGetReq(uart_inst_t * uart, uint8_t connID, char * sock_typte, char *
         printf("ESP-01 Sending Request: ERROR - The request limit is 2048 bytes. Your request have: %i bytes\n", cmdSize);
     }else{
         // Send the ammount of data we will send to ESP (the GET command size)
-        char cmdSend[16] = {};
+        char cmdSend[20] = {};
         sprintf(cmdSend,"AT+CIPSEND=%i,%i", connID, cmdSize);
         SendESPcmd(uart, cmdSend);
         char * resp = ReadESPcmd(2*1000*1000);
@@ -167,11 +167,11 @@ bool SendESPGetReq(uart_inst_t * uart, uint8_t connID, char * sock_typte, char *
                 if(strstr(resp, "+IPD") != NULL){
                     char numipd[4] = {};
                     for(int i = 7; i < strlen(resp); i++){
-                        numipd[i-5] = resp[i]; 
+                        numipd[i-7] = resp[i]; 
                     }
                     //Set the IPD value into a variable to control the data to send
                     ipdVal[connID] = atoi(numipd);
-                    printf("ESP-01 Bytes Received: %i\n", ipdVal);
+                    printf("ESP-01 Bytes Received: %i\n", ipdVal[connID]);
                     resp = ReadESPcmd(1*1000*1000);
                     if(strcmp(resp, "CLOSED") == 0){
                         isConnectedHost=false;
@@ -205,14 +205,14 @@ void ReadESPGetReq(uart_inst_t * uart, uint8_t connID, int dataSize){
                 ipdVal[connID] = ipdVal[connID] - dataSize;
             }
             // Enable to raw parse the incomming data
-            char cmdRead[20]={};
+            char cmdRead[25]={};
             buffGETReq_pointer=dataSize;
             sprintf(cmdRead,"AT+CIPRECVDATA=%i,%i",connID,dataSize);
             ishttpRequest=true;
             SendESPcmd(uart,cmdRead); //Must igonre the OK at the end, and the "+CIPRECVDATA,<size>:" at the beginning
             Delay_Timer(5*1000*1000); //5 sec. Give time to feed the buffer    
             ishttpRequest=false;
-            int cmdReadSize = strlen(cmdRead)+1;
+            int cmdReadSize = strlen(cmdRead)-1;
             for(int i = cmdReadSize; i < buffATrx_pointer-6; i++){
                 buffGETReq[i - cmdReadSize] = buffATrx[i];
             }
@@ -271,7 +271,7 @@ bool GetESPHostConn(uart_inst_t * uart){
 
 void CloseESPGetReq(uart_inst_t * uart, uint8_t connID){
     char cmd[15];
-    sprintf(cmd,"AT+CIPCLOSE=%i",connID)
+    sprintf(cmd,"AT+CIPCLOSE=%i",connID);
     SendESPcmd(uart,cmd);
     Delay_Timer(2*1000*1000); // 2 seconds
     FlushATBuff(); // Clean any output. We don't need it.
@@ -313,12 +313,61 @@ bool EspAT_Init(uart_inst_t * uart, int baudrate, int txpin, int rxpin){
 // Provides the necessary commands to connect the ESP to a WiFi network
 bool ConnectESPWiFi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int timeout){
     
-    //AT+CIPMUX=1 -- enable multi connections
     //AT+CIPSTO=0 -- set Server timeout (0~7200)
     
+    //test connection - Check 2 times in case the ESP return some echo 
+    FlushATBuff(); // Reset RX Buffer
+    SendESPcmd(uart,"AT");
+    char * resp = ReadESPcmd(1*1000*1000);
+    if(strcmp(resp, "OK") == 0){
+        printf("ESP-01 Connectivity: OK\n");
+    }else{        
+        printf("ESP-01 Connectivity: ERROR || Retrying...\n");
+        resp = ReadESPcmd(1*1000*1000);
+        if(strcmp(resp, "OK") == 0){
+            printf("ESP-01 Connectivity: OK\n");
+        }else{        
+            printf("ESP-01 Connectivity: ERROR\n");
+        }
+    }
+
+    // Disable echo - Check 2 times in case the ESP return some echo 
+    SendESPcmd(uart,"ATE0");
+    resp = ReadESPcmd(1*1000*1000);
+    if(strcmp(resp, "OK") == 0){
+        printf("ESP-01 Disable Echo: OK\n");
+    }else{        
+        printf("ESP-01 Disable Echo: ERROR || Retrying...\n");
+        resp = ReadESPcmd(1*1000*1000);
+        if(strcmp(resp, "OK") == 0){
+            printf("ESP-01 Disable Echo: OK\n");
+        }else{        
+            printf("ESP-01 Disable Echo: ERROR\n");
+        }
+    }
+
+    // Set to Passive Mode to receive TCP info
+    // AT+CIPRECVDATA=<size> | read the X amount of data from esp buffer
+    // AT+CIPRECVLEN? | return the remaining  buffer size like this +CIPRECVLEN:636,0,0,0,0)
+    SendESPcmd(uart, "AT+CIPRECVMODE=1");
+    resp = ReadESPcmd(1*1000*1000); // 2 second
+    if(strcmp(resp, "OK") == 0){
+        printf("ESP-01 Passive Mode: OK\n");
+    }else{        
+        printf("ESP-01 Passive Mode: ERROR\n");
+    }
+
+    SendESPcmd(uart, "AT+CIPMUX=1");
+    resp = ReadESPcmd(1*1000*1000); // 2 second
+    if(strcmp(resp, "OK") == 0){
+        printf("ESP-01 Multi Connections: OK\n");
+    }else{        
+        printf("ESP-01 Multi Connections: ERROR\n");
+    }
+
     // Set WiFi Mode to Station mode Only
     SendESPcmd(uart,"AT+CWMODE=1");
-    char * resp = ReadESPcmd(1*1000*1000); // 1 second
+    resp = ReadESPcmd(1*1000*1000);
     if(strcmp(resp, "OK") == 0){
         printf("ESP-01 Station Mode: OK\n");
         // Prepare the command to send

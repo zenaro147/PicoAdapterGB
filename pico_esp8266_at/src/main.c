@@ -78,7 +78,6 @@ struct mobile_user {
     struct mobile_adapter adapter;
     enum mobile_action action;
     uint8_t config_eeprom[FLASH_DATA_SIZE];
-    int sockets[MOBILE_MAX_CONNECTIONS];
     struct esp_sock_config esp_sockets[MOBILE_MAX_CONNECTIONS];
 };
 struct mobile_user *mobile;
@@ -180,7 +179,7 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
     // addrtype = MOBILE_ADDRTYPE_IPV4
     // bindport = 0    
 
-    if(mobile->sockets[conn] != -1){
+    if(mobile->esp_sockets[conn].host_id != -1){
         return false;
     }
 
@@ -338,7 +337,7 @@ void main(){
         //mobile_init(&adapter, NULL, NULL);
 
         mobile->action = MOBILE_ACTION_NONE;
-        for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++) mobile->sockets[i] = -1;
+        for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++) mobile->esp_sockets[i].host_id = -1;
 
         mobile_init(&mobile->adapter, mobile, &adapter_config);
         multicore_launch_core1(core1_context);

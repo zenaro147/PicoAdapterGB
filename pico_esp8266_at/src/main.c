@@ -180,6 +180,10 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
     // addrtype = MOBILE_ADDRTYPE_IPV4
     // bindport = 0    
 
+    if(mobile->sockets[conn] != -1){
+        return false;
+    }
+
     switch (socktype) {
         case MOBILE_SOCKTYPE_TCP: sprintf(mobile->esp_sockets[conn].host_type,"TCP");
         case MOBILE_SOCKTYPE_UDP: sprintf(mobile->esp_sockets[conn].host_type,"UDP");
@@ -197,10 +201,10 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
 
     return true;
 }
+
 void mobile_board_sock_close(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
     //conn = 1
-    sleep_ms(1);
 }
 int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;

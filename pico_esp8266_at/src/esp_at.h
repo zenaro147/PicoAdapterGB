@@ -318,6 +318,7 @@ bool EspAT_Init(uart_inst_t * uart, int baudrate, int txpin, int rxpin){
 bool ConnectESPWiFi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int timeout){
     
     //AT+CIPSTO=0 -- set Server timeout (0~7200)
+    //AT+CIPDINFO=1 -- Show port and IP on IPD return
     
     //test connection - Check 2 times in case the ESP return some echo 
     FlushATBuff(); // Reset RX Buffer

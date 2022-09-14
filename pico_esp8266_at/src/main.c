@@ -286,7 +286,10 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
     struct mobile_user *mobile = (struct mobile_user *)user;
     //user = 0x20001ab8
     //conn = 0
-    //data = 0x20001dc4 (gameboy.datacenter.ne.jp ??)
+    //data = 0x20001dc4 (memory address)
+    //                00 01 01 00 00 01 00 00 00 00 00 00       ............
+    //    07 67 61 6D 65 62 6F 79 0A 64 61 74 61 63 65 6E   .gameboy.datacen
+    //    74 65 72 02 6E 65 02 6A 70 00 00 01 00 01         ter.ne.jp.....
     //size = 42
     //addr = 0x20001da0
     //      Type: MOBILE_ADDRTYPE_IPV4

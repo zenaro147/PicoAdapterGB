@@ -1,5 +1,5 @@
 ////////////////////////////////////
-// - Need to fix the "eeprom" issue during the config request (maybe put the config at the end of the flash?)
+// - Change the Strings comps to string finds and read the buffer directly?
 // - Add the mobile_board_sock_* functions to handle the Request functions (only the necessary for now) - https://discord.com/channels/375413108467957761/541384270636384259/1017548420866654280
 // -- Docs about AT commands 
 // ---- https://www.espressif.com/sites/default/files/documentation/4a-esp8266_at_instruction_set_en.pdf
@@ -27,6 +27,12 @@
 #include "libmobile/mobile.h"
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool speed_240_MHz = false;
+
+#define LED_PIN         25
+#define LED_SET(A)      (gpio_put(LED_PIN, (A)))
+#define LED_ON          LED_SET(true)
+#define LED_OFF         LED_SET(false)
+#define LED_TOGGLE      (gpio_put(LED_PIN, !gpio_get(LED_PIN)))
 
 #define MKS(A)                  (A)
 #define MS(A)                   ((A) * 1000)
@@ -63,14 +69,13 @@ bool haveAdapterConfig = false;
 bool haveWifiConfig = false;
 bool haveConfigToWrite = false;
 
-struct mobile_adapter_config adapter_config = MOBILE_ADAPTER_CONFIG_DEFAULT;
+
 
 struct esp_sock_config {
-    uint8_t host_id;
-    unsigned char host_type[3];
-    unsigned char host_iptype[4];
-    unsigned char host_ip[40];
-    int host_port;
+    int host_id;
+    enum mobile_socktype host_type;
+    enum mobile_addrtype host_iptype;
+    int local_port;
     bool sock_status;
 };
 
@@ -125,8 +130,8 @@ For UDP the destination address is specified in sock_send(), and apparently this
 Similarly for TCP connections sock_send() is an AT+CIPSEND command.
 sock_recv() would depend on whether you're using active or passive mode for receiving, but I'm seeing there's no passive mode reception command for UDP which might be an issue.
 sock_recv() is also a funky one because it needs to signal to libmobile whether the connection has been closed (if it's a TCP connection) and it needs to know where the message came from (especially for UDP sockets) 
-
 */
+
 unsigned long millis_latch = 0;
 #define A_UNUSED __attribute__((unused))
 
@@ -171,49 +176,101 @@ bool mobile_board_time_check_ms(A_UNUSED void *user, enum mobile_timers timer, u
 
 
 bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
-    struct mobile_user *mobile = (struct mobile_user *)user;
     //Mobile Adapter connection
     // user = 0x20001ae8
     // conn = 0
     // socktype = MOBILE_SOCKTYPE_UDP
     // addrtype = MOBILE_ADDRTYPE_IPV4
-    // bindport = 0    
+    // bindport = 0
+    
+    struct mobile_user *mobile = (struct mobile_user *)user;
 
     if(mobile->esp_sockets[conn].host_id != -1){
         return false;
     }
 
     switch (socktype) {
-        case MOBILE_SOCKTYPE_TCP: sprintf(mobile->esp_sockets[conn].host_type,"TCP");
-        case MOBILE_SOCKTYPE_UDP: sprintf(mobile->esp_sockets[conn].host_type,"UDP");
-        default: return false;
+        case MOBILE_SOCKTYPE_TCP:
+        case MOBILE_SOCKTYPE_UDP: 
+            mobile->esp_sockets[conn].host_type = socktype;
+            break;
+        default: 
+            return false;
     }
 
     switch (addrtype) {
-        case MOBILE_ADDRTYPE_IPV4: sprintf(mobile->esp_sockets[conn].host_iptype,"IPV4");
-        case MOBILE_ADDRTYPE_IPV6: sprintf(mobile->esp_sockets[conn].host_iptype,"IPV6");
-        default: return false;
+        case MOBILE_ADDRTYPE_IPV4:
+        case MOBILE_ADDRTYPE_IPV6:
+            mobile->esp_sockets[conn].host_iptype = addrtype;
+            break;
+        default: 
+            return false;
     }
     
     mobile->esp_sockets[conn].host_id = conn;
-    mobile->esp_sockets[conn].host_port = bindport;
+    mobile->esp_sockets[conn].local_port = bindport;
 
     return true;
 }
 
 void mobile_board_sock_close(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    //conn = 1
+    CloseESPSockConn(UART_ID, conn);
+    mobile->esp_sockets[conn].host_id = -1;
+    mobile->esp_sockets[conn].local_port = -1;
+    mobile->esp_sockets[conn].sock_status = false;
 }
+
 int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
-    struct mobile_user *mobile = (struct mobile_user *)user;
     // conn = 1
     // addr = 0x2 
     //      Type: (unknown: 0x4) 
     //      _addr4 - type:(unknown: 0x4) / port:3473408 / host:0 0 1 0)
     //      _addr6 - type:(unknown: 0x4) / port:3473408 / host:---)
+    
+    struct mobile_user *mobile = (struct mobile_user *)user;
+    
+    char srv_ip[46];
+    memset(srv_ip,0x00,sizeof(srv_ip));
+    int srv_port=0;
+    char sock_type[5];
+
+    if (addr->type == MOBILE_ADDRTYPE_IPV4) {
+        const struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
+        sprintf(srv_ip, "%u.%u.%u.%u", addr4->host[0], addr4->host[1], addr4->host[2], addr4->host[3]);
+        srv_port=addr4->port;
+        if (mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_TCP) {
+            sprintf(sock_type,"TCP");
+        }else if(mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_UDP){
+            sprintf(sock_type,"UDP");
+        }else{
+            return -1;
+        }
+    } else if (addr->type == MOBILE_ADDRTYPE_IPV6) {
+        const struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
+        //Need to parse IPV6
+        srv_port=addr6->port;
+        if (mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_TCP) {
+            sprintf(sock_type,"TCP");
+        }else if(mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_UDP){
+            sprintf(sock_type,"UDP");
+        }else{
+            return -1;
+        } 
+        return -1;
+    } else {
+        return -1;
+    }
+
+    mobile->esp_sockets[conn].sock_status = OpenESPSockConn(UART_ID, conn, sock_type, srv_ip, srv_port, mobile->esp_sockets[conn].local_port);
+    
+    if(mobile->esp_sockets[conn].sock_status){
+        return 1;
+    }
+
     return -1;
 }
+
 bool mobile_board_sock_listen(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
     //conn = 1
@@ -224,18 +281,20 @@ bool mobile_board_sock_accept(void *user, unsigned conn){
     //conn = 1
     return false;
 }
+
 int mobile_board_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    //user = 0x200001d5 <flash_enable_xip_via_boot2+8> ????
-    //conn = 1
-    //data = 0x2
-    //size = 268437649
-    // addr = 0x200010bc <adapter> 
-    //      Type: MOBILE_ADDRTYPE_NONE
-    //      _addr4 - type:MOBILE_ADDRTYPE_NONE / port:1 / host:21 0 0 0)
-    //      _addr6 - type:MOBILE_ADDRTYPE_NONE / port:1 / host:---)
+    //user = 0x20001ab8
+    //conn = 0
+    //data = 0x20001dc4 (gameboy.datacenter.ne.jp ??)
+    //size = 42
+    //addr = 0x20001da0
+    //      Type: MOBILE_ADDRTYPE_IPV4
+    //      _addr4 - type:MOBILE_ADDRTYPE_IPV4 / port:53 / host:210 196 3 183)
+    //      _addr6 - type:MOBILE_ADDRTYPE_IPV4 / port:53 / host:210 196 3 183 1 9 0 0 53 0 0 0 210 141 112 163)
     return -1;
 }
+
 int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
     //user = 0x200001d5 <flash_enable_xip_via_boot2+8>
@@ -263,11 +322,16 @@ void core1_context() {
 }
 
 void main(){
-    mobile = malloc(sizeof(struct mobile_user));
-
     speed_240_MHz = set_sys_clock_khz(240000, false);
-
     stdio_init_all();
+
+    // For toggle_led
+    gpio_init(LED_PIN);
+    gpio_set_dir(LED_PIN, GPIO_OUT);
+    LED_ON;
+
+    mobile = malloc(sizeof(struct mobile_user));
+    struct mobile_adapter_config adapter_config = MOBILE_ADAPTER_CONFIG_DEFAULT;
 
     // Initialize SPI pins
     gpio_set_function(PIN_SPI_SCK, GPIO_FUNC_SPI), gpio_pull_up(PIN_SPI_SCK);
@@ -333,8 +397,7 @@ void main(){
 // END CONFIGURE
 //////////////////
     if(isConnectedWiFi){
-        //mobile_init(&mobile->adapter, mobile, &adapter_config);
-        //mobile_init(&adapter, NULL, NULL);
+        LED_OFF;
 
         mobile->action = MOBILE_ACTION_NONE;
         for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++) mobile->esp_sockets[i].host_id = -1;
@@ -366,5 +429,8 @@ void main(){
         //bool reqStatus = SendESPGetReq(UART_ID, ,MAGB_HOST, MAGB_PORT, "/cgb/download?name=/01/CGB-BXTJ/tamago/tamago0a.pkm"); 
         //bool reqStatus = SendESPGetReq(UART_ID, ,MAGB_HOST, MAGB_PORT, "/01/CGB-BXTJ/tamago/tamago0a.pkm");        
         //ReadESPGetReq(UART_ID,700); //The value will be stored into buffGETReq array
+
+    }else{
+        //do something
     }
 }

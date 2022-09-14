@@ -105,39 +105,6 @@ char * ReadESPcmd(int timeout){
     }
 }
 
-bool OpenESPSockConn(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port){
-    if(ipdVal[connID] != 0){
-        printf("ESP-01 Start Host Connection: You can't request more data now.\n");
-        return false;
-    }
-    
-    char cmdSckt[100];
-    sprintf(cmdSckt,"AT+CIPSTART=%i,\"%s\",\"%s\",%i", connID, sock_type, conn_host, conn_port);
-    SendESPcmd(uart, cmdSckt);
-    char * resp = ReadESPcmd(10*1000*1000); //10 seconds
-    if(strstr(resp, "CONNECT") != NULL){
-        resp = ReadESPcmd(5*1000*1000); //5 seconds
-        if(strcmp(resp, "OK") == 0){
-            printf("ESP-01 Start Host Connection: OK\n");
-        }else{
-            if(strcmp(resp, "ALREADY CONNECTED") == 0) {
-                printf("ESP-01 Start Host Connection: ALREADY CONNECTED\n");
-            }else{
-                printf("ESP-01 Start Host Connection: ERROR\n");
-                return false;
-            } 
-        }
-    }else{
-        if(strcmp(resp, "ALREADY CONNECTED") == 0) {            
-            printf("ESP-01 Start Host Connection: ALREADY CONNECTED\n");
-        }else{
-            printf("ESP-01 Start Host Connection: ERROR\n");
-            return false;
-        }        
-    }
-    return true;
-}
-
 // Establish a connection to the Host (Mobile Adapter GB server) and send the GET request to some URL
 bool SendESPGetReq(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, char * urlToRequest){
     // Connect the ESP to the Host
@@ -247,8 +214,42 @@ int ReadESPGetReqBuffSize(uart_inst_t * uart, uint8_t connIDReq){
     return 0;   
 }
 
-// Return the status of the Host connection using TCP or UDP (must be used like this: isConnectedHost = GetESPHostConn(UART_ID))
-bool GetESPHostConn(uart_inst_t * uart){
+//Open the desired ESP Socket
+bool OpenESPSockConn(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, int conn_localport){
+    if(ipdVal[connID] != 0){
+        printf("ESP-01 Start Host Connection: You can't request more data now.\n");
+        return false;
+    }
+    
+    char cmdSckt[100];
+
+    if (conn_localport != 0 && (strcmp(sock_type, "UDP") == 0 || strcmp(sock_type, "UDPv6") == 0)){
+        sprintf(cmdSckt,"AT+CIPSTART=%i,\"%s\",\"%s\",%i,%i", connID, sock_type, conn_host, conn_port, conn_localport);
+    }else{
+        sprintf(cmdSckt,"AT+CIPSTART=%i,\"%s\",\"%s\",%i", connID, sock_type, conn_host, conn_port);
+    }  
+    
+    SendESPcmd(uart, cmdSckt);
+    char * resp = ReadESPcmd(5*1000*1000); //5 seconds
+
+    if(strstr(resp, "CONNECT") != NULL){
+        resp = ReadESPcmd(1*1000*1000); //1 second
+        if(strcmp(resp, "OK") == 0){
+            printf("ESP-01 Start Host Connection: OK\n");
+        }
+    }else{
+        if(strcmp(resp, "ALREADY CONNECTED") == 0) {            
+            printf("ESP-01 Start Host Connection: ALREADY CONNECTED\n");
+        }else{
+            printf("ESP-01 Start Host Connection: ERROR\n");
+            return false;
+        }
+    }
+    return true;
+}
+
+// Return the status of the Host connection using TCP or UDP (must be used like this: isConnectedHost = GetESPSockConn(UART_ID))
+bool GetESPSockConn(uart_inst_t * uart){
     SendESPcmd(uart,"AT+CIPSTATUS");
     char * resp = ReadESPcmd(2*1000*1000);
     if(strstr(resp, "STATUS:") != NULL){
@@ -271,13 +272,14 @@ bool GetESPHostConn(uart_inst_t * uart){
     return false;    
 }
 
-void CloseESPGetReq(uart_inst_t * uart, uint8_t connID){
+//Close the desired ESP Socket
+void CloseESPSockConn(uart_inst_t * uart, uint8_t connID){
     char cmd[15];
     sprintf(cmd,"AT+CIPCLOSE=%i",connID);
     SendESPcmd(uart,cmd);
     Delay_Timer(2*1000*1000); // 2 seconds
     FlushATBuff(); // Clean any output. We don't need it.
-    GetESPHostConn(uart);
+    //GetESPSockConn(uart); //Need to recreate this function to get the status of all connections
 }
 
 // Initialize the ESP-01 UART communication

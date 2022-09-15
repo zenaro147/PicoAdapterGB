@@ -218,7 +218,7 @@ int ReadESPGetReqBuffSize(uart_inst_t * uart, uint8_t connIDReq){
 //Open the desired ESP Socket
 bool OpenESPSockConn(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, int conn_localport, uint8_t conn_mode){
     if(ipdVal[connID] != 0){
-        printf("ESP-01 Start Host Connection: You can't request more data now.\n");
+        printf("ESP-01 Start Host Connection: You can't open a connection now.\n");
         return false;
     }
     

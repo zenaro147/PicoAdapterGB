@@ -1,5 +1,6 @@
 ////////////////////////////////////
 // - Change the Strings comps to string finds and read the buffer directly?
+// - Optimize the ESP_AT.H file! Specially to handle the UDP connections better (fast)
 // - Add the mobile_board_sock_* functions to handle the Request functions (only the necessary for now) - https://discord.com/channels/375413108467957761/541384270636384259/1017548420866654280
 // -- Docs about AT commands 
 // ---- https://www.espressif.com/sites/default/files/documentation/4a-esp8266_at_instruction_set_en.pdf
@@ -178,7 +179,7 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
     // socktype = MOBILE_SOCKTYPE_UDP
     // addrtype = MOBILE_ADDRTYPE_IPV4
     // bindport = 0
-    
+    printf("call\n");
     struct mobile_user *mobile = (struct mobile_user *)user;
     if(mobile->esp_sockets[conn].host_id != -1){
         return false;

@@ -21,22 +21,16 @@
 //#include "hardware/clocks.h"
 #include "hardware/flash.h"
 
+#include "common.h"
 #include "esp_at.h"
 #include "flash_eeprom.h"
 
 #include "libmobile/mobile.h"
+#include "libmobile/inet_pton.h"
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool speed_240_MHz = false;
 
-#define LED_PIN         25
-#define LED_SET(A)      (gpio_put(LED_PIN, (A)))
-#define LED_ON          LED_SET(true)
-#define LED_OFF         LED_SET(false)
-#define LED_TOGGLE      (gpio_put(LED_PIN, !gpio_get(LED_PIN)))
 
-#define MKS(A)                  (A)
-#define MS(A)                   ((A) * 1000)
-#define SEC(A)                  ((A) * 1000 * 1000)
 
 // SPI pins
 #define SPI_PORT        spi0
@@ -57,6 +51,9 @@ uint64_t last_readable = 0;
 #define MAGB_HOST "192.168.0.126"
 #define MAGB_PORT 80
 
+#define MAGB_DNS1 "192.168.0.126"
+#define MAGB_DNS2 "192.168.0.127"
+
 #define CONFIG_OFFSET_MAGB          0 // Up to 256ytes
 #define CONFIG_OFFSET_WIFI_SSID     260 //28bytes (+4 to identify the config, "SSID" in ascii)
 #define CONFIG_OFFSET_WIFI_PASS     292 //28bytes (+4 to identify the config, "PASS" in ascii)
@@ -68,7 +65,6 @@ bool isESPDetected = false;
 bool haveAdapterConfig = false;
 bool haveWifiConfig = false;
 bool haveConfigToWrite = false;
-
 
 
 struct esp_sock_config {
@@ -184,18 +180,8 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
     // bindport = 0
     
     struct mobile_user *mobile = (struct mobile_user *)user;
-
     if(mobile->esp_sockets[conn].host_id != -1){
         return false;
-    }
-
-    switch (socktype) {
-        case MOBILE_SOCKTYPE_TCP:
-        case MOBILE_SOCKTYPE_UDP: 
-            mobile->esp_sockets[conn].host_type = socktype;
-            break;
-        default: 
-            return false;
     }
 
     switch (addrtype) {
@@ -206,11 +192,24 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
         default: 
             return false;
     }
+
+    switch (socktype) {
+        case MOBILE_SOCKTYPE_TCP:
+        case MOBILE_SOCKTYPE_UDP: 
+            mobile->esp_sockets[conn].host_type = socktype;
+            break;
+        default: 
+            return false;
+    }
     
     mobile->esp_sockets[conn].host_id = conn;
     mobile->esp_sockets[conn].local_port = bindport;
 
-    return true;
+    if(mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_UDP){
+        OpenESPSockConn(UART_ID, conn, mobile->esp_sockets[conn].host_iptype == MOBILE_ADDRTYPE_IPV4 ? "UDP" : "UDPv6", mobile->esp_sockets[conn].host_iptype == MOBILE_ADDRTYPE_IPV4 ? "127.0.0.1" : "0:0:0:0:0:0:0:1", 1, mobile->esp_sockets[conn].local_port, 2);
+    }
+
+    return true;    
 }
 
 void mobile_board_sock_close(void *user, unsigned conn){
@@ -262,8 +261,8 @@ int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_add
         return -1;
     }
 
-    mobile->esp_sockets[conn].sock_status = OpenESPSockConn(UART_ID, conn, sock_type, srv_ip, srv_port, mobile->esp_sockets[conn].local_port);
-    
+    mobile->esp_sockets[conn].sock_status = OpenESPSockConn(UART_ID, conn, sock_type, srv_ip, srv_port, mobile->esp_sockets[conn].local_port, mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_TCP ? 0 : 2);
+        
     if(mobile->esp_sockets[conn].sock_status){
         return 1;
     }
@@ -281,9 +280,15 @@ bool mobile_board_sock_accept(void *user, unsigned conn){
     //conn = 1
     return false;
 }
-
+ 
 int mobile_board_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
+
+    //if(!mobile->esp_sockets[conn].sock_status && mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_UDP){
+    //    mobile_board_sock_connect(user, conn, addr);
+    //}
+    
+
     //user = 0x20001ab8
     //conn = 0
     //data = 0x20001dc4 (memory address)
@@ -324,6 +329,29 @@ void core1_context() {
     }
 }
 
+void main_parse_addr(struct mobile_addr *dest, char *argv){
+    unsigned char ip[MOBILE_PTON_MAXLEN];
+    int rc = mobile_pton(MOBILE_PTON_ANY, argv, ip);
+
+    struct mobile_addr4 *dest4 = (struct mobile_addr4 *)dest;
+    struct mobile_addr6 *dest6 = (struct mobile_addr6 *)dest;
+    switch (rc) {
+    case MOBILE_PTON_IPV4:
+        dest4->type = MOBILE_ADDRTYPE_IPV4;
+        //dest4->port = MOBILE_DNS_PORT;
+        dest4->port = 53061;
+        memcpy(dest4->host, ip, sizeof(dest4->host));
+        break;
+    case MOBILE_PTON_IPV6:
+        dest6->type = MOBILE_ADDRTYPE_IPV6;
+        dest6->port = MOBILE_DNS_PORT;
+        memcpy(dest6->host, ip, sizeof(dest6->host));
+        break;
+    //default:
+        //fprintf(stderr, "Invalid parameter for %s: %s\n", argv[0], argv[1]);
+    }
+}
+
 void main(){
     speed_240_MHz = set_sys_clock_khz(240000, false);
     stdio_init_all();
@@ -332,14 +360,22 @@ void main(){
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
     LED_ON;
-
-    mobile = malloc(sizeof(struct mobile_user));
-    struct mobile_adapter_config adapter_config = MOBILE_ADAPTER_CONFIG_DEFAULT;
-
+    
     // Initialize SPI pins
     gpio_set_function(PIN_SPI_SCK, GPIO_FUNC_SPI), gpio_pull_up(PIN_SPI_SCK);
     gpio_set_function(PIN_SPI_SIN, GPIO_FUNC_SPI), gpio_pull_up(PIN_SPI_SIN);
     gpio_set_function(PIN_SPI_SOUT, GPIO_FUNC_SPI), gpio_pull_down(PIN_SPI_SOUT);
+
+    mobile = malloc(sizeof(struct mobile_user));
+    struct mobile_adapter_config adapter_config = MOBILE_ADAPTER_CONFIG_DEFAULT;
+
+
+    main_parse_addr(&adapter_config.dns1, MAGB_DNS1);
+    main_parse_addr(&adapter_config.dns2, MAGB_DNS2);
+    //adapter_config.p2p_port = 1027
+    //adapter_config.device = x
+    //adapter_config.unmetered = true;
+
 
     memset(WiFiSSID,0x00,sizeof(WiFiSSID));
     memset(WiFiPASS,0x00,sizeof(WiFiSSID));

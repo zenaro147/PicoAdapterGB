@@ -305,9 +305,9 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
             //Need to parse IPV6
             srv_port=addr6->port;
         }
-        reqStatus = SendESPGetReq(UART_ID, conn, "UDP" , srv_ip, srv_port, "/01/CGB-B9AJ/index.php");
+        reqStatus = ESP_SendData(UART_ID, conn, "UDP" , srv_ip, srv_port, "/01/CGB-B9AJ/index.php");
     }else if(mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_TCP){
-        //reqStatus = SendESPGetReq(UART_ID, conn, "TCP", "0", 0, "/01/CGB-B9AJ/index.php");
+        //reqStatus = ESP_SendData(UART_ID, conn, "TCP", "0", 0, "/01/CGB-B9AJ/index.php");
         return -1;
     }
 
@@ -483,9 +483,9 @@ void main(){
             }
         }
 
-        //bool reqStatus = SendESPGetReq(UART_ID, ,MAGB_HOST, MAGB_PORT, "/01/CGB-B9AJ/index.php");
-        //bool reqStatus = SendESPGetReq(UART_ID, ,MAGB_HOST, MAGB_PORT, "/cgb/download?name=/01/CGB-BXTJ/tamago/tamago0a.pkm"); 
-        //bool reqStatus = SendESPGetReq(UART_ID, ,MAGB_HOST, MAGB_PORT, "/01/CGB-BXTJ/tamago/tamago0a.pkm");        
+        //bool reqStatus = ESP_SendData(UART_ID, ,MAGB_HOST, MAGB_PORT, "/01/CGB-B9AJ/index.php");
+        //bool reqStatus = ESP_SendData(UART_ID, ,MAGB_HOST, MAGB_PORT, "/cgb/download?name=/01/CGB-BXTJ/tamago/tamago0a.pkm"); 
+        //bool reqStatus = ESP_SendData(UART_ID, ,MAGB_HOST, MAGB_PORT, "/01/CGB-BXTJ/tamago/tamago0a.pkm");        
         //ReadESPGetReq(UART_ID,700); //The value will be stored into buffGETReq array
 
     }else{

@@ -83,7 +83,7 @@ void ESP_SendCmd(uart_inst_t *uart, const uint8_t *command){
     memset(cmd,'\0',sizeof(cmd));
     sprintf(cmd,"%s\r\n",command);
     for (int i = 0; i< sizeof(cmd); i++){
-        uart_putc(uart, cmd[i]);
+        uart_putc_raw(uart, cmd[i]);
     }
     
 }

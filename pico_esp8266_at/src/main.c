@@ -345,7 +345,7 @@ void main_parse_addr(struct mobile_addr *dest, char *argv){
     case MOBILE_PTON_IPV4:
         dest4->type = MOBILE_ADDRTYPE_IPV4;
         //dest4->port = MOBILE_DNS_PORT;
-        dest4->port = 63562;
+        dest4->port = 49422;
         memcpy(dest4->host, ip, sizeof(dest4->host));
         break;
     case MOBILE_PTON_IPV6:

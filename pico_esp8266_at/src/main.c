@@ -5,7 +5,7 @@
 // -- Docs about AT commands 
 // ---- https://www.espressif.com/sites/default/files/documentation/4a-esp8266_at_instruction_set_en.pdf
 // ---- https://github.com/espressif/ESP8266_AT/wiki/ATE
-// ---- https://docs.espressif.com/projects/esp-at/en/latest/esp32/AT_Command_Set/Basic_AT_Commands.htm
+// ---- https://docs.espressif.com/projects/esp-at/en/release-v2.2.0.0_esp8266/AT_Command_Set/index.html
 ////////////////////////////////////
 
 #include <stdio.h>
@@ -179,7 +179,7 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
     // socktype = MOBILE_SOCKTYPE_UDP
     // addrtype = MOBILE_ADDRTYPE_IPV4
     // bindport = 0
-    printf("call\n");
+
     struct mobile_user *mobile = (struct mobile_user *)user;
     if(mobile->esp_sockets[conn].host_id != -1){
         return false;
@@ -206,8 +206,8 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
     mobile->esp_sockets[conn].host_id = conn;
     mobile->esp_sockets[conn].local_port = bindport;
 
-    if(mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_UDP){
-        OpenESPSockConn(UART_ID, conn, mobile->esp_sockets[conn].host_iptype == MOBILE_ADDRTYPE_IPV4 ? "UDP" : "UDPv6", mobile->esp_sockets[conn].host_iptype == MOBILE_ADDRTYPE_IPV4 ? "127.0.0.1" : "0:0:0:0:0:0:0:1", 1, mobile->esp_sockets[conn].local_port, 2);
+    if(mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_UDP && !mobile->esp_sockets[conn].sock_status){
+        mobile->esp_sockets[conn].sock_status = ESP_OpenSockConn(UART_ID, conn, mobile->esp_sockets[conn].host_iptype == MOBILE_ADDRTYPE_IPV4 ? "UDP" : "UDPv6", mobile->esp_sockets[conn].host_iptype == MOBILE_ADDRTYPE_IPV4 ? "127.0.0.1" : "0:0:0:0:0:0:0:1", 1, mobile->esp_sockets[conn].local_port, 2);
     }
 
     return true;    
@@ -215,7 +215,7 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
 
 void mobile_board_sock_close(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    CloseESPSockConn(UART_ID, conn);
+    ESP_CloseSockConn(UART_ID, conn);
     mobile->esp_sockets[conn].host_id = -1;
     mobile->esp_sockets[conn].local_port = -1;
     mobile->esp_sockets[conn].sock_status = false;
@@ -230,44 +230,47 @@ int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_add
     
     struct mobile_user *mobile = (struct mobile_user *)user;
     
-    char srv_ip[46];
-    memset(srv_ip,0x00,sizeof(srv_ip));
-    int srv_port=0;
-    char sock_type[5];
+    if(!mobile->esp_sockets[conn].sock_status){
+        char srv_ip[46];
+        memset(srv_ip,0x00,sizeof(srv_ip));
+        int srv_port=0;
+        char sock_type[5];
 
-    if (addr->type == MOBILE_ADDRTYPE_IPV4) {
-        const struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
-        sprintf(srv_ip, "%u.%u.%u.%u", addr4->host[0], addr4->host[1], addr4->host[2], addr4->host[3]);
-        srv_port=addr4->port;
-        if (mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_TCP) {
-            sprintf(sock_type,"TCP");
-        }else if(mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_UDP){
-            sprintf(sock_type,"UDP");
-        }else{
+        if (addr->type == MOBILE_ADDRTYPE_IPV4) {
+            const struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
+            sprintf(srv_ip, "%u.%u.%u.%u", addr4->host[0], addr4->host[1], addr4->host[2], addr4->host[3]);
+            srv_port=addr4->port;
+            if (mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_TCP) {
+                sprintf(sock_type,"TCP");
+            }else if(mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_UDP){
+                sprintf(sock_type,"UDP");
+            }else{
+                return -1;
+            }
+        } else if (addr->type == MOBILE_ADDRTYPE_IPV6) {
+            const struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
+            //Need to parse IPV6
+            srv_port=addr6->port;
+            if (mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_TCP) {
+                sprintf(sock_type,"TCPv6");
+            }else if(mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_UDP){
+                sprintf(sock_type,"UDPv6");
+            }else{
+                return -1;
+            } 
+            return -1;
+        } else {
             return -1;
         }
-    } else if (addr->type == MOBILE_ADDRTYPE_IPV6) {
-        const struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
-        //Need to parse IPV6
-        srv_port=addr6->port;
-        if (mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_TCP) {
-            sprintf(sock_type,"TCP");
-        }else if(mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_UDP){
-            sprintf(sock_type,"UDP");
-        }else{
-            return -1;
-        } 
-        return -1;
-    } else {
-        return -1;
-    }
 
-    mobile->esp_sockets[conn].sock_status = OpenESPSockConn(UART_ID, conn, sock_type, srv_ip, srv_port, mobile->esp_sockets[conn].local_port, mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_TCP ? 0 : 2);
-        
-    if(mobile->esp_sockets[conn].sock_status){
+        mobile->esp_sockets[conn].sock_status = ESP_OpenSockConn(UART_ID, conn, sock_type, srv_ip, srv_port, mobile->esp_sockets[conn].local_port, mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_TCP ? 0 : 2);
+            
+        if(mobile->esp_sockets[conn].sock_status){
+            return 1;
+        }
+    }else{
         return 1;
     }
-
     return -1;
 }
 
@@ -285,10 +288,28 @@ bool mobile_board_sock_accept(void *user, unsigned conn){
 int mobile_board_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
 
-    //if(!mobile->esp_sockets[conn].sock_status && mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_UDP){
-    //    mobile_board_sock_connect(user, conn, addr);
-    //}
-    
+    char srv_ip[46];
+    memset(srv_ip,0x00,sizeof(srv_ip));
+    int srv_port=0;
+    char sock_type[5];
+
+    bool reqStatus;
+
+    if(mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_UDP){
+        if (addr->type == MOBILE_ADDRTYPE_IPV4) {
+        const struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
+        sprintf(srv_ip, "%u.%u.%u.%u", addr4->host[0], addr4->host[1], addr4->host[2], addr4->host[3]);
+        srv_port=addr4->port;
+        } else if (addr->type == MOBILE_ADDRTYPE_IPV6) {
+            const struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
+            //Need to parse IPV6
+            srv_port=addr6->port;
+        }
+        reqStatus = SendESPGetReq(UART_ID, conn, "UDP" , srv_ip, srv_port, "/01/CGB-B9AJ/index.php");
+    }else if(mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_TCP){
+        //reqStatus = SendESPGetReq(UART_ID, conn, "TCP", "0", 0, "/01/CGB-B9AJ/index.php");
+        return -1;
+    }
 
     //user = 0x20001ab8
     //conn = 0
@@ -340,7 +361,7 @@ void main_parse_addr(struct mobile_addr *dest, char *argv){
     case MOBILE_PTON_IPV4:
         dest4->type = MOBILE_ADDRTYPE_IPV4;
         //dest4->port = MOBILE_DNS_PORT;
-        dest4->port = 53061;
+        dest4->port = 63562;
         memcpy(dest4->host, ip, sizeof(dest4->host));
         break;
     case MOBILE_PTON_IPV6:
@@ -428,10 +449,7 @@ void main(){
 //////////////////////
     isESPDetected = EspAT_Init(UART_ID, BAUD_RATE, UART_TX_PIN, UART_RX_PIN);
     if(isESPDetected){
-        isConnectedWiFi = ConnectESPWiFi(UART_ID, WiFiSSID, WiFiPASS,SEC(10));
-        if(!isConnectedWiFi){
-            printf("ESP-01 Connecting Wifi: ERROR\n");
-        }
+        isConnectedWiFi = ESP_ConnectWifi(UART_ID, WiFiSSID, WiFiPASS,SEC(10));
     }
 //////////////////
 // END CONFIGURE

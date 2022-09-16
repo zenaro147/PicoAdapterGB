@@ -125,7 +125,7 @@ char * ReadESPcmd(int timeout){
 }
 
 // Establish a connection to the Host (Mobile Adapter GB server) and send the GET request to some URL
-bool SendESPGetReq(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, char * urlToRequest){
+bool ESP_SendData(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, char * urlToRequest){
     // Connect the ESP to the Host
     char cmdGetReq[100] = {};
     // Prepare the GET command to send

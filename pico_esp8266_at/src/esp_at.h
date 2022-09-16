@@ -77,12 +77,15 @@ void Delay_Timer(int timeout){
     }
 }
 
-// Send a AT command to the ESP (don't read anything back, for this use the ReadESPcmd function)
-void ESP_SendCmd(uart_inst_t *uart, const char *command){
+// *********************Send a AT command to the ESP (don't read anything back, for this use the ReadESPcmd function)
+void ESP_SendCmd(uart_inst_t *uart, const uint8_t *command){
     char cmd[300] = {}; //should handle the GET requests
     memset(cmd,'\0',sizeof(cmd));
     sprintf(cmd,"%s\r\n",command);
-    uart_puts(uart, cmd);
+    for (int i = 0; i< sizeof(cmd); i++){
+        uart_putc(uart, cmd[i]);
+    }
+    
 }
 
 // Read the internal RX buffer with the received data from ESP

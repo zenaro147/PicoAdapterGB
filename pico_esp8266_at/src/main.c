@@ -302,10 +302,10 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
             //Need to parse IPV6
             srv_port=addr6->port;
         }
-        sendDataStatus = ESP_SendData(UART_ID, conn, "UDP" , srv_ip, srv_port, "/01/CGB-B9AJ/index.php");
+        sendDataStatus = ESP_SendData(UART_ID, conn, "UDP" , srv_ip, srv_port, "/01/CGB-B9AJ/index.php"); //dummy data
         FlushATBuff();
     }else if(mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_TCP){
-        sendDataStatus = ESP_SendData(UART_ID, conn, "TCP" , "0.0.0.0", 0, "/01/CGB-B9AJ/index.php");
+        sendDataStatus = ESP_SendData(UART_ID, conn, "TCP" , "0.0.0.0", 0, "/01/CGB-B9AJ/index.php"); //dummy data
         ESP_ReadDataBuffSize(UART_ID,conn);
         mobile->esp_sockets[conn].host_id = -1;
         mobile->esp_sockets[conn].local_port = -1;

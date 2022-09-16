@@ -21,6 +21,8 @@ bool ishttpRequest = false;
 int ipdVal[5] = {0,0,0,0,0};
 bool isConnectedHost = false;
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // RX interrupt handler
 void on_uart_rx(){
     while (uart_is_readable(use_uart0 ? uart0 : uart1)) {
@@ -43,6 +45,28 @@ void on_uart_rx(){
     }
 }
 
+// Clean the RX buffer and ignore any data on it
+void FlushATBuff(){
+    buffATrx_pointer=0;
+    memset(buffATrx,'\0',sizeof(buffATrx));
+}
+
+// Find a string into the RX buffer
+bool ESP_SerialFind(char * buf, char * target, int ms_timeout, bool cleanBuff){
+    volatile uint64_t timenow = time_us_64();
+    volatile uint64_t last_read = timenow;
+
+    while ((timenow - last_read) < ms_timeout){
+        timenow = time_us_64();
+        if(strstr(buf, target) != NULL){
+            if(cleanBuff) FlushATBuff();
+            return true;
+        }
+    }
+    if(cleanBuff) FlushATBuff();
+    return false;
+}
+
 // Run a little timeout instead sleep (to prevent any block to the RX interrupt)
 void Delay_Timer(int timeout){
     volatile uint64_t timenow = 0;
@@ -54,14 +78,8 @@ void Delay_Timer(int timeout){
     }
 }
 
-// Clean the RX buffer and ignore any data on it
-void FlushATBuff(){
-    buffATrx_pointer=0;
-    memset(buffATrx,'\0',sizeof(buffATrx));
-}
-
 // Send a AT command to the ESP (don't read anything back, for this use the ReadESPcmd function)
-void SendESPcmd(uart_inst_t *uart, const char *command){
+void ESP_SendCmd(uart_inst_t *uart, const char *command){
     char cmd[300] = {}; //should handle the GET requests
     memset(cmd,'\0',sizeof(cmd));
     sprintf(cmd,"%s\r\n",command);
@@ -119,15 +137,27 @@ bool SendESPGetReq(uart_inst_t * uart, uint8_t connID, char * sock_type, char * 
     if(cmdSize > 2048){
         printf("ESP-01 Sending Request: ERROR - The request limit is 2048 bytes. Your request have: %i bytes\n", cmdSize);
     }else{
+        
         // Send the ammount of data we will send to ESP (the GET command size)
-        char cmdSend[20] = {};
-        sprintf(cmdSend,"AT+CIPSEND=%i,%i", connID, cmdSize);
-        SendESPcmd(uart, cmdSend);
+        char cmdSend[100] = {};
+        if(strcmp(sock_type, "UDP") == 0){
+            sprintf(cmdSend,"AT+CIPSEND=%i,%i,\"%s\",%i", connID, cmdSize, conn_host, conn_port);
+        }else{
+            sprintf(cmdSend,"AT+CIPSEND=%i,%i", connID, cmdSize);
+        }
+
+        ESP_SendCmd(uart, cmdSend);
+        //if(ESP_SerialFind(buffATrx,"CONNECT",MS(5000),false)){          
+        //    printf("ESP-01 Host Connection: OK\n");
+        //}else{
+        //    printf("ESP-01 Start Host Connection: ERROR\n");
+        //}
+
         char * resp = ReadESPcmd(SEC(2));
         if(strcmp(resp, "OK") == 0){
             printf("ESP-01 Sending Request: OK\nSending Request...\n");
             FlushATBuff(); // Clean the '>' signal to receive the command
-            SendESPcmd(uart, cmdGetReq); // Finally send the GET request!It have one more \r\n at the end, but the SendESPcmd already do this.
+            ESP_SendCmd(uart, cmdGetReq); // Finally send the GET request!It have one more \r\n at the end, but the ESP_SendCmd already do this.
             //Possible returns: ERROR, SEND OK, SEND FAIL
             resp = ReadESPcmd(SEC(10)); //10 sec, "Received Bytes message" (unused data, but feeds the buffer if necessary)
             resp = ReadESPcmd(SEC(1));
@@ -179,7 +209,7 @@ void ReadESPGetReq(uart_inst_t * uart, uint8_t connID, int dataSize){
             buffGETReq_pointer=dataSize;
             sprintf(cmdRead,"AT+CIPRECVDATA=%i,%i",connID,dataSize);
             ishttpRequest=true;
-            SendESPcmd(uart,cmdRead); //Must igonre the OK at the end, and the "+CIPRECVDATA,<size>:" at the beginning
+            ESP_SendCmd(uart,cmdRead); //Must igonre the OK at the end, and the "+CIPRECVDATA,<size>:" at the beginning
             Delay_Timer(SEC(5)); //5 sec. Give time to feed the buffer    
             ishttpRequest=false;
             int cmdReadSize = strlen(cmdRead)-1;
@@ -195,7 +225,7 @@ void ReadESPGetReq(uart_inst_t * uart, uint8_t connID, int dataSize){
 //Read the remaining data inside ESP buffer (must be used like this: ipdVal = ReadESPGetReqBuffSize(UART_ID))
 int ReadESPGetReqBuffSize(uart_inst_t * uart, uint8_t connIDReq){
     uint8_t connID = 0;
-    SendESPcmd(uart,"AT+CIPRECVLEN?");
+    ESP_SendCmd(uart,"AT+CIPRECVLEN?");
     char * resp = ReadESPcmd(SEC(2));
     if(strstr(resp, "+CIPRECVLEN:") != NULL){
         // Extract the first token
@@ -216,44 +246,36 @@ int ReadESPGetReqBuffSize(uart_inst_t * uart, uint8_t connIDReq){
 }
 
 //Open the desired ESP Socket
-bool OpenESPSockConn(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, int conn_localport, uint8_t conn_mode){
+bool ESP_OpenSockConn(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, int conn_localport, uint8_t conn_mode){
     if(ipdVal[connID] != 0){
         printf("ESP-01 Start Host Connection: You can't open a connection now.\n");
         return false;
     }
-    
-    char cmdSckt[100];
 
+    char cmdSckt[100];
     if (conn_localport != 0){
         sprintf(cmdSckt,"AT+CIPSTART=%i,\"%s\",\"%s\",%i,%i,%i", connID, sock_type, conn_host, conn_port, conn_localport, conn_mode);
     }else{
         sprintf(cmdSckt,"AT+CIPSTART=%i,\"%s\",\"%s\",%i,,%i", connID, sock_type, conn_host, conn_port, conn_mode);
-    }  
-
-    printf("%s\n",cmdSckt);
+    }
     
-    SendESPcmd(uart, cmdSckt);
-    char * resp = ReadESPcmd(SEC(3));
-
-    if(strstr(resp, "CONNECT") != NULL){
-        resp = ReadESPcmd(SEC(1));
-        if(strcmp(resp, "OK") == 0){
-            printf("ESP-01 Start Host Connection: OK\n");
+    ESP_SendCmd(uart, cmdSckt);
+    if(ESP_SerialFind(buffATrx,"CONNECT",MS(5000),false)){
+        if(ESP_SerialFind(buffATrx,"OK",MS(5000),true)){            
+            printf("ESP-01 Host Connection: OK\n");
         }
+    }else if(ESP_SerialFind(buffATrx,"CONNECT",MS(5000),false)){        
+        printf("ESP-01 Start Host Connection: ALREADY CONNECTED\n");
     }else{
-        if(strcmp(resp, "ALREADY CONNECTED") == 0) {            
-            printf("ESP-01 Start Host Connection: ALREADY CONNECTED\n");
-        }else{
-            printf("ESP-01 Start Host Connection: ERROR\n");
-            return false;
-        }
+        printf("ESP-01 Start Host Connection: ERROR\n");
+        return false;
     }
     return true;
 }
 
-// Return the status of the Host connection using TCP or UDP (must be used like this: isConnectedHost = GetESPSockConn(UART_ID))
-bool GetESPSockConn(uart_inst_t * uart){
-    SendESPcmd(uart,"AT+CIPSTATUS");
+// Return the status of the Host connection using TCP or UDP (must be used like this: isConnectedHost = ESP_GetSockStatus(UART_ID))
+bool ESP_GetSockStatus(uart_inst_t * uart){
+    ESP_SendCmd(uart,"AT+CIPSTATUS");
     char * resp = ReadESPcmd(SEC(2));
     if(strstr(resp, "STATUS:") != NULL){
         char numstat[2] = {};
@@ -276,13 +298,16 @@ bool GetESPSockConn(uart_inst_t * uart){
 }
 
 //Close the desired ESP Socket
-void CloseESPSockConn(uart_inst_t * uart, uint8_t connID){
+void ESP_CloseSockConn(uart_inst_t * uart, uint8_t connID){
     char cmd[15];
     sprintf(cmd,"AT+CIPCLOSE=%i",connID);
-    SendESPcmd(uart,cmd);
-    Delay_Timer(SEC(2)); // 2 seconds
-    FlushATBuff(); // Clean any output. We don't need it.
-    //GetESPSockConn(uart); //Need to recreate this function to get the status of all connections
+    ESP_SendCmd(uart,cmd);
+    if(ESP_SerialFind(buffATrx,"OK",MS(2000),true)){
+         printf("ESP-01 Close Socket: OK\n");
+    }else{
+       printf("ESP-01 Close Socket: ERROR\n"); 
+    }
+    //ESP_GetSockStatus(uart); //Need to recreate this function to get the status of all connections
 }
 
 // Initialize the ESP-01 UART communication
@@ -318,98 +343,65 @@ bool EspAT_Init(uart_inst_t * uart, int baudrate, int txpin, int rxpin){
 }
 
 // Provides the necessary commands to connect the ESP to a WiFi network
-bool ConnectESPWiFi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int timeout){
+bool ESP_ConnectWifi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int timeout){
     
     //AT+CIPSTO=0 -- set Server timeout (0~7200)
     //AT+CIPDINFO=1 -- Show port and IP on IPD return
     
-    //test connection - Check 2 times in case the ESP return some echo 
+    //Test hardware connection
     FlushATBuff(); // Reset RX Buffer
-    SendESPcmd(uart,"AT");
-    char * resp = ReadESPcmd(SEC(1));
-    if(strcmp(resp, "OK") == 0){
-        printf("ESP-01 Connectivity: OK\n");
-    }else{        
-        printf("ESP-01 Connectivity: ERROR || Retrying...\n");
-        resp = ReadESPcmd(SEC(1));
-        if(strcmp(resp, "OK") == 0){
-            printf("ESP-01 Connectivity: OK\n");
-        }else{        
-            printf("ESP-01 Connectivity: ERROR\n");
-        }
+    ESP_SendCmd(uart,"AT");
+    if(ESP_SerialFind(buffATrx,"OK",MS(1000),true)){
+         printf("ESP-01 Connectivity: OK\n");
+    }else{
+       printf("ESP-01 Connectivity: ERROR\n"); 
     }
 
-    // Disable echo - Check 2 times in case the ESP return some echo 
-    SendESPcmd(uart,"ATE0");
-    resp = ReadESPcmd(SEC(1));
-    if(strcmp(resp, "OK") == 0){
-        printf("ESP-01 Disable Echo: OK\n");
-    }else{        
-        printf("ESP-01 Disable Echo: ERROR || Retrying...\n");
-        resp = ReadESPcmd(SEC(1));
-        if(strcmp(resp, "OK") == 0){
-            printf("ESP-01 Disable Echo: OK\n");
-        }else{        
-            printf("ESP-01 Disable Echo: ERROR\n");
-        }
+    // Disable echo 
+    ESP_SendCmd(uart,"ATE0");
+    if(ESP_SerialFind(buffATrx,"OK",MS(1000),true)){
+         printf("ESP-01 Disable Echo: OK\n");
+    }else{
+       printf("ESP-01 Disable Echo: ERROR\n"); 
     }
-
+    
     // Set to Passive Mode to receive TCP info
     // AT+CIPRECVDATA=<size> | read the X amount of data from esp buffer
     // AT+CIPRECVLEN? | return the remaining  buffer size like this +CIPRECVLEN:636,0,0,0,0)
-    SendESPcmd(uart, "AT+CIPRECVMODE=1");
-    resp = ReadESPcmd(SEC(1)); // 2 second
-    if(strcmp(resp, "OK") == 0){
-        printf("ESP-01 Passive Mode: OK\n");
-    }else{        
-        printf("ESP-01 Passive Mode: ERROR\n");
+    ESP_SendCmd(uart, "AT+CIPRECVMODE=1");
+    if(ESP_SerialFind(buffATrx,"OK",MS(1000),true)){
+         printf("ESP-01 Passive Mode: OK\n");
+    }else{
+       printf("ESP-01 Passive Mode: ERROR\n"); 
     }
 
-    SendESPcmd(uart, "AT+CIPMUX=1");
-    resp = ReadESPcmd(SEC(1)); // 2 second
-    if(strcmp(resp, "OK") == 0){
-        printf("ESP-01 Multi Connections: OK\n");
-    }else{        
-        printf("ESP-01 Multi Connections: ERROR\n");
+    ESP_SendCmd(uart, "AT+CIPMUX=1");
+    if(ESP_SerialFind(buffATrx,"OK",MS(1000),true)){
+         printf("ESP-01 Multi Connections: OK\n");
+    }else{
+       printf("ESP-01 Multi Connections: ERROR\n"); 
     }
 
     // Set WiFi Mode to Station mode Only
-    SendESPcmd(uart,"AT+CWMODE=1");
-    resp = ReadESPcmd(SEC(1));
-    if(strcmp(resp, "OK") == 0){
-        printf("ESP-01 Station Mode: OK\n");
-        // Prepare the command to send
+    ESP_SendCmd(uart,"AT+CWMODE=1");    
+    if(ESP_SerialFind(buffATrx,"OK",MS(1000),true)){
+         printf("ESP-01 Station Mode: OK\n");
+         // Prepare the command to send
         char espComm[100] = {};
         memset(espComm,'\0',sizeof(espComm));
         sprintf(espComm,"AT+CWJAP=\"%s\",\"%s\"",SSID_WiFi,Pass_WiFi);
-        SendESPcmd(uart, espComm);
-
-        resp = ReadESPcmd(timeout);
-        while (true){
-            if(strcmp(resp, "WIFI DISCONNECT") == 0){
-                printf("ESP-01 Connecting Wifi: DISCONNECTED\n");
-            }else{
-                if(strcmp(resp, "WIFI CONNECTED") == 0){
-                    printf("ESP-01 Connecting Wifi: CONNECTED\n");
-                }else{
-                    if(strcmp(resp, "WIFI GOT IP") == 0){
-                        printf("ESP-01 Connecting Wifi: GOT IP\n");
-                    }else{
-                        if(strcmp(resp, "OK") == 0){
-                            printf("ESP-01 Connecting Wifi: OK\n");
-                            return true;
-                        }else{
-                            printf("ESP-01 Connecting Wifi: ERROR\n");
-                            return false;
-                        }                        
-                    }
-                }
-            }
-            resp = ReadESPcmd(SEC(1)); // 2 seconds
+        ESP_SendCmd(uart, espComm);
+        
+        if(ESP_SerialFind(buffATrx,"OK",MS(10000),true)){
+            printf("ESP-01 Connecting Wifi: OK\n");
+            return true;
+        }else{
+            printf("ESP-01 Connecting Wifi: ERROR\n");
+            return false;
         }
-    }else{        
-        printf("ESP-01 Station Mode: ERROR\n");
-        return false;
+    }else{
+       printf("ESP-01 Station Mode: ERROR\n"); 
+       return false;
     }
 }
 #endif

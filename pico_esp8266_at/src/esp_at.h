@@ -147,16 +147,11 @@ bool ESP_SendData(uart_inst_t * uart, uint8_t connID, char * sock_type, char * c
         }
 
         ESP_SendCmd(uart, cmdSend);
-        //if(ESP_SerialFind(buffATrx,"CONNECT",MS(5000),false)){          
-        //    printf("ESP-01 Host Connection: OK\n");
-        //}else{
-        //    printf("ESP-01 Start Host Connection: ERROR\n");
-        //}
+        
 
-        char * resp = ReadESPcmd(SEC(2));
-        if(strcmp(resp, "OK") == 0){
+        char * resp = "";
+        if(ESP_SerialFind(buffATrx,">",MS(2),true)){         
             printf("ESP-01 Sending Request: OK\nSending Request...\n");
-            FlushATBuff(); // Clean the '>' signal to receive the command
             ESP_SendCmd(uart, cmdGetReq); // Finally send the GET request!It have one more \r\n at the end, but the ESP_SendCmd already do this.
             //Possible returns: ERROR, SEND OK, SEND FAIL
             resp = ReadESPcmd(SEC(10)); //10 sec, "Received Bytes message" (unused data, but feeds the buffer if necessary)
@@ -186,6 +181,8 @@ bool ESP_SendData(uart_inst_t * uart, uint8_t connID, char * sock_type, char * c
         }else{
             printf("ESP-01 Sending Request: ERROR\n");
         }
+
+
     }
     return false;
 }

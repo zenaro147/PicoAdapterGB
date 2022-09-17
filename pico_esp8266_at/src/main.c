@@ -440,13 +440,16 @@ void main(){
 
         //
         char dado[60] = "GET /01/CGB-B9AJ/index.php HTTP/1.0\r\nHost: 192.168.0.126\r\n\r\n";
+        uint8_t dadoudp [] = {0x00,0x01,0x01,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x07,0x67,0x61,0x6D,0x65,0x62,0x6F,0x79,0x0A,0x64,0x61,0x74,0x61,0x63,0x65,0x6E,0x74,0x65,0x72,0x02,0x6E,0x65,0x02,0x6A,0x70,0x00,0x00,0x01,0x00,0x01};
 
         ESP_OpenSockConn(UART_ID,0,"TCP","192.168.0.126",80,0,0);
         ESP_OpenSockConn(UART_ID,1,"UDP","192.168.0.126",57318,0,2);
         
+        ESP_SendData(UART_ID,1,"UDP","192.168.0.126",57318,dadoudp,sizeof(dadoudp));
         ESP_SendData(UART_ID,0,"TCP","192.168.0.126",80,dado,60);
+        //
 
-        ESP_ReadBuffSize(UART_ID)
+        ESP_ReqDataBuff(UART_ID,0,100);
 
         ESP_SendData(UART_ID,1,"UDP","192.168.0.126",57318,dado,60);
         //
@@ -474,7 +477,7 @@ void main(){
         //bool reqStatus = ESP_SendData(UART_ID, ,MAGB_HOST, MAGB_PORT, "/01/CGB-B9AJ/index.php");
         //bool reqStatus = ESP_SendData(UART_ID, ,MAGB_HOST, MAGB_PORT, "/cgb/download?name=/01/CGB-BXTJ/tamago/tamago0a.pkm"); 
         //bool reqStatus = ESP_SendData(UART_ID, ,MAGB_HOST, MAGB_PORT, "/01/CGB-BXTJ/tamago/tamago0a.pkm");        
-        //ReadESPGetReq(UART_ID,700); //The value will be stored into buffGETReq array
+        //ESP_ReqDataBuff(UART_ID,700); //The value will be stored into buffGETReq array
 
     }else{
         //do something

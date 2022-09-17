@@ -198,7 +198,7 @@ void mobile_board_sock_close(void *user, unsigned conn){
     }
 }
 
-int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){    
+int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
     
     if(!mobile->esp_sockets[conn].sock_status){
@@ -287,11 +287,9 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
             //Need to parse IPV6
             srv_port=addr6->port;
         }
-        sendDataStatus = ESP_SendData(UART_ID, conn, "UDP" , srv_ip, srv_port, data, size); //dummy data
-        FlushATBuff();
+        sendDataStatus = ESP_SendData(UART_ID, conn, "UDP" , srv_ip, srv_port, data, size); 
     }else if(mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_TCP){
-        sendDataStatus = ESP_SendData(UART_ID, conn, "TCP" , "0.0.0.0", 0, data, 0); //dummy data
-        //ESP_ReadBuffSize(UART_ID,conn);
+        sendDataStatus = ESP_SendData(UART_ID, conn, "TCP" , "0.0.0.0", 0, data, 0);
         char checkClose[12];
         sprintf(checkClose,"%i,CLOSED\r\n",conn);
         if (strstr(buffATrx,checkClose) != NULL){
@@ -315,10 +313,7 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
 
     //user = 0x20001ab8
     //conn = 0
-    //data = 0x20001e04 (memory address)
-    //                00 01 01 00 00 01 00 00 00 00 00 00       ............
-    //    07 67 61 6D 65 62 6F 79 0A 64 61 74 61 63 65 6E   .gameboy.datacen
-    //    74 65 72 02 6E 65 02 6A 70 00 00 01 00 01         ter.ne.jp.....
+    //data = 0x20001e04 (memory address) << Need to feed
     //size = 512
     //addr = 0x20041f08
     //      Type: MOBILE_ADDRTYPE_NONE
@@ -328,7 +323,7 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     //struct mobile_user *mobile = (struct mobile_user *)user;
     //int sock = mobile->sockets[conn];
     //
-    //// Make sure at least one byte is in the buffer
+    // Make sure at least one byte is in the buffer
     //if (socket_hasdata(sock, 0) <= 0) return 0;
     //
     //union u_sockaddr u_addr = {0};
@@ -337,16 +332,16 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     //
     //ssize_t len = 0;
     //if (data) {
-    //    // Retrieve at least 1 byte from the buffer
+        // Retrieve at least 1 byte from the buffer
     //    len = recvfrom(sock, data, size, 0, sock_addr, &sock_addrlen);
     //} else {
-    //    // Check if at least 1 byte is available in buffer
+        // Check if at least 1 byte is available in buffer
     //    char c;
     //    len = recvfrom(sock, &c, 1, MSG_PEEK, sock_addr, &sock_addrlen);
     //}
     //if (len == -1) {
-    //    // If the socket is blocking, we just haven't received anything
-    //    // Though this shouldn't happen thanks to the socket_hasdata check.
+        // If the socket is blocking, we just haven't received anything
+        // Though this shouldn't happen thanks to the socket_hasdata check.
     //    int err = socket_geterror();
     //    if (err == SOCKET_EWOULDBLOCK || err == SOCKET_EAGAIN) return 0;
     //
@@ -354,10 +349,10 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     //    return -1;
     //}
     //
-    //// A length of 0 will be returned if the remote has disconnected.
+    // A length of 0 will be returned if the remote has disconnected.
     //if (len == 0) {
-    //    // Though it's only relevant to TCP sockets, as UDP sockets may receive
-    //    // zero-length datagrams.
+        // Though it's only relevant to TCP sockets, as UDP sockets may receive
+        // zero-length datagrams.
     //    int sock_type = 0;
     //    socklen_t sock_type_len = sizeof(sock_type);
     //    getsockopt(sock, SOL_SOCKET, SO_TYPE, (char *)&sock_type,
@@ -385,6 +380,11 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     //
     //return len;
     struct mobile_user *mobile = (struct mobile_user *)user;
+
+    //! The buffer was cleared during the CIPCLOSE and there is not enough time to receive the DNS answer... Need to add a delay here (tested with 5seconds)
+    // If the Socket is an UDP, Search for a \r\n+IPD,<connID>,<size>: 
+    // Feed Data variable with the received size
+
     return -1;
 }
 
@@ -516,6 +516,20 @@ void main(){
         mobile_init(&mobile->adapter, mobile, &adapter_config);
         multicore_launch_core1(core1_context);
         FlushATBuff();
+
+        //
+        //char dado[60] = "GET /01/CGB-B9AJ/index.php HTTP/1.0\r\nHost: 192.168.0.126\r\n\r\n";
+        //uint8_t dadoudp [] = {0x00,0x01,0x01,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x07,0x67,0x61,0x6D,0x65,0x62,0x6F,0x79,0x0A,0x64,0x61,0x74,0x61,0x63,0x65,0x6E,0x74,0x65,0x72,0x02,0x6E,0x65,0x02,0x6A,0x70,0x00,0x00,0x01,0x00,0x01};
+        //
+        //ESP_OpenSockConn(UART_ID,1,"UDP","192.168.0.126",57318,0,2);
+        //
+        //ESP_SendData(UART_ID,1,"UDP","192.168.0.126",53,dadoudp,sizeof(dadoudp));
+        ////
+        //Delay_Timer(SEC(5));
+        //ESP_CloseSockConn(UART_ID,1);
+        //
+        //ESP_SendData(UART_ID,1,"UDP","192.168.0.126",57318,dado,60);
+        //
 
         while (true) {
             mobile_loop(&mobile->adapter);

@@ -10,7 +10,7 @@
 
 #define buffDelimiter '|'
 #define BUFF_AT_SIZE 2048 //2048 is the maximun you can receive from esp01
-char buffATrx[BUFF_AT_SIZE] = {};
+char buffATrx[BUFF_AT_SIZE+64] = {}; //  + extra bytes to hold the AT command answer echo
 int buffATrx_pointer = 0;
 char buffGETReq[BUFF_AT_SIZE] = {};
 int buffGETReq_pointer = 0;
@@ -26,21 +26,6 @@ int ipdVal[5] = {0,0,0,0,0};
 void on_uart_rx(){
     while (uart_is_readable(use_uart0 ? uart0 : uart1)) {
         char ch = uart_getc(use_uart0 ? uart0 : uart1);
-        //if(!ishttpRequest){
-        //    if(ch == '\n' || (buffATrx[buffATrx_pointer-1] == buffDelimiter && ch == '\r')){
-        //        continue;
-        //    }else{
-        //        if(ch == '\r'){
-        //            if (buffATrx_pointer > 0){
-        //                buffATrx[buffATrx_pointer++] = buffDelimiter;
-        //            }
-        //        }else{
-        //            buffATrx[buffATrx_pointer++] = ch;
-        //        }
-        //    }
-        //}else{
-        //    buffATrx[buffATrx_pointer++] = ch;
-        //}
         buffATrx[buffATrx_pointer++] = ch;
         if (buffATrx_pointer >= BUFF_AT_SIZE){
             buffATrx_pointer = 0;

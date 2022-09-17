@@ -175,8 +175,7 @@ void ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize){
 }
 
 // Send data to the Mobile Adapter GB Host
-uint8_t ESP_SendData(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, uint8_t * databuff, int datasize){
-    
+uint8_t ESP_SendData(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, const void * databuff, int datasize){    
     // Check if the GET command have less than 2048 bytes to send. This is the ESP limit
     if(datasize > 2048){
         printf("ESP-01 Sending Request: ERROR - The request limit is 2048 bytes. Your request have: %i bytes\n", datasize);
@@ -189,9 +188,10 @@ uint8_t ESP_SendData(uart_inst_t * uart, uint8_t connID, char * sock_type, char 
             sprintf(cmdSend,"AT+CIPSEND=%i,%i", connID, datasize);
         }
         ESP_SendCmd(uart,cmdSend,0);
-        if(ESP_SerialFind(buffATrx,"> ",MS(2),true)){         
+        if(ESP_SerialFind(buffATrx,"> ",MS(300),true)){
+            uint8_t * datasend = (uint8_t *)databuff;
             printf("ESP-01 Sending Data: OK\nSending Request...\n");
-            ESP_SendCmd(uart,databuff,datasize);
+            ESP_SendCmd(uart,datasend,datasize);
             if(ESP_SerialFind(buffATrx,"SEND OK\r\n",SEC(1),false)){
                 printf("ESP-01 Sending Data: SEND OK\n");
                 if(strcmp(sock_type, "TCP") == 0 && ESP_SerialFind(buffATrx,"+IPD",SEC(5),false)){

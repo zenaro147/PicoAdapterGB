@@ -155,9 +155,9 @@ sock_recv() is also a funky one because it needs to signal to libmobile whether 
 bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
     struct mobile_user *mobile = (struct mobile_user *)user;
 
-    if(mobile->esp_sockets[conn].host_id != -1){
-        return false;
-    }
+    //if(!mobile->esp_sockets[conn].sock_status && mobile->esp_sockets[conn].host_id != -1){
+    //    return false;
+    //}
 
     switch (addrtype) {
         case MOBILE_ADDRTYPE_IPV4:
@@ -287,10 +287,10 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
             //Need to parse IPV6
             srv_port=addr6->port;
         }
-        sendDataStatus = ESP_SendData(UART_ID, conn, "UDP" , srv_ip, srv_port, "GET /01/CGB-B9AJ/index.php HTTP/1.0\r\nHost: 192.168.0.126\r\n\r\n",60); //dummy data
+        sendDataStatus = ESP_SendData(UART_ID, conn, "UDP" , srv_ip, srv_port, data, size); //dummy data
         FlushATBuff();
     }else if(mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_TCP){
-        sendDataStatus = ESP_SendData(UART_ID, conn, "TCP" , "0.0.0.0", 0, "GET /01/CGB-B9AJ/index.php HTTP/1.0\r\nHost: 192.168.0.126\r\n\r\n",60); //dummy data
+        sendDataStatus = ESP_SendData(UART_ID, conn, "TCP" , "0.0.0.0", 0, data, 0); //dummy data
         //ESP_ReadBuffSize(UART_ID,conn);
         char checkClose[12];
         sprintf(checkClose,"%i,CLOSED\r\n",conn);
@@ -309,6 +309,81 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
 }
 
 int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
+    // Returns: amount of data received on success,
+    //          -1 on error,
+    //          -2 on remote disconnect
+
+    //user = 0x20001ab8
+    //conn = 0
+    //data = 0x20001e04 (memory address)
+    //                00 01 01 00 00 01 00 00 00 00 00 00       ............
+    //    07 67 61 6D 65 62 6F 79 0A 64 61 74 61 63 65 6E   .gameboy.datacen
+    //    74 65 72 02 6E 65 02 6A 70 00 00 01 00 01         ter.ne.jp.....
+    //size = 512
+    //addr = 0x20041f08
+    //      Type: MOBILE_ADDRTYPE_NONE
+    //      _addr4 - type:MOBILE_ADDRTYPE_NONE / port:0 / host:0 0 0 0)
+    //      _addr6 - type:MOBILE_ADDRTYPE_NONE / port:0 / host:0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
+
+    //struct mobile_user *mobile = (struct mobile_user *)user;
+    //int sock = mobile->sockets[conn];
+    //
+    //// Make sure at least one byte is in the buffer
+    //if (socket_hasdata(sock, 0) <= 0) return 0;
+    //
+    //union u_sockaddr u_addr = {0};
+    //socklen_t sock_addrlen = sizeof(u_addr);
+    //struct sockaddr *sock_addr = (struct sockaddr *)&u_addr;
+    //
+    //ssize_t len = 0;
+    //if (data) {
+    //    // Retrieve at least 1 byte from the buffer
+    //    len = recvfrom(sock, data, size, 0, sock_addr, &sock_addrlen);
+    //} else {
+    //    // Check if at least 1 byte is available in buffer
+    //    char c;
+    //    len = recvfrom(sock, &c, 1, MSG_PEEK, sock_addr, &sock_addrlen);
+    //}
+    //if (len == -1) {
+    //    // If the socket is blocking, we just haven't received anything
+    //    // Though this shouldn't happen thanks to the socket_hasdata check.
+    //    int err = socket_geterror();
+    //    if (err == SOCKET_EWOULDBLOCK || err == SOCKET_EAGAIN) return 0;
+    //
+    //    socket_perror("recv");
+    //    return -1;
+    //}
+    //
+    //// A length of 0 will be returned if the remote has disconnected.
+    //if (len == 0) {
+    //    // Though it's only relevant to TCP sockets, as UDP sockets may receive
+    //    // zero-length datagrams.
+    //    int sock_type = 0;
+    //    socklen_t sock_type_len = sizeof(sock_type);
+    //    getsockopt(sock, SOL_SOCKET, SO_TYPE, (char *)&sock_type,
+    //        &sock_type_len);
+    //    if (sock_type == SOCK_STREAM) return -2;
+    //}
+    //
+    //if (!data) return 0;
+    //
+    //if (addr && sock_addrlen) {
+    //    if (sock_addr->sa_family == AF_INET) {
+    //        struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
+    //        addr4->type = MOBILE_ADDRTYPE_IPV4;
+    //        addr4->port = ntohs(u_addr.addr4.sin_port);
+    //        memcpy(addr4->host, &u_addr.addr4.sin_addr.s_addr,
+    //            sizeof(addr4->host));
+    //    } else if (sock_addr->sa_family == AF_INET6) {
+    //        struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
+    //        addr6->type = MOBILE_ADDRTYPE_IPV6;
+    //        addr6->port = ntohs(u_addr.addr6.sin6_port);
+    //        memcpy(addr6->host, &u_addr.addr6.sin6_addr.s6_addr,
+    //            sizeof(addr6->host));
+    //    }
+    //}
+    //
+    //return len;
     struct mobile_user *mobile = (struct mobile_user *)user;
     return -1;
 }
@@ -336,7 +411,6 @@ void main_parse_addr(struct mobile_addr *dest, char *argv){
     case MOBILE_PTON_IPV4:
         dest4->type = MOBILE_ADDRTYPE_IPV4;
         dest4->port = MOBILE_DNS_PORT;
-        //dest4->port = 49422;
         memcpy(dest4->host, ip, sizeof(dest4->host));
         break;
     case MOBILE_PTON_IPV6:
@@ -433,10 +507,15 @@ void main(){
         LED_OFF;
 
         mobile->action = MOBILE_ACTION_NONE;
-        for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++) mobile->esp_sockets[i].host_id = -1;
+        for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
+            mobile->esp_sockets[i].host_id = -1;
+            mobile->esp_sockets[i].host_iptype = MOBILE_ADDRTYPE_NONE;
+            mobile->esp_sockets[i].sock_status = false;
+        } 
 
         mobile_init(&mobile->adapter, mobile, &adapter_config);
         multicore_launch_core1(core1_context);
+        FlushATBuff();
 
         while (true) {
             mobile_loop(&mobile->adapter);
@@ -457,12 +536,6 @@ void main(){
                 }
             }
         }
-
-        //bool reqStatus = ESP_SendData(UART_ID, ,MAGB_HOST, MAGB_PORT, "/01/CGB-B9AJ/index.php");
-        //bool reqStatus = ESP_SendData(UART_ID, ,MAGB_HOST, MAGB_PORT, "/cgb/download?name=/01/CGB-BXTJ/tamago/tamago0a.pkm"); 
-        //bool reqStatus = ESP_SendData(UART_ID, ,MAGB_HOST, MAGB_PORT, "/01/CGB-BXTJ/tamago/tamago0a.pkm");        
-        //ESP_ReqDataBuff(UART_ID,700); //The value will be stored into buffGETReq array
-
     }else{
         //do something
     }

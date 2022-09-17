@@ -335,8 +335,8 @@ void main_parse_addr(struct mobile_addr *dest, char *argv){
     switch (rc) {
     case MOBILE_PTON_IPV4:
         dest4->type = MOBILE_ADDRTYPE_IPV4;
-        //dest4->port = MOBILE_DNS_PORT;
-        dest4->port = 49422;
+        dest4->port = MOBILE_DNS_PORT;
+        //dest4->port = 49422;
         memcpy(dest4->host, ip, sizeof(dest4->host));
         break;
     case MOBILE_PTON_IPV6:
@@ -437,22 +437,6 @@ void main(){
 
         mobile_init(&mobile->adapter, mobile, &adapter_config);
         multicore_launch_core1(core1_context);
-
-        //
-        char dado[60] = "GET /01/CGB-B9AJ/index.php HTTP/1.0\r\nHost: 192.168.0.126\r\n\r\n";
-        uint8_t dadoudp [] = {0x00,0x01,0x01,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x07,0x67,0x61,0x6D,0x65,0x62,0x6F,0x79,0x0A,0x64,0x61,0x74,0x61,0x63,0x65,0x6E,0x74,0x65,0x72,0x02,0x6E,0x65,0x02,0x6A,0x70,0x00,0x00,0x01,0x00,0x01};
-
-        ESP_OpenSockConn(UART_ID,0,"TCP","192.168.0.126",80,0,0);
-        ESP_OpenSockConn(UART_ID,1,"UDP","192.168.0.126",57318,0,2);
-        
-        ESP_SendData(UART_ID,1,"UDP","192.168.0.126",57318,dadoudp,sizeof(dadoudp));
-        ESP_SendData(UART_ID,0,"TCP","192.168.0.126",80,dado,60);
-        //
-
-        ESP_ReqDataBuff(UART_ID,0,100);
-
-        ESP_SendData(UART_ID,1,"UDP","192.168.0.126",57318,dado,60);
-        //
 
         while (true) {
             mobile_loop(&mobile->adapter);

@@ -8,12 +8,11 @@
 #include "hardware/irq.h"
 #include "common.h"
 
-#define buffDelimiter '|'
 #define BUFF_AT_SIZE 2048 //2048 is the maximun you can receive from esp01
 char buffATrx[BUFF_AT_SIZE+64] = {}; //  + extra bytes to hold the AT command answer echo
 int buffATrx_pointer = 0;
-char buffGETReq[BUFF_AT_SIZE] = {};
-int buffGETReq_pointer = 0;
+char buffTCPReq[BUFF_AT_SIZE] = {};
+int buffTCPReq_pointer = 0;
 bool use_uart0 = true;
 
 bool isConnectedWiFi = false;
@@ -110,7 +109,7 @@ int ESP_GetCmdIndexBuffer(char * rxbuff, char * cmdSearch){
 int ESP_ReadBuffSize(uart_inst_t * uart, uint8_t connIDReq){
     FlushATBuff();
     ESP_SendCmd(uart,"AT+CIPRECVLEN?",0);
-    if(ESP_SerialFind(buffATrx,"+CIPRECVLEN:",MS(2000),false)){
+    if(ESP_SerialFind(buffATrx,"+CIPRECVLEN:",SEC(2),false)){
         Delay_Timer(MS(100));
         uint8_t connID_pointer = 0;
         char resp[50];
@@ -154,18 +153,18 @@ void ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize){
             }
 
             char cmdRead[25]={};
-            buffGETReq_pointer=dataSize;
+            buffTCPReq_pointer=dataSize;
             sprintf(cmdRead,"AT+CIPRECVDATA=%i,%i",connID,dataSize);
 
             ESP_SendCmd(uart,cmdRead,0); //Must igonre the OK at the end, and the "+CIPRECVDATA,<size>:" at the beginning
             if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(5),false)){
                 int cmdReadSize = strlen(cmdRead)-1;
                 for(int i = cmdReadSize; i < buffATrx_pointer-6; i++){
-                    buffGETReq[i - cmdReadSize] = buffATrx[i];
+                    buffTCPReq[i - cmdReadSize] = buffATrx[i];
                 }
                 Delay_Timer(MS(100));
                 FlushATBuff();
-                memcpy(buffATrx,buffGETReq,dataSize);
+                memcpy(buffATrx,buffTCPReq,dataSize);
                 printf("ESP-01 Read Request: DONE.\n");
             }else{
                 printf("ESP-01 Read Request: ERROR.\n");
@@ -192,7 +191,7 @@ uint8_t ESP_SendData(uart_inst_t * uart, uint8_t connID, char * sock_type, char 
             uint8_t * datasend = (uint8_t *)databuff;
             printf("ESP-01 Sending Data: OK\nSending Request...\n");
             ESP_SendCmd(uart,datasend,datasize);
-            if(ESP_SerialFind(buffATrx,"SEND OK\r\n",SEC(1),false)){
+            if(ESP_SerialFind(buffATrx,"SEND OK\r\n",SEC(1),true)){
                 printf("ESP-01 Sending Data: SEND OK\n");
                 if(strcmp(sock_type, "TCP") == 0 && ESP_SerialFind(buffATrx,"+IPD",SEC(5),false)){
                     Delay_Timer(MS(100)); //Fill IPD value info for TCP sockets
@@ -240,7 +239,7 @@ bool ESP_OpenSockConn(uart_inst_t * uart, uint8_t connID, char * sock_type, char
     
     ESP_SendCmd(uart, cmdSckt,0);
     if(ESP_SerialFind(buffATrx,"CONNECT",MS(5000),false)){
-        if(ESP_SerialFind(buffATrx,"OK",MS(5000),true)){            
+        if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",MS(5000),true)){            
             printf("ESP-01 Host Connection: OK\n");
         }
     }else if(ESP_SerialFind(buffATrx,"ALREADY CONNECTED",MS(5000),false)){        
@@ -344,7 +343,7 @@ bool ESP_CloseSockConn(uart_inst_t * uart, uint8_t connID){
     char cmd[15];
     sprintf(cmd,"AT+CIPCLOSE=%i",connID);
     ESP_SendCmd(uart,cmd,0);
-    if(ESP_SerialFind(buffATrx,"OK",MS(2000),true)){
+    if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(2),false)){
         printf("ESP-01 Close Socket: OK\n");
         return true;
     }else{
@@ -394,15 +393,16 @@ bool ESP_ConnectWifi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int
     //Test hardware connection
     FlushATBuff(); // Reset RX Buffer
     ESP_SendCmd(uart,"AT",0);
-    if(ESP_SerialFind(buffATrx,"OK",SEC(1),true)){
+    if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(2),true)){
          printf("ESP-01 Connectivity: OK\n");
     }else{
        printf("ESP-01 Connectivity: ERROR\n"); 
     }
-    
+ 
+
     // Disable echo 
     ESP_SendCmd(uart,"ATE0",0);
-    if(ESP_SerialFind(buffATrx,"OK",SEC(1),true)){
+    if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(1),true)){
          printf("ESP-01 Disable Echo: OK\n");
     }else{
        printf("ESP-01 Disable Echo: ERROR\n"); 
@@ -412,14 +412,14 @@ bool ESP_ConnectWifi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int
     // AT+CIPRECVDATA=<size> | read the X amount of data from esp buffer
     // AT+CIPRECVLEN? | return the remaining  buffer size like this +CIPRECVLEN:636,0,0,0,0)
     ESP_SendCmd(uart, "AT+CIPRECVMODE=1",0);
-    if(ESP_SerialFind(buffATrx,"OK",SEC(1),true)){
+    if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(1),true)){
          printf("ESP-01 Passive Mode: OK\n");
     }else{
        printf("ESP-01 Passive Mode: ERROR\n"); 
     }
 
     ESP_SendCmd(uart, "AT+CIPMUX=1",0);
-    if(ESP_SerialFind(buffATrx,"OK",SEC(1),true)){
+    if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(1),true)){
          printf("ESP-01 Multi Connections: OK\n");
     }else{
        printf("ESP-01 Multi Connections: ERROR\n"); 
@@ -427,7 +427,7 @@ bool ESP_ConnectWifi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int
 
     // Set WiFi Mode to Station mode Only
     ESP_SendCmd(uart,"AT+CWMODE=1",0);    
-    if(ESP_SerialFind(buffATrx,"OK",SEC(1),true)){
+    if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(1),true)){
          printf("ESP-01 Station Mode: OK\n");
          // Prepare the command to send
         char espComm[100] = {};
@@ -435,7 +435,7 @@ bool ESP_ConnectWifi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int
         sprintf(espComm,"AT+CWJAP=\"%s\",\"%s\"",SSID_WiFi,Pass_WiFi);
         ESP_SendCmd(uart, espComm,0);
         
-        if(ESP_SerialFind(buffATrx,"OK",SEC(10),true)){
+        if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(10),true)){
             printf("ESP-01 Connecting Wifi: OK\n");
             return true;
         }else{

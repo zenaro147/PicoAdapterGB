@@ -5,7 +5,6 @@
 //Flash reprograming example https://github.com/raspberrypi/pico-examples/blob/master/flash/program/flash_program.c
 //https://www.makermatrix.com/blog/read-and-write-data-with-the-pi-pico-onboard-flash/
 
-#define FLASH_DATA_SIZE (FLASH_PAGE_SIZE * 2)
 #define FLASH_TARGET_OFFSET (FLASH_DATA_SIZE * 1024)
 const uint8_t *flash_target_contents = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET);
 

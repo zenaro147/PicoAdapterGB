@@ -26,12 +26,8 @@
 #include "esp_at.h"
 #include "flash_eeprom.h"
 
-#include "libmobile/mobile.h"
-#include "libmobile/inet_pton.h"
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool speed_240_MHz = false;
-
-
 
 // SPI pins
 #define SPI_PORT        spi0
@@ -67,22 +63,6 @@ bool haveAdapterConfig = false;
 bool haveWifiConfig = false;
 bool haveConfigToWrite = false;
 
-
-struct esp_sock_config {
-    int host_id;
-    enum mobile_socktype host_type;
-    enum mobile_addrtype host_iptype;
-    int local_port;
-    bool sock_status;
-};
-
-struct mobile_user {
-    struct mobile_adapter adapter;
-    enum mobile_action action;
-    uint8_t config_eeprom[FLASH_DATA_SIZE];
-    struct esp_sock_config esp_sockets[MOBILE_MAX_CONNECTIONS];
-};
-struct mobile_user *mobile;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////
@@ -113,21 +93,6 @@ static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
 ///////////////////////////////////////
 // Mobile Adapter GB Functions
 ///////////////////////////////////////
-/*
-you don't need to support everything it says right out of the gate, for example IPv6 isn't used currently.
-and UDP is only necessary for DNS
-similarly the bind() functionality is only used for receiving calls.
-so you can just check for all the things you don't support and return errors for now 
-This API might not map exactly to the AT commands the ESP has but it should be close-ish
-For example, sock_open() should do nothing in your case but initialize a structure that keeps track of the socket's type, and then when sock_connect() is called, AT+CIPSTART needs to be called with the socket type specified in sock_open() and the address specified in sock_connect().
-Same for sock_listen() but the AT command would be AT+CIPSERVER
-sock_accept() would check if anything has connected to the AT+CIPSERVER socket
-All of sock_connect(), sock_listen() and sock_accept() are for TCP
-For UDP the destination address is specified in sock_send(), and apparently this mirrors the AT+CIPSENDEX command.
-Similarly for TCP connections sock_send() is an AT+CIPSEND command.
-sock_recv() would depend on whether you're using active or passive mode for receiving, but I'm seeing there's no passive mode reception command for UDP which might be an issue.
-sock_recv() is also a funky one because it needs to signal to libmobile whether the connection has been closed (if it's a TCP connection) and it needs to know where the message came from (especially for UDP sockets) 
-*/
 
 unsigned long millis_latch = 0;
 #define A_UNUSED __attribute__((unused))
@@ -171,6 +136,22 @@ bool mobile_board_time_check_ms(A_UNUSED void *user, enum mobile_timers timer, u
     return (time_us_64() - millis_latch) > MS(ms);
 }
 
+/*
+you don't need to support everything it says right out of the gate, for example IPv6 isn't used currently.
+and UDP is only necessary for DNS
+similarly the bind() functionality is only used for receiving calls.
+so you can just check for all the things you don't support and return errors for now 
+This API might not map exactly to the AT commands the ESP has but it should be close-ish
+For example, sock_open() should do nothing in your case but initialize a structure that keeps track of the socket's type, and then when sock_connect() is called, AT+CIPSTART needs to be called with the socket type specified in sock_open() and the address specified in sock_connect().
+Same for sock_listen() but the AT command would be AT+CIPSERVER
+sock_accept() would check if anything has connected to the AT+CIPSERVER socket
+All of sock_connect(), sock_listen() and sock_accept() are for TCP
+For UDP the destination address is specified in sock_send(), and apparently this mirrors the AT+CIPSENDEX command.
+Similarly for TCP connections sock_send() is an AT+CIPSEND command.
+sock_recv() would depend on whether you're using active or passive mode for receiving, but I'm seeing there's no passive mode reception command for UDP which might be an issue.
+sock_recv() is also a funky one because it needs to signal to libmobile whether the connection has been closed (if it's a TCP connection) and it needs to know where the message came from (especially for UDP sockets) 
+*/
+
 bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
     struct mobile_user *mobile = (struct mobile_user *)user;
 
@@ -208,10 +189,13 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
 
 void mobile_board_sock_close(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    ESP_CloseSockConn(UART_ID, conn);
-    mobile->esp_sockets[conn].host_id = -1;
-    mobile->esp_sockets[conn].local_port = -1;
-    mobile->esp_sockets[conn].sock_status = false;
+    if(mobile->esp_sockets[conn].sock_status){
+        if(ESP_CloseSockConn(UART_ID, conn)){
+            mobile->esp_sockets[conn].host_id = -1;
+            mobile->esp_sockets[conn].local_port = -1;
+            mobile->esp_sockets[conn].sock_status = false;
+        }
+    }
 }
 
 int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){    
@@ -237,6 +221,7 @@ int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_add
         } else if (addr->type == MOBILE_ADDRTYPE_IPV6) {
             const struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
             //Need to parse IPV6
+            //sprintf(srv_ip, "%u.%u.%u.%u", addr4->host[0], addr4->host[1], addr4->host[2], addr4->host[3]);
             srv_port=addr6->port;
             if (mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_TCP) {
                 sprintf(sock_type,"TCPv6");
@@ -306,14 +291,20 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
         FlushATBuff();
     }else if(mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_TCP){
         sendDataStatus = ESP_SendData(UART_ID, conn, "TCP" , "0.0.0.0", 0, "GET /01/CGB-B9AJ/index.php HTTP/1.0\r\nHost: 192.168.0.126\r\n\r\n",60); //dummy data
-        ESP_ReadDataBuffSize(UART_ID,conn);
-        mobile->esp_sockets[conn].host_id = -1;
-        mobile->esp_sockets[conn].local_port = -1;
-        mobile->esp_sockets[conn].sock_status = false;
+        //ESP_ReadBuffSize(UART_ID,conn);
+        char checkClose[12];
+        sprintf(checkClose,"%i,CLOSED\r\n",conn);
+        if (strstr(buffATrx,checkClose) != NULL){
+            mobile->esp_sockets[conn].host_id = -1;
+            mobile->esp_sockets[conn].local_port = -1;
+            mobile->esp_sockets[conn].host_iptype = MOBILE_ADDRTYPE_NONE;
+            mobile->esp_sockets[conn].sock_status = false;
+            FlushATBuff();
+        }
     }else{
         return -1;
     }
-    //Need call ESP_GetSockStatus to check the Socket Status
+    
     return sendDataStatus;
 }
 
@@ -446,6 +437,19 @@ void main(){
 
         mobile_init(&mobile->adapter, mobile, &adapter_config);
         multicore_launch_core1(core1_context);
+
+        //
+        char dado[60] = "GET /01/CGB-B9AJ/index.php HTTP/1.0\r\nHost: 192.168.0.126\r\n\r\n";
+
+        ESP_OpenSockConn(UART_ID,0,"TCP","192.168.0.126",80,0,0);
+        ESP_OpenSockConn(UART_ID,1,"UDP","192.168.0.126",57318,0,2);
+        
+        ESP_SendData(UART_ID,0,"TCP","192.168.0.126",80,dado,60);
+
+        ESP_ReadBuffSize(UART_ID)
+
+        ESP_SendData(UART_ID,1,"UDP","192.168.0.126",57318,dado,60);
+        //
 
         while (true) {
             mobile_loop(&mobile->adapter);

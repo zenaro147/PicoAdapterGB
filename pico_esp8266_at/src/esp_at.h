@@ -21,6 +21,20 @@ bool ishttpRequest = false;
 int ipdVal[5] = {0,0,0,0,0};
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Basics AT functions
+
+// Run a little timeout instead sleep (to prevent any block to the RX interrupt)
+void Delay_Timer(int timeout){
+    volatile uint64_t timenow = 0;
+    volatile uint64_t last_read = 0;
+    timenow = time_us_64();
+    last_read = timenow;
+    while ((timenow - last_read) < timeout){
+        timenow = time_us_64();
+    }
+}
 
 // RX interrupt handler
 void on_uart_rx(){
@@ -53,18 +67,7 @@ bool ESP_SerialFind(char * buf, char * target, int ms_timeout, bool cleanBuff){
     }
     if(cleanBuff) FlushATBuff();
     return false;
-}
-
-// Run a little timeout instead sleep (to prevent any block to the RX interrupt)
-void Delay_Timer(int timeout){
-    volatile uint64_t timenow = 0;
-    volatile uint64_t last_read = 0;
-    timenow = time_us_64();
-    last_read = timenow;
-    while ((timenow - last_read) < timeout){
-        timenow = time_us_64();
-    }
-}
+} 
 
 // Send a AT command to the ESP (don't read anything back, for this use the ReadESPcmd function)
 void ESP_SendCmd(uart_inst_t *uart, const uint8_t *command, const uint8_t *databuff, int datasize){
@@ -75,13 +78,34 @@ void ESP_SendCmd(uart_inst_t *uart, const uint8_t *command, const uint8_t *datab
     
     if(cmdsize > 2){
         uart_puts(uart, cmd);
+    }else{
+        for (int i = 0; i < datasize; i++){
+            uart_putc_raw(uart, cmd[i]);
+        }
     }
-
-    for (int i = 0; i < datasize; i++){
-        uart_putc_raw(uart, cmd[i]);
-    }
-    
 }
+
+// Return the command index inside the RX buffer (useful to get data from the RX to a variable)
+int ESP_GetCmdIndexBuffer(char * rxbuff, char * cmdSearch){
+    int cmdIndex = -1;
+    for (int i = 0; rxbuff[i] != '\0'; i++) {
+        cmdIndex = -1;
+        for (int j = 0; cmdSearch[j] != '\0'; j++) {
+            if (rxbuff[i + j] != cmdSearch[j]) {
+                cmdIndex = -1;
+                break;
+            }
+            cmdIndex = i;
+        }
+        if (cmdIndex != -1) {
+            break;
+        }
+    }
+    return cmdIndex;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // *********************Read the internal RX buffer with the received data from ESP
 char * ReadESPcmd(int timeout){
@@ -121,35 +145,6 @@ char * ReadESPcmd(int timeout){
     }
 }
 
-// ********************* Send data to the Mobile Adapter GB Host
-uint8_t ESP_SendData(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, uint8_t * databuff, int datasize){
-    
-    // Check if the GET command have less than 2048 bytes to send. This is the ESP limit
-    if(datasize > 2048){
-        printf("ESP-01 Sending Request: ERROR - The request limit is 2048 bytes. Your request have: %i bytes\n", datasize);
-    }else{        
-        // Send the ammount of data we will send to ESP (the GET command size)
-        char cmdSend[100] = {};
-        if(strcmp(sock_type, "UDP") == 0){
-            sprintf(cmdSend,"AT+CIPSEND=%i,%i,\"%s\",%i", connID, datasize, conn_host, conn_port);
-        }else{
-            sprintf(cmdSend,"AT+CIPSEND=%i,%i", connID, datasize);
-        }
-        ESP_SendCmd(uart, cmdSend,0,0);
-        if(ESP_SerialFind(buffATrx,">",MS(2),true)){         
-            printf("ESP-01 Sending Data: OK\nSending Request...\n");
-            ESP_SendCmd(uart,0,databuff,datasize);
-            //Possible returns: ERROR, SEND OK, SEND FAIL
-            if(ESP_SerialFind(buffATrx,"SEND OK",MS(10),false)){
-                printf("ESP-01 Sending Data: SEND OK\n");
-                return datasize;
-            }
-        }
-    }
-    printf("ESP-01 Sending Request: ERROR\n");
-    return -1;
-}
-
 // *********************Retrieve data from the ESP buffer (max Data Size = 2048)
 void ReadESPGetReq(uart_inst_t * uart, uint8_t connID, int dataSize){
     if(ipdVal[connID] == 0){
@@ -182,8 +177,8 @@ void ReadESPGetReq(uart_inst_t * uart, uint8_t connID, int dataSize){
     }    
 }
 
-// *********************Read the remaining data inside ESP buffer (must be used like this: ipdVal = ESP_ReadDataBuffSize(UART_ID))
-int ESP_ReadDataBuffSize(uart_inst_t * uart, uint8_t connIDReq){
+// *********************Read the remaining data inside ESP buffer (must be used like this: ipdVal = ESP_ReadBuffSize(UART_ID))
+int ESP_ReadBuffSize(uart_inst_t * uart, uint8_t connIDReq){
     FlushATBuff();
     ESP_SendCmd(uart,"AT+CIPRECVLEN?",0,0);
     if(ESP_SerialFind(buffATrx,"+CIPRECVLEN:",MS(2000),false)){
@@ -208,6 +203,52 @@ int ESP_ReadDataBuffSize(uart_inst_t * uart, uint8_t connIDReq){
     return 0;
 }
 
+// Send data to the Mobile Adapter GB Host
+uint8_t ESP_SendData(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, uint8_t * databuff, int datasize){
+    
+    // Check if the GET command have less than 2048 bytes to send. This is the ESP limit
+    if(datasize > 2048){
+        printf("ESP-01 Sending Request: ERROR - The request limit is 2048 bytes. Your request have: %i bytes\n", datasize);
+    }else{        
+        // Send the ammount of data we will send to ESP (the GET command size)
+        char cmdSend[100] = {};
+        if(strcmp(sock_type, "UDP") == 0){
+            sprintf(cmdSend,"AT+CIPSEND=%i,%i,\"%s\",%i", connID, datasize, conn_host, conn_port);
+        }else{
+            sprintf(cmdSend,"AT+CIPSEND=%i,%i", connID, datasize);
+        }
+        ESP_SendCmd(uart, cmdSend,0,0);
+        if(ESP_SerialFind(buffATrx,"> ",MS(2),true)){         
+            printf("ESP-01 Sending Data: OK\nSending Request...\n");
+            ESP_SendCmd(uart,databuff,0,0);
+            if(ESP_SerialFind(buffATrx,"SEND OK",MS(1000),true)){
+                printf("ESP-01 Sending Data: SEND OK\n");
+                if(strcmp(sock_type, "TCP") == 0 && ESP_SerialFind(buffATrx,"+IPD",SEC(5),false)){
+                    Delay_Timer(MS(100)); //Fill IPD value info for TCP sockets
+
+                    char cmdCheck[10];
+                    sprintf(cmdCheck,"+IPD,%i,",connID);
+                    int cmdIndex = ESP_GetCmdIndexBuffer(buffATrx, cmdCheck);
+
+                    char numipd[4];
+                    for(int i = cmdIndex+strlen(cmdCheck); i < sizeof(buffATrx); i++){
+                        if(buffATrx[i] == '\r' && buffATrx[i+1] == '\n'){
+                            break;
+                        }else{
+                            numipd[i-(cmdIndex+strlen(cmdCheck))] = buffATrx[i];
+                        }
+                    }
+                    ipdVal[connID] = atoi(numipd); //Set the IPD value into a variable to control the data to send
+                    printf("ESP-01 Bytes Received: %i\n", ipdVal[connID]);                   
+                }
+                return datasize;
+            }
+        }
+    }
+    printf("ESP-01 Sending Request: ERROR\n");
+    return -1;
+}
+
 // Establish a connection to the Host (Mobile Adapter GB server)
 bool ESP_OpenSockConn(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, int conn_localport, uint8_t conn_mode){
     if(ipdVal[connID] != 0){
@@ -216,8 +257,12 @@ bool ESP_OpenSockConn(uart_inst_t * uart, uint8_t connID, char * sock_type, char
     }
 
     char cmdSckt[100];
-    if (conn_localport != 0){
-        sprintf(cmdSckt,"AT+CIPSTART=%i,\"%s\",\"%s\",%i,%i,%i", connID, sock_type, conn_host, conn_port, conn_localport, conn_mode);
+    if (strstr(sock_type,"UDP") != NULL){
+        if(conn_localport == 0){
+            sprintf(cmdSckt,"AT+CIPSTART=%i,\"%s\",\"%s\",%i,,%i", connID, sock_type, conn_host, conn_port, conn_mode);
+        }else{
+            sprintf(cmdSckt,"AT+CIPSTART=%i,\"%s\",\"%s\",%i,%i,%i", connID, sock_type, conn_host, conn_port, conn_localport, conn_mode);
+        }
     }else{
         sprintf(cmdSckt,"AT+CIPSTART=%i,\"%s\",\"%s\",%i", connID, sock_type, conn_host, conn_port);
     }
@@ -237,43 +282,104 @@ bool ESP_OpenSockConn(uart_inst_t * uart, uint8_t connID, char * sock_type, char
     return true;
 }
 
-// *********************Return the status of the Host connection using TCP or UDP (must be used like this: isConnectedHost = ESP_GetSockStatus(UART_ID))
-bool ESP_GetSockStatus(uart_inst_t * uart, uint8_t connID){
+// Return the status of the desired ESP Socket
+bool ESP_GetSockStatus(uart_inst_t * uart, uint8_t connID, void *user){
+    struct mobile_user *mobile = (struct mobile_user *)user;
+
+    mobile->esp_sockets[connID].host_id = -1;
+    mobile->esp_sockets[connID].local_port = -1;
+    mobile->esp_sockets[connID].host_iptype = MOBILE_ADDRTYPE_NONE;
+    mobile->esp_sockets[connID].sock_status = false;
+
     ESP_SendCmd(uart,"AT+CIPSTATUS",0,0);
-    char * resp = ReadESPcmd(SEC(2));
+    Delay_Timer(SEC(2));
 
-
-    if(strstr(resp, "STATUS:") != NULL){
+    if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",MS(1000),false)){
         char numstat[2] = {};
-        for(int i = 7; i < strlen(resp); i++){
-            numstat[i-7] = resp[i]; 
+        // i starts on 7 because the "STATUS:" lenght is 6, and the status code will be at the position 7
+        for(int i = 7; i < sizeof(buffATrx); i++){
+            if(buffATrx[i] == '\r' && buffATrx[i+1] == '\n'){
+                break;
+            }else{
+                numstat[i-7] = buffATrx[i];
+            }
         }
-        FlushATBuff();
         uint8_t numstat_val = 0;
         numstat_val = atoi(numstat);
         if(numstat_val == 3){ // The ESP8266 Station has created a TCP or UDP transmission. 
             printf("ESP-01 Host Status: TCP/UDP still connected.\n");
-            return true;
         }else{
             printf("ESP-01 Host Status: All TCP/UDP disconnected.\n");
         }
-    }else{        
+
+        char cmdCheck[15];
+        sprintf(cmdCheck,"+CIPSTATUS:%i,",connID);
+        int cmdIndex = ESP_GetCmdIndexBuffer(buffATrx,cmdCheck);
+        if (cmdIndex >= 0){
+            char returnStatus[60];
+            for(int i = cmdIndex+strlen(cmdCheck); i < sizeof(buffATrx); i++){
+                if(buffATrx[i] == '\r' && buffATrx[i+1] == '\n'){
+                    break;
+                }else{
+                    returnStatus[i-(cmdIndex+strlen(cmdCheck))] = buffATrx[i];
+                }
+            }
+            // Extract the first token
+            char * token = strtok(returnStatus, ",");
+            // loop through the string to extract all other tokens
+            //Socket Type
+            //Remote IP
+            //Remote Port
+            //Local Port
+            int infoPointer = 0;
+            while(token != NULL) {
+                switch(infoPointer){
+                    case 0:
+                        if(strstr(token,"TCPv6") != NULL){
+                            mobile->esp_sockets[connID].host_iptype = MOBILE_ADDRTYPE_IPV6;
+                            mobile->esp_sockets[connID].host_type = MOBILE_SOCKTYPE_TCP;
+                        }else if(strstr(token,"TCP") != NULL){
+                                mobile->esp_sockets[connID].host_iptype = MOBILE_ADDRTYPE_IPV4;
+                                mobile->esp_sockets[connID].host_type = MOBILE_SOCKTYPE_TCP;
+                        }else if(strstr(token,"UDPv6") != NULL){
+                                mobile->esp_sockets[connID].host_iptype = MOBILE_ADDRTYPE_IPV6;
+                                mobile->esp_sockets[connID].host_type = MOBILE_SOCKTYPE_UDP;
+                        }else if(strstr(token,"UDP") != NULL){
+                                mobile->esp_sockets[connID].host_iptype = MOBILE_ADDRTYPE_IPV4;
+                                mobile->esp_sockets[connID].host_type = MOBILE_SOCKTYPE_UDP;
+                        }
+                        break;
+                    case 3:
+                        mobile->esp_sockets[connID].local_port = atoi(token);
+                        break;
+                    default:
+                        break;
+                }
+                token = strtok(NULL, ",");
+                infoPointer++;
+            }
+            FlushATBuff();
+            mobile->esp_sockets[connID].sock_status = true;
+        }
+        printf("ESP-01 Host Status: SOCKET CLOSED\n");
+    }else{
         printf("ESP-01 Host Status: ERROR\n");
     }
-    return false;    
+    return mobile->esp_sockets[connID].sock_status;
 }
 
-// *********************Close the desired ESP Socket
-void ESP_CloseSockConn(uart_inst_t * uart, uint8_t connID){
+// Close the desired ESP Socket
+bool ESP_CloseSockConn(uart_inst_t * uart, uint8_t connID){
     char cmd[15];
     sprintf(cmd,"AT+CIPCLOSE=%i",connID);
     ESP_SendCmd(uart,cmd,0,0);
     if(ESP_SerialFind(buffATrx,"OK",MS(2000),true)){
-         printf("ESP-01 Close Socket: OK\n");
+        printf("ESP-01 Close Socket: OK\n");
+        return true;
     }else{
-       printf("ESP-01 Close Socket: ERROR\n"); 
+        printf("ESP-01 Close Socket: ERROR\n"); 
+        return false;
     }
-    //ESP_GetSockStatus(uart); //Need to recreate this function to get the status of all connections
 }
 
 // Initialize the ESP-01 UART communication

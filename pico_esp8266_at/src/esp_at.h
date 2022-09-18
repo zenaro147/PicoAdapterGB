@@ -13,6 +13,8 @@ char buffATrx[BUFF_AT_SIZE+64] = {}; //  + extra bytes to hold the AT command an
 int buffATrx_pointer = 0;
 char buffTCPReq[BUFF_AT_SIZE] = {};
 int buffTCPReq_pointer = 0;
+char buffUDPReq[BUFF_AT_SIZE] = {};
+int buffUDPReq_pointer = 0;
 bool use_uart0 = true;
 
 bool isConnectedWiFi = false;
@@ -21,6 +23,34 @@ int ipdVal[5] = {0,0,0,0,0};
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Basics AT functions
+
+// C Funciton to replace strcmp. Necessary to compare strings if the buffer have a 0x00 byte.
+void *memmem(const void *l, size_t l_len, const void *s, size_t s_len){
+	register char *cur, *last;
+	const char *cl = (const char *)l;
+	const char *cs = (const char *)s;
+
+	/* we need something to compare */
+	if (l_len == 0 || s_len == 0)
+		return NULL;
+
+	/* "s" must be smaller or equal to "l" */
+	if (l_len < s_len)
+		return NULL;
+
+	/* special case where s_len == 1 */
+	if (s_len == 1)
+		return memchr(l, (int)*cs, l_len);
+
+	/* the last position where its possible to find "s" in "l" */
+	last = (char *)cl + l_len - s_len;
+
+	for (cur = (char *)cl; cur <= last; cur++)
+		if (cur[0] == cs[0] && memcmp(cur, cs, s_len) == 0)
+			return cur;
+
+	return NULL;
+}
 
 // Run a little timeout instead sleep (to prevent any block to the RX interrupt)
 void Delay_Timer(int timeout){
@@ -57,13 +87,14 @@ bool ESP_SerialFind(char * buf, char * target, int ms_timeout, bool cleanBuff){
 
     while ((timenow - last_read) < ms_timeout){
         timenow = time_us_64();
-        if(strstr(buf, target) != NULL){
+        if(memmem(buf, sizeof(buffATrx), target, strlen(target)+1) != NULL){
             if(cleanBuff) FlushATBuff();
             return true;
         }
     }
     if(cleanBuff) FlushATBuff();
     return false;
+    
 } 
 
 // Send a AT command to the ESP
@@ -80,7 +111,9 @@ void ESP_SendCmd(uart_inst_t *uart, const uint8_t *command, int datasize){
         memcpy(cmd,command,cmdsize);
     }
 
-    uart_write_blocking(uart, cmd ,cmdsize);
+    if(!uart_is_readable(uart)){
+        uart_write_blocking(uart, cmd ,cmdsize);
+    }
 }
 
 // Return the command index inside the RX buffer (useful to get data from the RX to a variable)
@@ -102,10 +135,14 @@ int ESP_GetCmdIndexBuffer(char * rxbuff, char * cmdSearch){
     return cmdIndex;
 }
 
+void ESP_ReadIncommingUDP(uart_inst_t *uart, int timeout){
+    
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Read the how much data remaining inside ESP buffer
+// Read the how much data remaining inside ESP buffer (only TCP)
 int ESP_ReadBuffSize(uart_inst_t * uart, uint8_t connIDReq){
     FlushATBuff();
     ESP_SendCmd(uart,"AT+CIPRECVLEN?",0);
@@ -131,7 +168,7 @@ int ESP_ReadBuffSize(uart_inst_t * uart, uint8_t connIDReq){
     return 0;
 }
 
-// Retrieve data from the ESP buffer (max Data Size = 2048)
+// Retrieve data from the ESP buffer (only TCP) (max Data Size = 2048)
 void ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize){
     FlushATBuff();
 
@@ -174,7 +211,7 @@ void ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize){
 }
 
 // Send data to the Mobile Adapter GB Host
-uint8_t ESP_SendData(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, const void * databuff, int datasize){    
+uint8_t ESP_SendData(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, const void * databuff, int datasize){
     // Check if the GET command have less than 2048 bytes to send. This is the ESP limit
     if(datasize > 2048){
         printf("ESP-01 Sending Request: ERROR - The request limit is 2048 bytes. Your request have: %i bytes\n", datasize);
@@ -193,23 +230,22 @@ uint8_t ESP_SendData(uart_inst_t * uart, uint8_t connID, char * sock_type, char 
             ESP_SendCmd(uart,datasend,datasize);
             if(ESP_SerialFind(buffATrx,"SEND OK\r\n",SEC(1),true)){
                 printf("ESP-01 Sending Data: SEND OK\n");
-                if(strcmp(sock_type, "TCP") == 0 && ESP_SerialFind(buffATrx,"+IPD",SEC(5),false)){
+                if(ESP_SerialFind(buffATrx,"+IPD",SEC(5),false) && strcmp(sock_type, "TCP") == 0){
                     Delay_Timer(MS(100)); //Fill IPD value info for TCP sockets
+                        char cmdCheck[10];
+                        sprintf(cmdCheck,"+IPD,%i,",connID);
+                        int cmdIndex = ESP_GetCmdIndexBuffer(buffATrx, cmdCheck);
 
-                    char cmdCheck[10];
-                    sprintf(cmdCheck,"+IPD,%i,",connID);
-                    int cmdIndex = ESP_GetCmdIndexBuffer(buffATrx, cmdCheck);
-
-                    char numipd[4];
-                    for(int i = cmdIndex+strlen(cmdCheck); i < sizeof(buffATrx); i++){
-                        if(buffATrx[i] == '\r' && buffATrx[i+1] == '\n'){
-                            break;
-                        }else{
-                            numipd[i-(cmdIndex+strlen(cmdCheck))] = buffATrx[i];
+                        char numipd[4];
+                        for(int i = cmdIndex+strlen(cmdCheck); i < sizeof(buffATrx); i++){
+                            if(buffATrx[i] == '\r' && buffATrx[i+1] == '\n'){
+                                break;
+                            }else{
+                                numipd[i-(cmdIndex+strlen(cmdCheck))] = buffATrx[i];
+                            }
                         }
-                    }
-                    ipdVal[connID] = atoi(numipd); //Set the IPD value into a variable to control the data to send
-                    printf("ESP-01 Bytes Received: %i\n", ipdVal[connID]);                   
+                        ipdVal[connID] = atoi(numipd); //Set the IPD value into a variable to control the data to send
+                        printf("ESP-01 Bytes Received: %i\n", ipdVal[connID]);
                 }
                 return datasize;
             }
@@ -391,15 +427,21 @@ bool ESP_ConnectWifi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int
     //AT+CIPDINFO=1 -- Show port and IP on IPD return
     
     //Test hardware connection
+    Delay_Timer(SEC(5));
     FlushATBuff(); // Reset RX Buffer
     ESP_SendCmd(uart,"AT",0);
     if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(2),true)){
-         printf("ESP-01 Connectivity: OK\n");
+        printf("ESP-01 Connectivity: Checking...");
+        ESP_SendCmd(uart,"AT+RST",0);
+        if(ESP_SerialFind(buffATrx,"\r\nWIFI GOT IP\r\n",SEC(10),true)){
+            printf(" OK\n");
+        }else{
+            printf(" ERROR\n");
+        }
     }else{
        printf("ESP-01 Connectivity: ERROR\n"); 
     }
  
-
     // Disable echo 
     ESP_SendCmd(uart,"ATE0",0);
     if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(1),true)){
@@ -408,9 +450,15 @@ bool ESP_ConnectWifi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int
        printf("ESP-01 Disable Echo: ERROR\n"); 
     }
     
+    // Disable echo 
+    ESP_SendCmd(uart,"AT+CIPDINFO=1",0);
+    if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(1),true)){
+         printf("ESP-01 XXXX: OK\n");
+    }else{
+       printf("ESP-01 XXXX: ERROR\n"); 
+    }
+    
     // Set to Passive Mode to receive TCP info
-    // AT+CIPRECVDATA=<size> | read the X amount of data from esp buffer
-    // AT+CIPRECVLEN? | return the remaining  buffer size like this +CIPRECVLEN:636,0,0,0,0)
     ESP_SendCmd(uart, "AT+CIPRECVMODE=1",0);
     if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(1),true)){
          printf("ESP-01 Passive Mode: OK\n");

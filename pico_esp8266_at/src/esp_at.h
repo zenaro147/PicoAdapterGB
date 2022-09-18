@@ -74,7 +74,7 @@ void on_uart_rx(){
     }
 }
 
-// Clean the RX buffer and ignore any data on it
+// Clean the RX buffer
 void FlushATBuff(){
     buffATrx_pointer=0;
     memset(buffATrx,'\0',sizeof(buffATrx));
@@ -94,7 +94,6 @@ bool ESP_SerialFind(char * buf, char * target, int ms_timeout, bool cleanBuff){
     }
     if(cleanBuff) FlushATBuff();
     return false;
-    
 } 
 
 // Send a AT command to the ESP
@@ -111,9 +110,7 @@ void ESP_SendCmd(uart_inst_t *uart, const uint8_t *command, int datasize){
         memcpy(cmd,command,cmdsize);
     }
 
-    if(!uart_is_readable(uart)){
-        uart_write_blocking(uart, cmd ,cmdsize);
-    }
+    uart_write_blocking(uart, cmd ,cmdsize);
 }
 
 // Return the command index inside the RX buffer (useful to get data from the RX to a variable)
@@ -136,6 +133,7 @@ int ESP_GetCmdIndexBuffer(char * rxbuff, char * cmdSearch){
 }
 
 void ESP_ReadIncommingUDP(uart_inst_t *uart, int timeout){
+
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

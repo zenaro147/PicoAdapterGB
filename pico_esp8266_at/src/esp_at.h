@@ -289,7 +289,7 @@ bool ESP_OpenSockConn(uart_inst_t * uart, uint8_t connID, char * sock_type, char
 bool ESP_GetSockStatus(uart_inst_t * uart, uint8_t connID, void *user){
     struct mobile_user *mobile = (struct mobile_user *)user;
 
-    //mobile->esp_sockets[connID].host_id = -1;
+    mobile->esp_sockets[connID].host_id = -1;
     //mobile->esp_sockets[connID].local_port = -1;
     //mobile->esp_sockets[connID].host_iptype = MOBILE_ADDRTYPE_NONE;
     mobile->esp_sockets[connID].sock_status = false;
@@ -334,6 +334,7 @@ bool ESP_GetSockStatus(uart_inst_t * uart, uint8_t connID, void *user){
             //Remote IP
             //Remote Port
             //Local Port
+            mobile->esp_sockets[connID].host_id = connID;
             int infoPointer = 0;
             while(token != NULL) {
                 switch(infoPointer){

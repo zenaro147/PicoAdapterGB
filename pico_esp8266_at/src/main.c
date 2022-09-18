@@ -361,7 +361,7 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
 
             int buffAT_size = sizeof(buffATrx);
             char buffAT_cpy[buffAT_size];
-            memset(buffAT_cpy,0x00,sizeof(buffAT_cpy));
+            //memset(buffAT_cpy,0x00,sizeof(buffAT_cpy));
             memcpy(buffAT_cpy,buffATrx,buffAT_size);
             FlushATBuff();
 

@@ -191,8 +191,8 @@ void mobile_board_sock_close(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
     if(mobile->esp_sockets[conn].sock_status){
         if(ESP_CloseSockConn(UART_ID, conn)){
-            mobile->esp_sockets[conn].host_id = -1;
-            mobile->esp_sockets[conn].local_port = -1;
+            //mobile->esp_sockets[conn].host_id = -1;
+            //mobile->esp_sockets[conn].local_port = -1;
             mobile->esp_sockets[conn].sock_status = false;
         }
     }
@@ -381,9 +381,15 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     //return len;
     struct mobile_user *mobile = (struct mobile_user *)user;
 
-    //! The buffer was cleared during the CIPCLOSE and there is not enough time to receive the DNS answer... Need to add a delay here (tested with 5seconds)
+    //! The buffer was cleared during the CIPCLOSE and there is not enough time to receive the DNS answer... 
+    //! Need to add a delay here (tested with 5seconds... but shoud take moreless 5ms, at least for DNS query)
+    
+    //? TCP SOCKETS CLOSES AS SOON THE DATA ARRIVES, BUT IT KEEPS THE DATA INTO THE BUFFER
+    //? UDP SOCKETS KEEP THE SOCKET OPEN, BUT DON'T STORE THE DATA INTO ANY BUFFER
+
     // If the Socket is an UDP, Search for a \r\n+IPD,<connID>,<size>: 
     // Feed Data variable with the received size
+    // could generate a conflict with the buffer cleaner
     Delay_Timer(SEC(5));
     return -1;
 }

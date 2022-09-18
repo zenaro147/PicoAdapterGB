@@ -155,9 +155,9 @@ sock_recv() is also a funky one because it needs to signal to libmobile whether 
 bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
     struct mobile_user *mobile = (struct mobile_user *)user;
 
-    //if(!mobile->esp_sockets[conn].sock_status && mobile->esp_sockets[conn].host_id != -1){
-    //    return false;
-    //}
+    if(mobile->esp_sockets[conn].host_id != -1){
+        return false;
+    }
 
     switch (addrtype) {
         case MOBILE_ADDRTYPE_IPV4:
@@ -191,7 +191,7 @@ void mobile_board_sock_close(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
     if(mobile->esp_sockets[conn].sock_status){
         if(ESP_CloseSockConn(UART_ID, conn)){
-            //mobile->esp_sockets[conn].host_id = -1;
+            mobile->esp_sockets[conn].host_id = -1;
             //mobile->esp_sockets[conn].local_port = -1;
             mobile->esp_sockets[conn].sock_status = false;
         }
@@ -287,15 +287,15 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
             //Need to parse IPV6
             srv_port=addr6->port;
         }
-        sendDataStatus = ESP_SendData(UART_ID, conn, "UDP" , srv_ip, srv_port, data, size); 
+        sendDataStatus = ESP_SendData(UART_ID, conn, "UDP" , srv_ip, srv_port, data, size);
     }else if(mobile->esp_sockets[conn].host_type == MOBILE_SOCKTYPE_TCP){
         sendDataStatus = ESP_SendData(UART_ID, conn, "TCP" , "0.0.0.0", 0, data, 0);
         char checkClose[12];
         sprintf(checkClose,"%i,CLOSED\r\n",conn);
         if (strstr(buffATrx,checkClose) != NULL){
             mobile->esp_sockets[conn].host_id = -1;
-            mobile->esp_sockets[conn].local_port = -1;
-            mobile->esp_sockets[conn].host_iptype = MOBILE_ADDRTYPE_NONE;
+            //mobile->esp_sockets[conn].local_port = -1;
+            //mobile->esp_sockets[conn].host_iptype = MOBILE_ADDRTYPE_NONE;
             mobile->esp_sockets[conn].sock_status = false;
             FlushATBuff();
         }
@@ -379,7 +379,6 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     //}
     //
     //return len;
-    struct mobile_user *mobile = (struct mobile_user *)user;
 
     //! The buffer was cleared during the CIPCLOSE and there is not enough time to receive the DNS answer... 
     //! Need to add a delay here (tested with 5seconds... but shoud take moreless 5ms, at least for DNS query)
@@ -390,7 +389,67 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     // If the Socket is an UDP, Search for a \r\n+IPD,<connID>,<size>: 
     // Feed Data variable with the received size
     // could generate a conflict with the buffer cleaner
-    Delay_Timer(SEC(5));
+
+    struct mobile_user *mobile = (struct mobile_user *)user;
+
+    //Checking if there is any UDP data in the buffer
+    char cmdCheck[100];
+    sprintf(cmdCheck,"+IPD,%i,",conn);
+    if(ESP_SerialFind(buffATrx,cmdCheck,SEC(5),false)){
+        Delay_Timer(MS(500));
+
+        int buffAT_size = sizeof(buffATrx);
+        char buffAT_cpy[buffAT_size];
+        memcpy(buffAT_cpy,buffATrx,buffAT_size);
+        FlushATBuff();
+
+        int cmdIndex = ESP_GetCmdIndexBuffer(buffAT_cpy, cmdCheck);
+        int lastpointer = 0;
+        char numipd[5];
+
+        // Read the ammount of received data
+        for(int i = cmdIndex+strlen(cmdCheck); i < buffAT_size; i++){
+            if(buffAT_cpy[i] == ','){
+                numipd[i-(lastpointer)] = 0x00;
+                lastpointer = i+1;
+                break;
+            }else{
+                numipd[i-(cmdIndex+strlen(cmdCheck))] = buffAT_cpy[i];
+            }
+        }
+        ipdVal[conn] = atoi(numipd); //Set the IPD value into a variable to control the data to send
+        printf("ESP-01 UDP Bytes Received: %i\n", ipdVal[conn]);
+
+        // Read the remote IP from the UDP answer        
+        char remoteIP[50];
+        for(int i = lastpointer; i < buffAT_size; i++){
+            if(buffAT_cpy[i] == ','){
+                remoteIP[i-(lastpointer)] = 0x00;
+                lastpointer = i+1;
+                break;
+            }else{
+                remoteIP[i-(lastpointer)] = buffAT_cpy[i];
+            }
+        }
+
+        // Read the remote Port from the UDP answer  
+        char remotePORT[10];
+        for(int i = lastpointer; i < buffAT_size; i++){
+            if(buffAT_cpy[i] == ':'){
+                remotePORT[i-(lastpointer)] = 0x00;
+                lastpointer = i+1;
+                break;
+            }else{
+                remotePORT[i-(lastpointer)] = buffAT_cpy[i];
+            }
+        }
+        int numRemotePort = atoi(remotePORT);
+        printf("%i\n",numRemotePort);
+
+        printf("teste\n");
+    }
+
+    
     return -1;
 }
 
@@ -516,6 +575,7 @@ void main(){
         for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
             mobile->esp_sockets[i].host_id = -1;
             mobile->esp_sockets[i].host_iptype = MOBILE_ADDRTYPE_NONE;
+            mobile->esp_sockets[i].host_type = MOBILE_SOCKTYPE_NONE;
             mobile->esp_sockets[i].sock_status = false;
         } 
 
@@ -524,19 +584,18 @@ void main(){
         FlushATBuff();
 
         //
-        char dado[60] = "GET /01/CGB-B9AJ/index.php HTTP/1.0\r\nHost: 192.168.0.126\r\n\r\n";
-        uint8_t dadoudp [] = {0x00,0x01,0x01,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x07,0x67,0x61,0x6D,0x65,0x62,0x6F,0x79,0x0A,0x64,0x61,0x74,0x61,0x63,0x65,0x6E,0x74,0x65,0x72,0x02,0x6E,0x65,0x02,0x6A,0x70,0x00,0x00,0x01,0x00,0x01};
+        //char dado[60] = "GET /01/CGB-B9AJ/index.php HTTP/1.0\r\nHost: 192.168.0.126\r\n\r\n";
+        //uint8_t dadoudp [] = {0x00,0x01,0x01,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x07,0x67,0x61,0x6D,0x65,0x62,0x6F,0x79,0x0A,0x64,0x61,0x74,0x61,0x63,0x65,0x6E,0x74,0x65,0x72,0x02,0x6E,0x65,0x02,0x6A,0x70,0x00,0x00,0x01,0x00,0x01};
 
-        ESP_OpenSockConn(UART_ID,0,"TCP","192.168.0.126",80,0,0);
-        ESP_OpenSockConn(UART_ID,1,"UDP","192.168.0.126",53,0,2);
+        //ESP_OpenSockConn(UART_ID,0,"TCP","192.168.0.126",80,0,0);
+        //ESP_OpenSockConn(UART_ID,1,"UDP","192.168.0.126",53,0,2);
 
-        ESP_SendData(UART_ID,0,"TCP","192.168.0.126",80,dado,60);
-        ESP_SendData(UART_ID,1,"UDP","192.168.0.126",53,dadoudp,sizeof(dadoudp));
-        //
+        //ESP_SendData(UART_ID,0,"TCP","192.168.0.126",80,dado,60);
+        //ESP_SendData(UART_ID,1,"UDP","192.168.0.126",53,dadoudp,sizeof(dadoudp));
 
-        Delay_Timer(SEC(5));
+        //Delay_Timer(SEC(5));
 
-        ESP_ReqDataBuff(UART_ID,0,100);
+        //ESP_ReqDataBuff(UART_ID,0,100);
 
         //ESP_SendData(UART_ID,1,"UDP","192.168.0.126",57318,dado,60);
         //

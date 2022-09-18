@@ -229,20 +229,20 @@ uint8_t ESP_SendData(uart_inst_t * uart, uint8_t connID, char * sock_type, char 
                 printf("ESP-01 Sending Data: SEND OK\n");
                 if(ESP_SerialFind(buffATrx,"+IPD",SEC(5),false) && strcmp(sock_type, "TCP") == 0){
                     Delay_Timer(MS(100)); //Fill IPD value info for TCP sockets
-                        char cmdCheck[10];
-                        sprintf(cmdCheck,"+IPD,%i,",connID);
-                        int cmdIndex = ESP_GetCmdIndexBuffer(buffATrx, cmdCheck);
+                    char cmdCheck[10];
+                    sprintf(cmdCheck,"+IPD,%i,",connID);
+                    int cmdIndex = ESP_GetCmdIndexBuffer(buffATrx, cmdCheck);
 
-                        char numipd[4];
-                        for(int i = cmdIndex+strlen(cmdCheck); i < sizeof(buffATrx); i++){
-                            if(buffATrx[i] == '\r' && buffATrx[i+1] == '\n'){
-                                break;
-                            }else{
-                                numipd[i-(cmdIndex+strlen(cmdCheck))] = buffATrx[i];
-                            }
+                    char numipd[4];
+                    for(int i = cmdIndex+strlen(cmdCheck); i < sizeof(buffATrx); i++){
+                        if(buffATrx[i] == '\r' && buffATrx[i+1] == '\n'){
+                            break;
+                        }else{
+                            numipd[i-(cmdIndex+strlen(cmdCheck))] = buffATrx[i];
                         }
-                        ipdVal[connID] = atoi(numipd); //Set the IPD value into a variable to control the data to send
-                        printf("ESP-01 Bytes Received: %i\n", ipdVal[connID]);
+                    }
+                    ipdVal[connID] = atoi(numipd); //Set the IPD value into a variable to control the data to send
+                    printf("ESP-01 Bytes Received: %i\n", ipdVal[connID]);
                 }
                 return datasize;
             }

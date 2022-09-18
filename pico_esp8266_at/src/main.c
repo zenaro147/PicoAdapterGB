@@ -411,12 +411,16 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
             int numRemotePort = atoi(remotePORT);
             memcpy(data, buffAT_cpy + lastpointer, len); //memcpy with offset in source
         }
-        if(!ESP_GetSockStatus(UART_ID, conn, user)){
-            len = -2;
-        }
+        //if(!ESP_GetSockStatus(UART_ID, conn, mobile)){
+        //    len = -2; //Esta entrando aqui?
+        //}
     }else if(mobile->esp_sockets[conn].host_type == 1){
         if(ipdVal[conn] == 0){
             if(ESP_ReadBuffSize(UART_ID,conn) == 0){
+                if(ESP_GetSockStatus(UART_ID,conn,mobile)){
+                    printf("mobile_board_sock_recv RETURN -2\n");
+                    return -2;
+                }
                 printf("mobile_board_sock_recv RETURN -1\n");
                 return -1;
             }

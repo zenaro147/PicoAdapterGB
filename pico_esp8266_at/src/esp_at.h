@@ -136,7 +136,6 @@ int ESP_GetCmdIndexBuffer(char * rxbuff, char * cmdSearch){
 }
 
 void ESP_ReadIncommingUDP(uart_inst_t *uart, int timeout){
-    
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -292,9 +291,9 @@ bool ESP_OpenSockConn(uart_inst_t * uart, uint8_t connID, char * sock_type, char
 bool ESP_GetSockStatus(uart_inst_t * uart, uint8_t connID, void *user){
     struct mobile_user *mobile = (struct mobile_user *)user;
 
-    mobile->esp_sockets[connID].host_id = -1;
-    mobile->esp_sockets[connID].local_port = -1;
-    mobile->esp_sockets[connID].host_iptype = MOBILE_ADDRTYPE_NONE;
+    //mobile->esp_sockets[connID].host_id = -1;
+    //mobile->esp_sockets[connID].local_port = -1;
+    //mobile->esp_sockets[connID].host_iptype = MOBILE_ADDRTYPE_NONE;
     mobile->esp_sockets[connID].sock_status = false;
 
     ESP_SendCmd(uart,"AT+CIPSTATUS",0);
@@ -453,9 +452,9 @@ bool ESP_ConnectWifi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int
     // Disable echo 
     ESP_SendCmd(uart,"AT+CIPDINFO=1",0);
     if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(1),true)){
-         printf("ESP-01 XXXX: OK\n");
+         printf("ESP-01 UDP IDP info: OK\n");
     }else{
-       printf("ESP-01 XXXX: ERROR\n"); 
+       printf("ESP-01 UDP IDP info: ERROR\n"); 
     }
     
     // Set to Passive Mode to receive TCP info

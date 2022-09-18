@@ -16,10 +16,12 @@
 #define MS(A)                   ((A) * 1000)
 #define SEC(A)                  ((A) * 1000 * 1000)
 
+
+
 struct esp_sock_config {
     int host_id;
-    enum mobile_socktype host_type;
-    enum mobile_addrtype host_iptype;
+    uint8_t host_type; //0=NONE, 1=TCP or 3=UDP
+    enum mobile_addrtype host_iptype; //IPV4, IPV6 or NONE
     int local_port;
     bool sock_status;
 };

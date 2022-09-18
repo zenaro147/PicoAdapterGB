@@ -12,7 +12,7 @@
 char buffATrx[BUFF_AT_SIZE+64] = {}; //  + extra bytes to hold the AT command answer echo
 int buffATrx_pointer = 0;
 char buffTCPReq[BUFF_AT_SIZE] = {};
-int buffTCPReq_pointer = 0;
+//int buffTCPReq_pointer = 0;
 char buffUDPReq[BUFF_AT_SIZE] = {};
 int buffUDPReq_pointer = 0;
 bool use_uart0 = true;
@@ -165,8 +165,8 @@ int ESP_ReadBuffSize(uart_inst_t * uart, uint8_t connIDReq){
     return 0;
 }
 
-// Retrieve data from the ESP buffer (only TCP) (max Data Size = 2048)
-void ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize){
+// Retrieve data from the ESP buffer (only TCP) and store to the internal buffer (max Data Size = 2048)
+int ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize){
     FlushATBuff();
 
     //Search on ESP if there is more data to read
@@ -187,22 +187,19 @@ void ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize){
             }
 
             char cmdRead[25]={};
-            buffTCPReq_pointer=dataSize;
+            memset(buffTCPReq,0x00,sizeof(buffTCPReq));
             sprintf(cmdRead,"AT+CIPRECVDATA=%i,%i",connID,dataSize);
-
             ESP_SendCmd(uart,cmdRead,0); //Must igonre the OK at the end, and the "+CIPRECVDATA,<size>:" at the beginning
             if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(5),false)){
-                int cmdReadSize = strlen(cmdRead)-1;
-                for(int i = cmdReadSize; i < buffATrx_pointer-6; i++){
-                    buffTCPReq[i - cmdReadSize] = buffATrx[i];
-                }
+                int cmdReadSize = strlen(cmdRead)-1;               
+                memcpy(&buffTCPReq, buffATrx + cmdReadSize, buffATrx_pointer-cmdReadSize-6); //memcpy with offset in source
                 Delay_Timer(MS(100));
                 FlushATBuff();
-                memcpy(buffATrx,buffTCPReq,dataSize);
                 printf("ESP-01 Read Request: DONE.\n");
             }else{
                 printf("ESP-01 Read Request: ERROR.\n");
             }
+            return dataSize;
         }
     }
 }
@@ -273,12 +270,12 @@ bool ESP_OpenSockConn(uart_inst_t * uart, uint8_t connID, char * sock_type, char
     ESP_SendCmd(uart, cmdSckt,0);
     if(ESP_SerialFind(buffATrx,"CONNECT",MS(5000),false)){
         if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",MS(5000),true)){            
-            printf("ESP-01 Host Connection: OK\n");
+            printf("ESP-01 Host %s Connection: OK\n",sock_type);
         }
     }else if(ESP_SerialFind(buffATrx,"ALREADY CONNECTED",MS(5000),false)){        
-        printf("ESP-01 Start Host Connection: ALREADY CONNECTED\n");
+        printf("ESP-01 Start Host %s Connection: ALREADY CONNECTED\n",sock_type);
     }else{
-        printf("ESP-01 Start Host Connection: ERROR\n");
+        printf("ESP-01 Start Host %s Connection: ERROR\n",sock_type);
         return false;
     }
 
@@ -339,18 +336,20 @@ bool ESP_GetSockStatus(uart_inst_t * uart, uint8_t connID, void *user){
             while(token != NULL) {
                 switch(infoPointer){
                     case 0:
-                        if(strstr(token,"TCPv6") != NULL){
-                            mobile->esp_sockets[connID].host_iptype = MOBILE_ADDRTYPE_IPV6;
-                            mobile->esp_sockets[connID].host_type = MOBILE_SOCKTYPE_TCP;
+                        if(strstr(token,"v6") != NULL){
+                            if(strstr(token,"TCP") != NULL){
+                                mobile->esp_sockets[connID].host_iptype = MOBILE_ADDRTYPE_IPV6;
+                                mobile->esp_sockets[connID].host_type = 1;
+                            }else if(strstr(token,"UDP") != NULL){
+                                    mobile->esp_sockets[connID].host_iptype = MOBILE_ADDRTYPE_IPV6;
+                                    mobile->esp_sockets[connID].host_type = 2;
+                            }
                         }else if(strstr(token,"TCP") != NULL){
                                 mobile->esp_sockets[connID].host_iptype = MOBILE_ADDRTYPE_IPV4;
-                                mobile->esp_sockets[connID].host_type = MOBILE_SOCKTYPE_TCP;
-                        }else if(strstr(token,"UDPv6") != NULL){
-                                mobile->esp_sockets[connID].host_iptype = MOBILE_ADDRTYPE_IPV6;
-                                mobile->esp_sockets[connID].host_type = MOBILE_SOCKTYPE_UDP;
+                                mobile->esp_sockets[connID].host_type = 1;
                         }else if(strstr(token,"UDP") != NULL){
                                 mobile->esp_sockets[connID].host_iptype = MOBILE_ADDRTYPE_IPV4;
-                                mobile->esp_sockets[connID].host_type = MOBILE_SOCKTYPE_UDP;
+                                mobile->esp_sockets[connID].host_type = 2;
                         }
                         break;
                     case 3:

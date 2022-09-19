@@ -13,8 +13,8 @@ char buffATrx[BUFF_AT_SIZE+64] = {}; //  + extra bytes to hold the AT command an
 int buffATrx_pointer = 0;
 char buffTCPReq[BUFF_AT_SIZE] = {};
 //int buffTCPReq_pointer = 0;
-char buffUDPReq[BUFF_AT_SIZE] = {};
-int buffUDPReq_pointer = 0;
+//char buffUDPReq[BUFF_AT_SIZE] = {};
+//int buffUDPReq_pointer = 0;
 bool use_uart0 = true;
 
 bool isConnectedWiFi = false;
@@ -52,13 +52,6 @@ void *memmem(const void *l, size_t l_len, const void *s, size_t s_len){
 	return NULL;
 }
 
-
-
-
-
-
-
-
 // Run a little timeout instead sleep (to prevent any block to the RX interrupt)
 void Delay_Timer(int timeout){
     volatile uint64_t timenow = 0;
@@ -83,6 +76,7 @@ void on_uart_rx(){
 
 // Clean the RX buffer
 void FlushATBuff(){
+    //printf("!! test\n");
     buffATrx_pointer=0;
     memset(buffATrx,'\0',sizeof(buffATrx));
 }
@@ -152,6 +146,7 @@ int ESP_GetCmdIndexBuffer(char * rxbuff, char * cmdSearch){
 // Read the how much data remaining inside ESP buffer (only TCP)
 int ESP_ReadBuffSize(uart_inst_t * uart, uint8_t connIDReq){
     FlushATBuff();
+    int tmp_ipd[5];
     ESP_SendCmd(uart,"AT+CIPRECVLEN?",0);
     if(ESP_SerialFind(buffATrx,"+CIPRECVLEN:",SEC(2),false,true)){
         Delay_Timer(MS(100));
@@ -163,12 +158,12 @@ int ESP_ReadBuffSize(uart_inst_t * uart, uint8_t connIDReq){
         // loop through the string to extract all other tokens
         while(token != NULL) {
             if(strcmp(token, "+CIPRECVLEN") != 0){
-                ipdVal[connID_pointer++] = atoi(token);
+                tmp_ipd[connID_pointer++] = atoi(token);
             }
             token = strtok(NULL, ",");
         }
         FlushATBuff();
-        return ipdVal[connIDReq]; 
+        return tmp_ipd[connIDReq]; 
     }
     printf("ESP-01 Read Buffer Lenght: ERROR\n"); 
     FlushATBuff();
@@ -181,7 +176,7 @@ int ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize){
 
     //Search on ESP if there is more data to read
     if(ipdVal[connID] == 0){
-        ESP_ReadBuffSize(uart,connID);
+        ipdVal[connID] = ESP_ReadBuffSize(uart,connID);
     }
     if(ipdVal[connID] == 0){
         printf("ESP-01 Read Request: You don't have data to read.\n");
@@ -221,7 +216,7 @@ uint8_t ESP_SendData(uart_inst_t * uart, uint8_t connID, char * sock_type, char 
         printf("ESP-01 Sending Request: ERROR - The request limit is 2048 bytes. Your request have: %i bytes\n", datasize);
     }else{        
         // Send the ammount of data we will send to ESP (the GET command size)
-        char cmdSend[100] = {};
+        char cmdSend[100] = {0};
         if(strcmp(sock_type, "UDP") == 0){
             sprintf(cmdSend,"AT+CIPSEND=%i,%i,\"%s\",%i", connID, datasize, conn_host, conn_port);
         }else{
@@ -230,27 +225,10 @@ uint8_t ESP_SendData(uart_inst_t * uart, uint8_t connID, char * sock_type, char 
         ESP_SendCmd(uart,cmdSend,0);
         if(ESP_SerialFind(buffATrx,"> ",MS(300),true,true)){
             uint8_t * datasend = (uint8_t *)databuff;
-            printf("ESP-01 Sending Data: OK\nSending Request...\n");
+            printf("ESP-01 Sending Data: OK\nSending %i bytes...\n",datasize);
             ESP_SendCmd(uart,datasend,datasize);
-            if(ESP_SerialFind(buffATrx,"SEND OK\r\n",SEC(1),true,true)){
-                printf("ESP-01 Sending Data: SEND OK\n");
-                if(ESP_SerialFind(buffATrx,"+IPD",SEC(5),false,true) && strcmp(sock_type, "TCP") == 0){
-                    Delay_Timer(MS(100)); //Fill IPD value info for TCP sockets
-                    char cmdCheck[10];
-                    sprintf(cmdCheck,"+IPD,%i,",connID);
-                    int cmdIndex = ESP_GetCmdIndexBuffer(buffATrx, cmdCheck);
-
-                    char numipd[4];
-                    for(int i = cmdIndex+strlen(cmdCheck); i < sizeof(buffATrx); i++){
-                        if(buffATrx[i] == '\r' && buffATrx[i+1] == '\n'){
-                            break;
-                        }else{
-                            numipd[i-(cmdIndex+strlen(cmdCheck))] = buffATrx[i];
-                        }
-                    }
-                    ipdVal[connID] = atoi(numipd); //Set the IPD value into a variable to control the data to send
-                    printf("ESP-01 Bytes Received: %i\n", ipdVal[connID]);
-                }
+            if(ESP_SerialFind(buffATrx,"SEND OK\r\n",SEC(5),true,true)){
+                printf("ESP-01 Sending Data: %i bytes OK\n",datasize);
                 return datasize;
             }
         }
@@ -387,7 +365,7 @@ bool ESP_CloseSockConn(uart_inst_t * uart, uint8_t connID){
     char cmd[15];
     sprintf(cmd,"AT+CIPCLOSE=%i",connID);
     ESP_SendCmd(uart,cmd,0);
-    if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(2),true,true)){
+    if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(2),false,true)){
         printf("ESP-01 Close Socket %i: OK\n",connID);
         return true;
     }else{
@@ -436,6 +414,7 @@ bool ESP_ConnectWifi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int
     //Test hardware connection
     Delay_Timer(SEC(5));
     FlushATBuff(); // Reset RX Buffer
+    
     ESP_SendCmd(uart,"AT",0);
     if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(2),true,true)){
         printf("ESP-01 Connectivity: Checking...");

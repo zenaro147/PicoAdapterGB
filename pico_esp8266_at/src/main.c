@@ -323,6 +323,7 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
         }
         sendDataStatus = ESP_SendData(UART_ID, conn, "UDP" , srv_ip, srv_port, data, size);
     }else if(mobile->esp_sockets[conn].host_type == 1){
+        //TODO: IF it was a GET request, need to store all pameters before send the command
         sendDataStatus = ESP_SendData(UART_ID, conn, "TCP" , "0.0.0.0", 0, data, 0);
         char checkClose[12];
         sprintf(checkClose,"%i,CLOSED\r\n",conn);

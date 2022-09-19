@@ -97,6 +97,28 @@ static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
 unsigned long millis_latch = 0;
 #define A_UNUSED __attribute__((unused))
 
+void main_parse_addr(struct mobile_addr *dest, char *argv){
+    unsigned char ip[MOBILE_PTON_MAXLEN];
+    int rc = mobile_pton(MOBILE_PTON_ANY, argv, ip);
+
+    struct mobile_addr4 *dest4 = (struct mobile_addr4 *)dest;
+    struct mobile_addr6 *dest6 = (struct mobile_addr6 *)dest;
+    switch (rc) {
+    case MOBILE_PTON_IPV4:
+        dest4->type = MOBILE_ADDRTYPE_IPV4;
+        dest4->port = MOBILE_DNS_PORT;
+        memcpy(dest4->host, ip, sizeof(dest4->host));
+        break;
+    case MOBILE_PTON_IPV6:
+        dest6->type = MOBILE_ADDRTYPE_IPV6;
+        dest6->port = MOBILE_DNS_PORT;
+        memcpy(dest6->host, ip, sizeof(dest6->host));
+        break;
+    default:
+        break;
+    }
+}
+
 void mobile_board_debug_log(void *user, const char *line){
     (void)user;
     fprintf(stderr, "%s\n", line);
@@ -157,7 +179,6 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
     printf("mobile_board_sock_open\n");
 
     if(mobile->esp_sockets[conn].host_id != -1){
-        printf("mobile_board_sock_open RETURN FALSE\n");
         return false;
     }
 
@@ -167,7 +188,6 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
             mobile->esp_sockets[conn].host_iptype = addrtype;
             break;
         default: 
-            printf("mobile_board_sock_open RETURN FALSE\n");
             return false;
     }
 
@@ -179,7 +199,6 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
             mobile->esp_sockets[conn].host_type = 2;
             break;
         default: 
-            printf("mobile_board_sock_open RETURN FALSE\n");
             return false;
     }
     
@@ -188,10 +207,13 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
 
     if(mobile->esp_sockets[conn].host_type == 2 && !mobile->esp_sockets[conn].sock_status){
         mobile->esp_sockets[conn].sock_status = ESP_OpenSockConn(UART_ID, conn, mobile->esp_sockets[conn].host_iptype == MOBILE_ADDRTYPE_IPV4 ? "UDP" : "UDPv6", mobile->esp_sockets[conn].host_iptype == MOBILE_ADDRTYPE_IPV4 ? "127.0.0.1" : "0:0:0:0:0:0:0:1", 1, mobile->esp_sockets[conn].local_port, 2);
-        printf("mobile_board_sock_open RETURN %s\n", mobile->esp_sockets[conn].sock_status ? "TRUE":"FALSE");
+        if(!mobile->esp_sockets[conn].sock_status){
+            mobile->esp_sockets[conn].host_id = -1;
+            mobile->esp_sockets[conn].local_port = -1;
+            mobile->esp_sockets[conn].sock_status = false;
+        }
         return mobile->esp_sockets[conn].sock_status;
     }
-    printf("mobile_board_sock_open RETURN TRUE\n");
     return true;    
 }
 
@@ -201,7 +223,7 @@ void mobile_board_sock_close(void *user, unsigned conn){
     if(mobile->esp_sockets[conn].sock_status){
         if(ESP_CloseSockConn(UART_ID, conn)){
             mobile->esp_sockets[conn].host_id = -1;
-            //mobile->esp_sockets[conn].local_port = -1;
+            mobile->esp_sockets[conn].local_port = -1;
             mobile->esp_sockets[conn].sock_status = false;
         }
     }
@@ -222,11 +244,10 @@ int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_add
             sprintf(srv_ip, "%u.%u.%u.%u", addr4->host[0], addr4->host[1], addr4->host[2], addr4->host[3]);
             srv_port=addr4->port;
             if (mobile->esp_sockets[conn].host_type == 1) {
-                sprintf(sock_type,"TCP");
+               sprintf(sock_type,"TCP");
             }else if(mobile->esp_sockets[conn].host_type == 2){
                 sprintf(sock_type,"UDP");
             }else{
-                printf("mobile_board_sock_connect RETURN -1\n");
                 return -1;
             }
         } else if (addr->type == MOBILE_ADDRTYPE_IPV6) {
@@ -239,27 +260,21 @@ int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_add
             }else if(mobile->esp_sockets[conn].host_type == 2){
                 sprintf(sock_type,"UDPv6");
             }else{
-                printf("mobile_board_sock_connect RETURN -1\n");
                 return -1;
             } 
-            printf("mobile_board_sock_connect RETURN -1\n");
             return -1;
         } else {
-            printf("mobile_board_sock_connect RETURN -1\n");
             return -1;
         }
 
         mobile->esp_sockets[conn].sock_status = ESP_OpenSockConn(UART_ID, conn, sock_type, srv_ip, srv_port, mobile->esp_sockets[conn].local_port, mobile->esp_sockets[conn].host_type == 2 ? 2 : 0);
            
         if(mobile->esp_sockets[conn].sock_status){
-            printf("mobile_board_sock_connect RETURN 1\n");
             return 1;
         }
     }else{
-        printf("mobile_board_sock_connect RETURN 1\n");
         return 1;
     }
-    printf("mobile_board_sock_connect RETURN -1\n");
     return -1;
 }
 
@@ -307,39 +322,24 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
             srv_port=addr6->port;
         }
         sendDataStatus = ESP_SendData(UART_ID, conn, "UDP" , srv_ip, srv_port, data, size);
-    }else if(mobile->esp_sockets[conn].host_type == 2){
+    }else if(mobile->esp_sockets[conn].host_type == 1){
         sendDataStatus = ESP_SendData(UART_ID, conn, "TCP" , "0.0.0.0", 0, data, 0);
         char checkClose[12];
         sprintf(checkClose,"%i,CLOSED\r\n",conn);
         if (strstr(buffATrx,checkClose) != NULL){
             mobile->esp_sockets[conn].host_id = -1;
-            //mobile->esp_sockets[conn].local_port = -1;
+            mobile->esp_sockets[conn].local_port = -1;
             //mobile->esp_sockets[conn].host_iptype = MOBILE_ADDRTYPE_NONE;
             mobile->esp_sockets[conn].sock_status = false;
             FlushATBuff();
         }
     }else{
-        printf("mobile_board_sock_send RETURN -1\n");
         return -1;
     }
-    printf("mobile_board_sock_send RETURN %i\n", sendDataStatus);
     return sendDataStatus;
 }
 
 int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
-    // Returns: amount of data received on success,
-    //          -1 on error,
-    //          -2 on remote disconnect
-
-    //user = 0x20001ab8
-    //conn = 0
-    //data = 0x20001e04 (memory address) << Need to feed
-    //size = 512
-    //addr = 0x20041f08
-    //      Type: MOBILE_ADDRTYPE_NONE
-    //      _addr4 - type:MOBILE_ADDRTYPE_NONE / port:0 / host:0 0 0 0)
-    //      _addr6 - type:MOBILE_ADDRTYPE_NONE / port:0 / host:0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
-    
     //? TCP SOCKETS CLOSES AS SOON THE DATA ARRIVES, BUT IT KEEPS THE DATA INTO THE BUFFER
     //? UDP SOCKETS KEEP THE SOCKET OPEN, BUT DON'T STORE THE DATA INTO ANY BUFFER
 
@@ -348,20 +348,26 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     // could generate a conflict with the buffer cleaner
 
     struct mobile_user *mobile = (struct mobile_user *)user;
+    struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
+    struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
+
     printf("mobile_board_sock_recv\n");
 
     int len = -1;
+    int numRemotePort=-1;
+    char remoteIP[50] = {0};
+    uint8_t recvbuff[512] = {0};
 
     //Checking if there is any UDP data in the buffer
     if(mobile->esp_sockets[conn].host_type == 2){
-        char cmdCheck[100];
+        char cmdCheck[10];
         sprintf(cmdCheck,"+IPD,%i,",conn);
-        if(ESP_SerialFind(buffATrx,cmdCheck,SEC(5),false)){
+        if(ESP_SerialFind(buffATrx,cmdCheck,SEC(5),false,false)){
             Delay_Timer(MS(500));
 
             int buffAT_size = sizeof(buffATrx);
             char buffAT_cpy[buffAT_size];
-            //memset(buffAT_cpy,0x00,sizeof(buffAT_cpy));
+            memset(buffAT_cpy,0x00,sizeof(buffAT_cpy));
             memcpy(buffAT_cpy,buffATrx,buffAT_size);
             FlushATBuff();
 
@@ -372,30 +378,26 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
             // Read the ammount of received data
             for(int i = cmdIndex+strlen(cmdCheck); i < buffAT_size; i++){
                 if(buffAT_cpy[i] == ','){
-                    numipd[i-(lastpointer)] = 0x00;
+                    numipd[i-(cmdIndex+strlen(cmdCheck))] = 0x00;
                     lastpointer = i+1;
                     break;
                 }else{
                     numipd[i-(cmdIndex+strlen(cmdCheck))] = buffAT_cpy[i];
                 }
             }
-            //ipdVal[conn] = atoi(numipd); //Set the IPD value into a variable to control the data to send
-            if(atoi(numipd) > 0){
-                len = atoi(numipd);
-            }
+            if(atoi(numipd) > 0) len = atoi(numipd);
             printf("ESP-01 UDP Bytes Received: %i\n", len);
 
-            // Read the remote IP from the UDP answer        
-            //char remoteIP[50];
-            //for(int i = lastpointer; i < buffAT_size; i++){
-            //    if(buffAT_cpy[i] == ','){
-            //        remoteIP[i-(lastpointer)] = 0x00;
-            //        lastpointer = i+1;
-            //        break;
-            //    }else{
-            //        remoteIP[i-(lastpointer)] = buffAT_cpy[i];
-            //    }
-            //}
+            // Read the remote IP from the UDP answer  
+            for(int i = lastpointer; i < buffAT_size; i++){
+                if(buffAT_cpy[i] == ','){
+                    remoteIP[i-(lastpointer)] = 0x00;
+                    lastpointer = i+1;
+                    break;
+                }else{
+                    remoteIP[i-(lastpointer)] = buffAT_cpy[i];
+                }
+            }
 
             // Read the remote Port from the UDP answer  
             char remotePORT[10];
@@ -408,30 +410,54 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
                     remotePORT[i-(lastpointer)] = buffAT_cpy[i];
                 }
             }
-            int numRemotePort = atoi(remotePORT);
-            memcpy(data, buffAT_cpy + lastpointer, len); //memcpy with offset in source
+            numRemotePort = atoi(remotePORT);
+            
+            if(len > 0){
+                memcpy(recvbuff, buffAT_cpy + lastpointer, len); //memcpy with offset in source
+            }
+
+            if (addr && strlen(remoteIP) > 0){
+                unsigned char ip[MOBILE_PTON_MAXLEN];
+                int rc = mobile_pton(MOBILE_PTON_ANY, remoteIP, ip);
+
+                switch (rc) {
+                case MOBILE_PTON_IPV4:
+                    addr4->type = MOBILE_ADDRTYPE_IPV4;
+                    addr4->port = numRemotePort;
+                    memcpy(addr4->host, ip, sizeof(addr4->host));
+                    break;
+                case MOBILE_PTON_IPV6:
+                    addr6->type = MOBILE_ADDRTYPE_IPV6;
+                    addr6->port = numRemotePort;
+                    memcpy(addr6->host, ip, sizeof(addr6->host));
+                    break;
+                default:
+                    break;
+                }
+            }
         }
-        //if(!ESP_GetSockStatus(UART_ID, conn, mobile)){
-        //    len = -2; //Esta entrando aqui?
-        //}
-    }else if(mobile->esp_sockets[conn].host_type == 1){
+    }
+    
+    if (!data){
+        if(!ESP_GetSockStatus(UART_ID,conn,user)){
+            return -2;
+        }else{
+            return 0;
+        }
+    }  
+    
+    if(mobile->esp_sockets[conn].host_type == 1){
         if(ipdVal[conn] == 0){
             if(ESP_ReadBuffSize(UART_ID,conn) == 0){
-                if(ESP_GetSockStatus(UART_ID,conn,mobile)){
-                    printf("mobile_board_sock_recv RETURN -2\n");
-                    return -2;
-                }
-                printf("mobile_board_sock_recv RETURN -1\n");
                 return -1;
             }
         }
-
         len = ESP_ReqDataBuff(UART_ID,conn,size);
-        memcpy(data,buffTCPReq,len);
-    }else{
-        len = -1;
+        memcpy(recvbuff,buffTCPReq,len);
     }
-    
+
+    memcpy(data,recvbuff,len);
+
     printf("mobile_board_sock_recv RETURN %i\n",len);
     return len;
 }
@@ -446,28 +472,6 @@ void core1_context() {
         if (spi_is_readable(SPI_PORT)) {
             spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, spi_get_hw(SPI_PORT)->dr);
         }
-    }
-}
-
-void main_parse_addr(struct mobile_addr *dest, char *argv){
-    unsigned char ip[MOBILE_PTON_MAXLEN];
-    int rc = mobile_pton(MOBILE_PTON_ANY, argv, ip);
-
-    struct mobile_addr4 *dest4 = (struct mobile_addr4 *)dest;
-    struct mobile_addr6 *dest6 = (struct mobile_addr6 *)dest;
-    switch (rc) {
-    case MOBILE_PTON_IPV4:
-        dest4->type = MOBILE_ADDRTYPE_IPV4;
-        dest4->port = MOBILE_DNS_PORT;
-        memcpy(dest4->host, ip, sizeof(dest4->host));
-        break;
-    case MOBILE_PTON_IPV6:
-        dest6->type = MOBILE_ADDRTYPE_IPV6;
-        dest6->port = MOBILE_DNS_PORT;
-        memcpy(dest6->host, ip, sizeof(dest6->host));
-        break;
-    //default:
-        //fprintf(stderr, "Invalid parameter for %s: %s\n", argv[0], argv[1]);
     }
 }
 
@@ -561,6 +565,7 @@ void main(){
             mobile->esp_sockets[i].host_type = 0;
             mobile->esp_sockets[i].local_port = -1;
             mobile->esp_sockets[i].sock_status = false;
+            ESP_CloseSockConn(UART_ID,i);
         } 
 
         mobile_init(&mobile->adapter, mobile, &adapter_config);

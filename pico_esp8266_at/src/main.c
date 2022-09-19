@@ -49,7 +49,7 @@ uint64_t last_readable = 0;
 #define MAGB_PORT 80
 
 #define MAGB_DNS1 "192.168.0.126"
-#define MAGB_DNS2 "192.168.0.127"
+#define MAGB_DNS2 "192.168.0.126"
 
 #define CONFIG_OFFSET_MAGB          0 // Up to 256ytes
 #define CONFIG_OFFSET_WIFI_SSID     260 //28bytes (+4 to identify the config, "SSID" in ascii)
@@ -177,8 +177,10 @@ sock_recv() is also a funky one because it needs to signal to libmobile whether 
 bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
     struct mobile_user *mobile = (struct mobile_user *)user;
     printf("mobile_board_sock_open\n");
+    FlushATBuff();
 
-    if(mobile->esp_sockets[conn].host_id != -1){
+    if(mobile->esp_sockets[conn].host_id != -1 && !mobile->esp_sockets[conn].sock_status){
+        mobile->esp_sockets[conn].host_id = -1;
         return false;
     }
 
@@ -221,7 +223,8 @@ void mobile_board_sock_close(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
     printf("mobile_board_sock_close\n");
     if(mobile->esp_sockets[conn].sock_status){
-        if(ESP_CloseSockConn(UART_ID, conn)){
+        if(ESP_GetSockStatus(UART_ID,conn,user)){
+            ESP_CloseSockConn(UART_ID, conn);
             mobile->esp_sockets[conn].host_id = -1;
             mobile->esp_sockets[conn].local_port = -1;
             mobile->esp_sockets[conn].sock_status = false;
@@ -232,7 +235,13 @@ void mobile_board_sock_close(void *user, unsigned conn){
 int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
     printf("mobile_board_sock_connect\n");
-    
+
+    if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status){
+        return -1;
+    }
+
+    FlushATBuff();
+
     if(!mobile->esp_sockets[conn].sock_status){
         char srv_ip[46];
         memset(srv_ip,0x00,sizeof(srv_ip));
@@ -280,37 +289,33 @@ int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_add
 
 bool mobile_board_sock_listen(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
+    FlushATBuff();
     printf("mobile_board_sock_listen\n");
     return false;
 }
 bool mobile_board_sock_accept(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
+    FlushATBuff();
     printf("mobile_board_sock_accept\n");
     return false;
 }
  
-int mobile_board_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){
-    //user = 0x20001ab8
-    //conn = 0
-    //data = 0x20001dc4 (memory address)
-    //                00 01 01 00 00 01 00 00 00 00 00 00       ............
-    //    07 67 61 6D 65 62 6F 79 0A 64 61 74 61 63 65 6E   .gameboy.datacen
-    //    74 65 72 02 6E 65 02 6A 70 00 00 01 00 01         ter.ne.jp.....
-    //size = 42
-    //addr = 0x20001da0
-    //      Type: MOBILE_ADDRTYPE_IPV4
-    //      _addr4 - type:MOBILE_ADDRTYPE_IPV4 / port:53 / host:210 196 3 183)
-    //      _addr6 - type:MOBILE_ADDRTYPE_IPV4 / port:53 / host:210 196 3 183 1 9 0 0 53 0 0 0 210 141 112 163)
-    
+int mobile_board_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){    
     struct mobile_user *mobile = (struct mobile_user *)user;
+    
+    if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status){
+        return -1;
+    }
+    
     printf("mobile_board_sock_send\n");
-
+    
     char srv_ip[46];
     memset(srv_ip,0x00,sizeof(srv_ip));
     int srv_port=0;
     char sock_type[5];
     uint8_t sendDataStatus;
 
+    FlushATBuff();
     if(mobile->esp_sockets[conn].host_type == 2){
         if (addr->type == MOBILE_ADDRTYPE_IPV4) {
         const struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
@@ -324,7 +329,7 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
         sendDataStatus = ESP_SendData(UART_ID, conn, "UDP" , srv_ip, srv_port, data, size);
     }else if(mobile->esp_sockets[conn].host_type == 1){
         //TODO: IF it was a GET request, need to store all pameters before send the command
-        sendDataStatus = ESP_SendData(UART_ID, conn, "TCP" , "0.0.0.0", 0, data, 0);
+        sendDataStatus = ESP_SendData(UART_ID, conn, "TCP" , "0.0.0.0", 0, data, size);
         char checkClose[12];
         sprintf(checkClose,"%i,CLOSED\r\n",conn);
         if (strstr(buffATrx,checkClose) != NULL){
@@ -337,40 +342,42 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
     }else{
         return -1;
     }
-    return sendDataStatus;
+    if(sendDataStatus >= 0){
+        return sendDataStatus;
+    }else{
+        return -1;
+    }
 }
 
 int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
-    //? TCP SOCKETS CLOSES AS SOON THE DATA ARRIVES, BUT IT KEEPS THE DATA INTO THE BUFFER
-    //? UDP SOCKETS KEEP THE SOCKET OPEN, BUT DON'T STORE THE DATA INTO ANY BUFFER
-
-    // If the Socket is an UDP, Search for a \r\n+IPD,<connID>,<size>: 
-    // Feed Data variable with the received size
-    // could generate a conflict with the buffer cleaner
+    //! TCP SOCKETS CLOSES AS SOON THE DATA ARRIVES, BUT IT KEEPS THE DATA INTO THE BUFFER
+    //! UDP SOCKETS KEEP THE SOCKET OPEN, BUT DON'T STORE THE DATA INTO ANY BUFFER
 
     struct mobile_user *mobile = (struct mobile_user *)user;
     struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
     struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
+    
+    if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status){
+        return -1;
+    }
 
     printf("mobile_board_sock_recv\n");
 
     int len = -1;
     int numRemotePort=-1;
     char remoteIP[50] = {0};
-    uint8_t recvbuff[512] = {0};
 
     //Checking if there is any UDP data in the buffer
     if(mobile->esp_sockets[conn].host_type == 2){
         char cmdCheck[10];
         sprintf(cmdCheck,"+IPD,%i,",conn);
         if(ESP_SerialFind(buffATrx,cmdCheck,SEC(5),false,false)){
-            Delay_Timer(MS(500));
+            Delay_Timer(MS(300));
 
             int buffAT_size = sizeof(buffATrx);
             char buffAT_cpy[buffAT_size];
             memset(buffAT_cpy,0x00,sizeof(buffAT_cpy));
             memcpy(buffAT_cpy,buffATrx,buffAT_size);
-            FlushATBuff();
 
             int cmdIndex = ESP_GetCmdIndexBuffer(buffAT_cpy, cmdCheck);
             int lastpointer = 0;
@@ -413,8 +420,8 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
             }
             numRemotePort = atoi(remotePORT);
             
-            if(len > 0){
-                memcpy(recvbuff, buffAT_cpy + lastpointer, len); //memcpy with offset in source
+            if(len > 0 && data){
+                memcpy(data, buffAT_cpy + lastpointer, len); //memcpy with offset in source
             }
 
             if (addr && strlen(remoteIP) > 0){
@@ -438,7 +445,7 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
             }
         }
     }
-    
+    FlushATBuff();
     if (!data){
         if(!ESP_GetSockStatus(UART_ID,conn,user)){
             return -2;
@@ -450,14 +457,14 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     if(mobile->esp_sockets[conn].host_type == 1){
         if(ipdVal[conn] == 0){
             if(ESP_ReadBuffSize(UART_ID,conn) == 0){
-                return -1;
+                if(!ESP_GetSockStatus(UART_ID,conn,user)){
+                    return -1;
+                }
             }
         }
         len = ESP_ReqDataBuff(UART_ID,conn,size);
-        memcpy(recvbuff,buffTCPReq,len);
+        memcpy(data,buffTCPReq,len);
     }
-
-    memcpy(data,recvbuff,len);
 
     printf("mobile_board_sock_recv RETURN %i\n",len);
     return len;
@@ -557,7 +564,6 @@ void main(){
 // END CONFIGURE
 //////////////////
     if(isConnectedWiFi){
-        LED_OFF;
 
         mobile->action = MOBILE_ACTION_NONE;
         for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
@@ -580,6 +586,10 @@ void main(){
         //ESP_OpenSockConn(UART_ID,0,"TCP","192.168.0.126",80,0,0);
         //ESP_OpenSockConn(UART_ID,1,"UDP","192.168.0.126",53,0,2);
 
+        //ESP_GetSockStatus(UART_ID,0,mobile);
+        //ESP_GetSockStatus(UART_ID,1,mobile);
+        
+
         //ESP_SendData(UART_ID,0,"TCP","192.168.0.126",80,dado,60);
         //ESP_SendData(UART_ID,1,"UDP","192.168.0.126",53,dadoudp,sizeof(dadoudp));
 
@@ -590,6 +600,7 @@ void main(){
         //ESP_SendData(UART_ID,1,"UDP","192.168.0.126",57318,dado,60);
         //
 
+        LED_OFF;
         while (true) {
             mobile_loop(&mobile->adapter);
 

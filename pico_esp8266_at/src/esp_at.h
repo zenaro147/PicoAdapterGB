@@ -144,7 +144,7 @@ int ESP_GetCmdIndexBuffer(char * rxbuff, char * cmdSearch){
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Read the how much data remaining inside ESP buffer (only TCP)
-int ESP_ReadBuffSize(uart_inst_t * uart, uint8_t connIDReq){
+int ESP_ReadBuffSize(uart_inst_t * uart, uint8_t connID){
     FlushATBuff();
     int tmp_ipd[5];
     ESP_SendCmd(uart,"AT+CIPRECVLEN?",0);
@@ -163,7 +163,8 @@ int ESP_ReadBuffSize(uart_inst_t * uart, uint8_t connIDReq){
             token = strtok(NULL, ",");
         }
         FlushATBuff();
-        return tmp_ipd[connIDReq]; 
+        printf("ESP-01 Read Buffer %i Lenght: %i bytes\n",connID, tmp_ipd);
+        return tmp_ipd[connID]; 
     }
     printf("ESP-01 Read Buffer Lenght: ERROR\n"); 
     FlushATBuff();

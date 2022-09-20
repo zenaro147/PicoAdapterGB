@@ -16,7 +16,13 @@
 #define MS(A)                   ((A) * 1000)
 #define SEC(A)                  ((A) * 1000 * 1000)
 
+#define BUFF_AT_SIZE 2048 //2048 is the maximun you can receive from esp01
+uint8_t buffATrx[BUFF_AT_SIZE+64] = {}; //  + extra bytes to hold the AT command answer echo
+int buffATrx_pointer = 0;
+uint8_t buffTCPReq[BUFF_AT_SIZE] = {};
 
+bool isConnectedWiFi = false;
+int ipdVal[5] = {0,0,0,0,0};
 
 struct esp_sock_config {
     int host_id;
@@ -33,5 +39,4 @@ struct mobile_user {
     struct esp_sock_config esp_sockets[MOBILE_MAX_CONNECTIONS];
 };
 struct mobile_user *mobile;
-
 #endif

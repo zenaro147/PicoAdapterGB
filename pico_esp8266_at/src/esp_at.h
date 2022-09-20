@@ -8,17 +8,8 @@
 #include "hardware/irq.h"
 #include "common.h"
 
-#define BUFF_AT_SIZE 2048 //2048 is the maximun you can receive from esp01
-uint8_t buffATrx[BUFF_AT_SIZE+64] = {}; //  + extra bytes to hold the AT command answer echo
-int buffATrx_pointer = 0;
-uint8_t buffTCPReq[BUFF_AT_SIZE] = {};
-//int buffTCPReq_pointer = 0;
-//char buffUDPReq[BUFF_AT_SIZE] = {};
-//int buffUDPReq_pointer = 0;
 bool use_uart0 = true;
 
-bool isConnectedWiFi = false;
-int ipdVal[5] = {0,0,0,0,0};
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -122,23 +113,34 @@ void ESP_SendCmd(uart_inst_t *uart, const uint8_t *command, int datasize){
 }
 
 // Return the command index inside the RX buffer (useful to get data from the RX to a variable)
-int ESP_GetCmdIndexBuffer(char * rxbuff, char * cmdSearch){
-    int cmdIndex = -1;
-    //for (int i = 0; rxbuff[i] != '\0'; i++) {
-    for (int i = 0; rxbuff[i] < sizeof(buffATrx); i++) {
-        cmdIndex = -1;
-        for (int j = 0; cmdSearch[j] != '\0'; j++) {
-            if (rxbuff[i + j] != cmdSearch[j]) {
-                cmdIndex = -1;
-                break;
-            }
-            cmdIndex = i;
-        }
-        if (cmdIndex != -1) {
-            break;
-        }
-    }
-    return cmdIndex;
+int ESP_GetCmdIndexBuffer(char * rxbuff, char * cmdSearch)
+//{
+//    int cmdIndex = -1;
+//    //for (int i = 0; rxbuff[i] != '\0'; i++) {
+//    for (int i = 0; rxbuff[i] < buffATrx_pointer; i++) {
+//        cmdIndex = -1;
+//        for (int j = 0; cmdSearch[j] != '\0'; j++) {
+//            if (rxbuff[i + j] != cmdSearch[j]) {
+//                cmdIndex = -1;
+//                break;
+//            }
+//            cmdIndex = i;
+//        }
+//        if (cmdIndex != -1) {
+//            break;
+//        }
+//    }
+//    return cmdIndex;
+//}
+{
+    int offset = 0;
+    //char buf_cpy[strlen(buf)];
+    char buf_cpy[sizeof(buffATrx)];
+    strncpy(buf_cpy, rxbuff+offset, sizeof(buffATrx)-offset);
+    char *p = strstr(buf_cpy, cmdSearch);
+    if (p)
+        return p - buf_cpy+offset;
+    return -1;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -149,7 +151,7 @@ int ESP_ReadBuffSize(uart_inst_t * uart, uint8_t connID){
     int tmp_ipd[5] = {0,0,0,0,0};
     FlushATBuff();
     ESP_SendCmd(uart,"AT+CIPRECVLEN?",0);
-    if(ESP_SerialFind(buffATrx,"+CIPRECVLEN:",SEC(2),false,true)){
+    if(ESP_SerialFind(buffATrx,"+CIPRECVLEN:",SEC(2),false,false)){
         Delay_Timer(MS(100));
         uint8_t connID_pointer = 0;
         char resp[50];
@@ -177,40 +179,45 @@ int ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize){
     FlushATBuff();
 
     //Search on ESP if there is more data to read
-    if(ipdVal[connID] == 0){
+    if(ipdVal[connID] <= 0){
         ipdVal[connID] = ESP_ReadBuffSize(uart,connID);
+        printf("ESP-01 Read Request: New IPD %i.\n",ipdVal[connID]);
     }
     if(ipdVal[connID] == 0){
         printf("ESP-01 Read Request: You don't have data to read.\n");
+        return 0;
     }else{
         if (dataSize < 0){
             printf("ESP-01 Read Request: Size less than 0.\n");
             return -1;
-        } 
-        if(dataSize > 254){
+        }
+        if(dataSize > MOBILE_MAX_DATA_SIZE){
             printf("ESP-01 Read Request: The maximum data to read is 254.\n");
-        }else{
-            int tmp_idp = ipdVal[connID]-dataSize;
-            if(tmp_idp < 0){
-                printf("ESP-01 Read Request: You request %i bytes, but buffer only have %i bytes. Changing value.\n",dataSize,ipdVal[connID]);
-                dataSize=ipdVal[connID];        
-            }else{
-                ipdVal[connID] = ipdVal[connID] - dataSize;
-            }
-            char cmdRead[25]={};
-            memset(buffTCPReq,0x00,sizeof(buffTCPReq));
-            sprintf(cmdRead,"AT+CIPRECVDATA=%i,%i",connID,dataSize);
-            ESP_SendCmd(uart,cmdRead,0); //Must igonre the OK at the end, and the "+CIPRECVDATA,<size>:" at the beginning
-            if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(5),false,true)){
-                int cmdReadSize = strlen(cmdRead)-1;               
-                memcpy(&buffTCPReq, buffATrx + cmdReadSize, buffATrx_pointer-cmdReadSize-6); //memcpy with offset in source
-                Delay_Timer(MS(100));
-                FlushATBuff();
-                printf("ESP-01 Read Request: DONE.\n");
-            }else{
-                printf("ESP-01 Read Request: ERROR.\n");
-            }
+            dataSize = MOBILE_MAX_DATA_SIZE;
+        }
+        int tmp_idp = ipdVal[connID];
+        int tmp_idp_new = tmp_idp-dataSize;
+        if(tmp_idp_new < 0){
+            printf("ESP-01 Read Request: You request %i bytes, but buffer only have %i bytes. Changing value.\n",dataSize,ipdVal[connID]);
+            dataSize=ipdVal[connID];
+        }
+        char cmdRead[25]={};
+        //memset(buffTCPReq,0x00,sizeof(buffTCPReq));
+        sprintf(cmdRead,"AT+CIPRECVDATA=%i,%i",connID,dataSize);
+        FlushATBuff();
+        ESP_SendCmd(uart,cmdRead,0); //Must igonre the OK at the end, and the "+CIPRECVDATA,<size>:" at the beginning
+        if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(5),false,true)){
+            int cmdReadSize = strlen(cmdRead)-1;               
+            //memcpy(&buffTCPReq, buffATrx + cmdReadSize, buffATrx_pointer-cmdReadSize-6); //memcpy with offset in source
+            memcpy(&buffTCPReq, buffATrx + cmdReadSize, dataSize); //memcpy with offset in source
+            Delay_Timer(MS(100));
+            FlushATBuff();
+            ipdVal[connID] = ipdVal[connID] - dataSize;
+            printf("ESP-01 Read Request: %i bytes read.\n",dataSize);
             return dataSize;
+        }else{
+            printf("ESP-01 Read Request: Error on Read %i bytes.\n",dataSize);
+            return -1;
         }
     }
 }

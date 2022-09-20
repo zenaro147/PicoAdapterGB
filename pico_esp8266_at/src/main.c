@@ -176,7 +176,6 @@ sock_recv() is also a funky one because it needs to signal to libmobile whether 
 
 bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_board_sock_open\n");
     FlushATBuff();
 
     if(mobile->esp_sockets[conn].host_id != -1 && !mobile->esp_sockets[conn].sock_status){
@@ -221,7 +220,6 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
 
 void mobile_board_sock_close(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_board_sock_close\n");
     if(mobile->esp_sockets[conn].sock_status){
         if(ESP_GetSockStatus(UART_ID,conn,user)){
             ESP_CloseSockConn(UART_ID, conn);
@@ -234,7 +232,6 @@ void mobile_board_sock_close(void *user, unsigned conn){
 
 int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_board_sock_connect\n");
 
     if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status){
         return -1;
@@ -307,8 +304,6 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
         return -1;
     }
     
-    printf("mobile_board_sock_send\n");
-    
     char srv_ip[46];
     memset(srv_ip,0x00,sizeof(srv_ip));
     int srv_port=0;
@@ -360,8 +355,6 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status){
         return -1;
     }
-
-    printf("mobile_board_sock_recv\n");
 
     int len = -1;
     int numRemotePort=-1;
@@ -462,11 +455,16 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
                 }
             }
         }
-        len = ESP_ReqDataBuff(UART_ID,conn,size);
-        memcpy(data,buffTCPReq,len);
+        if(!ESP_GetSockStatus(UART_ID,conn,user) && ipdVal > 0){
+            len = ESP_ReqDataBuff(UART_ID,conn,size);
+            if(len > 0){
+                memcpy(data,buffTCPReq,len);
+            }
+        }else{
+            len = 0;
+        }
     }
 
-    printf("mobile_board_sock_recv RETURN %i\n",len);
     return len;
 }
 
@@ -499,7 +497,6 @@ void main(){
 
     mobile = malloc(sizeof(struct mobile_user));
     struct mobile_adapter_config adapter_config = MOBILE_ADAPTER_CONFIG_DEFAULT;
-
 
     main_parse_addr(&adapter_config.dns1, MAGB_DNS1);
     main_parse_addr(&adapter_config.dns2, MAGB_DNS2);

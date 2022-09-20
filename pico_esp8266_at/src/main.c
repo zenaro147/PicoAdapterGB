@@ -367,6 +367,7 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
 
     //Checking if there is any UDP data in the buffer
     if(mobile->esp_sockets[conn].host_type == 2){
+        printf("check 0\n");
         char cmdCheck[10];
         sprintf(cmdCheck,"+IPD,%i,",conn);
         if(ESP_SerialFind(buffATrx,cmdCheck,SEC(5),false,false)){

@@ -176,6 +176,7 @@ sock_recv() is also a funky one because it needs to signal to libmobile whether 
 
 bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
     struct mobile_user *mobile = (struct mobile_user *)user;
+    printf("mobile_board_sock_open\n");
     FlushATBuff();
 
     if(mobile->esp_sockets[conn].host_id != -1 && !mobile->esp_sockets[conn].sock_status){
@@ -220,6 +221,7 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
 
 void mobile_board_sock_close(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
+    printf("mobile_board_sock_close\n");
     if(mobile->esp_sockets[conn].sock_status){
         if(ESP_GetSockStatus(UART_ID,conn,user)){
             ESP_CloseSockConn(UART_ID, conn);
@@ -232,6 +234,7 @@ void mobile_board_sock_close(void *user, unsigned conn){
 
 int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
+    printf("mobile_board_sock_connect\n");
 
     if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status){
         return -1;
@@ -299,6 +302,7 @@ bool mobile_board_sock_accept(void *user, unsigned conn){
  
 int mobile_board_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){    
     struct mobile_user *mobile = (struct mobile_user *)user;
+    printf("mobile_board_sock_send\n");
     
     if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status){
         return -1;
@@ -347,6 +351,7 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
 int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
     //! TCP SOCKETS CLOSES AS SOON THE DATA ARRIVES, BUT IT KEEPS THE DATA INTO THE BUFFER
     //! UDP SOCKETS KEEP THE SOCKET OPEN, BUT DON'T STORE THE DATA INTO ANY BUFFER
+    printf("mobile_board_sock_recv\n");
 
     struct mobile_user *mobile = (struct mobile_user *)user;
     struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;

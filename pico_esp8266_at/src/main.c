@@ -356,7 +356,7 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
     struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
     
-    //if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status){
+    //if(dmobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status){
     //    return -2;
     //}
 
@@ -455,23 +455,32 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     
     if(mobile->esp_sockets[conn].host_type == 1){         
         if(!ESP_GetSockStatus(UART_ID,conn,user)){
-            if(ipdVal[conn] == 0){
+            if(ipdVal[conn] <= 0){
                 if(ESP_ReadBuffSize(UART_ID,conn) == 0){
                     printf("check 3\n");
                     return -2;
                 }
             }else{
-                if (ipdVal[conn] < 0) return -1;
+                if (ipdVal[conn] < 0){printf("check 3\n"); return -1;}
             }
         }
         
         len = ESP_ReqDataBuff(UART_ID,conn,size);
-        if(len > 0){
-            memcpy(data,buffTCPReq,len);
+
+        if(len > 0 ){
+            memcpy(data,buffRecData + buffRecData_pointer,len);
+            buffRecData_pointer = buffRecData_pointer + len;
+            if(buffRecData_pointer >= ipdVal[conn]){
+                buffRecData_pointer = 0;
+                ipdVal[conn] = 0;
+            } 
+            //ipdVal[conn] = ipdVal[conn] - len;
         }else{
-            len = 0;
+            printf("Return %i bytes.\n",len);
+            return len;
         }
     }
+    printf("Return %i bytes.\n",len);
     return len;
 }
 

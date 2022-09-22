@@ -10,7 +10,6 @@
 
 bool use_uart0 = true;
 
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Basics AT functions
@@ -80,7 +79,7 @@ bool ESP_SerialFind(char * buf, char * target, int ms_timeout, bool cleanBuff, b
     while ((timenow - last_read) < ms_timeout){
         timenow = time_us_64();
         if(useMemFind){
-            if(memmem(buf, buffATrx_pointer, target, strlen(target)+1) != NULL){
+            if(memmem(buf, sizeof(buffATrx), target, strlen(target)+1) != NULL){
                 if(cleanBuff) FlushATBuff();
                 return true;
             }
@@ -161,6 +160,7 @@ int ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize){
 
     //Search on ESP if there is more data to read
     if(ipdVal[connID] <= 0){
+        buffRecData_pointer = 0;
         ipdVal[connID] = ESP_ReadBuffSize(uart,connID);
         printf("ESP-01 Read Request: New IPD %i.\n",ipdVal[connID]);
     }
@@ -171,35 +171,33 @@ int ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize){
         if (dataSize < 0){
             printf("ESP-01 Read Request: Size less than 0.\n");
             return -1;
-        }
+        }        
         if(dataSize > MOBILE_MAX_DATA_SIZE){
-            printf("ESP-01 Read Request: The maximum data to read is 254.\n");
+            printf("ESP-01 Read Request: The maximum data to read is %i.\n",MOBILE_MAX_DATA_SIZE);
             dataSize = MOBILE_MAX_DATA_SIZE;
         }
         int tmp_idp = ipdVal[connID];
-        int tmp_idp_new = tmp_idp-dataSize;
+        int tmp_idp_new = (tmp_idp-buffRecData_pointer)-dataSize;
         if(tmp_idp_new < 0){
-            printf("ESP-01 Read Request: You request %i bytes, but buffer only have %i bytes. Changing value.\n",dataSize,ipdVal[connID]);
-            dataSize=ipdVal[connID];
+            printf("ESP-01 Read Request: You request %i bytes, but buffer only have %i bytes. Changing value.\n",dataSize,(tmp_idp-buffRecData_pointer));
+            dataSize=(tmp_idp-buffRecData_pointer);
         }
-        char cmdRead[25]={};
-        //memset(buffTCPReq,0x00,sizeof(buffTCPReq));
-        sprintf(cmdRead,"AT+CIPRECVDATA=%i,%i",connID,dataSize);
-        FlushATBuff();
-        ESP_SendCmd(uart,cmdRead,0); //Must igonre the OK at the end, and the "+CIPRECVDATA,<size>:" at the beginning
-        if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(10),false,false)){
-            int cmdReadSize = strlen(cmdRead)-1;               
-            //memcpy(&buffTCPReq, buffATrx + cmdReadSize, buffATrx_pointer-cmdReadSize-6); //memcpy with offset in source
-            memcpy(&buffTCPReq, buffATrx + cmdReadSize, dataSize); //memcpy with offset in source
-            Delay_Timer(MS(100));
+
+        if(buffRecData_pointer == 0){
+            char cmdRead[25]={};
+            sprintf(cmdRead,"AT+CIPRECVDATA=%i,%i",connID,ipdVal[connID] < BUFF_AT_SIZE ? ipdVal[connID] : BUFF_AT_SIZE);
             FlushATBuff();
-            ipdVal[connID] = ipdVal[connID] - dataSize;
-            printf("ESP-01 Read Request: %i bytes read.\n",dataSize);
-            return dataSize;
-        }else{
-            printf("ESP-01 Read Request: Error on Read %i bytes.\n",dataSize);
-            return -1;
+            ESP_SendCmd(uart,cmdRead,0); //Must igonre the OK at the end, and the "+CIPRECVDATA,<size>:" at the beginning
+            if(!ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(10),false,true)){
+                printf("ESP-01 Read Request: Error on Read %i bytes.\n",ipdVal[connID] <= BUFF_AT_SIZE ? ipdVal[connID] : BUFF_AT_SIZE);
+                return -1;
+            }
+            Delay_Timer(MS(100)); 
+            int cmdReadSize = strlen(cmdRead)-1;             
+            memcpy(&buffRecData, buffATrx + cmdReadSize, ipdVal[connID] < BUFF_AT_SIZE ? ipdVal[connID] : BUFF_AT_SIZE); //memcpy with offset in source
+            FlushATBuff();
         }
+        return dataSize;
     }
 }
 
@@ -432,7 +430,7 @@ bool ESP_ConnectWifi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int
     if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(2),true,false)){
         printf("ESP-01 Connectivity: Checking...");
         ESP_SendCmd(uart,"AT+RST",0);
-        if(ESP_SerialFind(buffATrx,"\r\nWIFI GOT IP\r\n",SEC(10),true,false)){
+        if(ESP_SerialFind(buffATrx,"\r\nWIFI GOT IP\r\n",SEC(10),true,true)){
             printf(" OK\n");
         }else{
             printf(" ERROR\n");

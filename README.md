@@ -8,7 +8,7 @@ Based on: [Libmobile](https://github.com/REONTeam/libmobile) by [REON Team](http
 * Gameboy can recognize Pico as a Mobile Device
 * Can read the Mobile Adapter config on flash (since Pico don't have an EEPROM)
 * Save Mobile Trainer Config into Flash (eeprom-like)
-* Mobile Trainer login (pop and smtp) and web page navigation 
+* Mobile Trainer login (pop and smtp) and web navigation 
 * Pokemon Crystal Odd Egg event
 
 ### What need to do:

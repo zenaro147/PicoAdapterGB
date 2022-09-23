@@ -125,8 +125,9 @@ void mobile_board_serial_enable(A_UNUSED void *user) {
 
 bool mobile_board_config_read(void *user, void *dest, const uintptr_t offset, const size_t size) {
     struct mobile_user *mobile = (struct mobile_user *)user;
+    int newOffset = OFFSET_MAGB + offset;
     for(int i = 0; i < size; i++){
-        ((char *)dest)[i] = (char)mobile->config_eeprom[OFFSET_MAGB + offset + i];
+        ((char *)dest)[i] = (char)mobile->config_eeprom[newOffset + i];
     }
     return true;
 }
@@ -580,6 +581,7 @@ void main(){
                 if (time_us_now - last_readable > SEC(5)){
                     if(!spi_is_readable(SPI_PORT)){
                         multicore_reset_core1();
+                        FormatFlashConfig();
                         SaveFlashConfig(mobile->config_eeprom);
                         haveConfigToWrite = false;
                         time_us_now = 0;

@@ -45,22 +45,13 @@ bool speed_240_MHz = false;
 volatile uint64_t time_us_now = 0;
 uint64_t last_readable = 0;
 
-#define MAGB_HOST "192.168.0.126"
-#define MAGB_PORT 80
-
-#define MAGB_DNS1 "192.168.0.126"
-#define MAGB_DNS2 "192.168.0.126"
-
 #define CONFIG_OFFSET_MAGB          0 // Up to 256ytes
 #define CONFIG_OFFSET_WIFI_SSID     260 //28bytes (+4 to identify the config, "SSID" in ascii)
 #define CONFIG_OFFSET_WIFI_PASS     292 //28bytes (+4 to identify the config, "PASS" in ascii)
 #define CONFIG_OFFSET_WIFI_SIZE     28 //28bytes (+4 to identify the config, "SSID" in ascii)
-char WiFiSSID[32] = "";
-char WiFiPASS[32] = "";
+
 bool isESPDetected = false;
 
-bool haveAdapterConfig = false;
-bool haveWifiConfig = false;
 bool haveConfigToWrite = false;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -135,7 +126,7 @@ void mobile_board_serial_enable(A_UNUSED void *user) {
 bool mobile_board_config_read(void *user, void *dest, const uintptr_t offset, const size_t size) {
     struct mobile_user *mobile = (struct mobile_user *)user;
     for(int i = 0; i < size; i++){
-        ((char *)dest)[i] = (char)mobile->config_eeprom[offset + i];
+        ((char *)dest)[i] = (char)mobile->config_eeprom[OFFSET_MAGB + offset + i];
     }
     return true;
 }
@@ -143,7 +134,7 @@ bool mobile_board_config_read(void *user, void *dest, const uintptr_t offset, co
 bool mobile_board_config_write(void *user, const void *src, const uintptr_t offset, const size_t size) {
     struct mobile_user *mobile = (struct mobile_user *)user;
     for(int i = 0; i < size; i++){
-        mobile->config_eeprom[offset + i] = ((uint8_t *)src)[i];
+        mobile->config_eeprom[OFFSET_MAGB + offset + i] = ((uint8_t *)src)[i];
     }
     haveConfigToWrite = true;
     last_readable = time_us_64();
@@ -357,9 +348,11 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
     struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
     
-    //if(dmobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status){
-    //    return -2;
-    //}
+    if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status
+        && ESP_ReadBuffSize(UART_ID,conn) == 0 
+        && ipdVal[conn] == 0){
+        return -1;
+    }
 
     int len = -1;
     int numRemotePort=-1;
@@ -367,7 +360,6 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
 
     //Checking if there is any UDP data in the buffer
     if(mobile->esp_sockets[conn].host_type == 2){
-        printf("check 0\n");
         char cmdCheck[10];
         sprintf(cmdCheck,"+IPD,%i,",conn);
         if(ESP_SerialFind(buffATrx,cmdCheck,SEC(5),false,false)){
@@ -458,11 +450,10 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
         if(!ESP_GetSockStatus(UART_ID,conn,user)){
             if(ipdVal[conn] <= 0){
                 if(ESP_ReadBuffSize(UART_ID,conn) == 0){
-                    printf("check 3\n");
                     return -2;
                 }
             }else{
-                if (ipdVal[conn] < 0){printf("check 3\n"); return -1;}
+                if (ipdVal[conn] < 0) return -1;
             }
         }
         
@@ -509,63 +500,27 @@ void main(){
 
     // Initialize SPI pins
     gpio_set_function(PIN_SPI_SCK, GPIO_FUNC_SPI), gpio_pull_up(PIN_SPI_SCK);
-    gpio_set_function(PIN_SPI_SIN, GPIO_FUNC_SPI), gpio_pull_up(PIN_SPI_SIN);
-    gpio_set_function(PIN_SPI_SOUT, GPIO_FUNC_SPI), gpio_pull_down(PIN_SPI_SOUT);
+    gpio_set_function(PIN_SPI_SIN, GPIO_FUNC_SPI);
+    gpio_set_function(PIN_SPI_SOUT, GPIO_FUNC_SPI);
 
     mobile = malloc(sizeof(struct mobile_user));
     struct mobile_adapter_config adapter_config = MOBILE_ADAPTER_CONFIG_DEFAULT;
 
+
+
+
+    memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
+    ReadFlashConfig(mobile->config_eeprom);
+
+    #ifdef USE_CUSTOM_DNS1
     main_parse_addr(&adapter_config.dns1, MAGB_DNS1);
+    #endif
+    #ifdef USE_CUSTOM_DNS2
     main_parse_addr(&adapter_config.dns2, MAGB_DNS2);
+    #endif
     //adapter_config.p2p_port = 1027
-    //adapter_config.device = x
     //adapter_config.unmetered = true;
 
-
-    memset(WiFiSSID,0x00,sizeof(WiFiSSID));
-    memset(WiFiPASS,0x00,sizeof(WiFiSSID));
-    memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
-
-    uint8_t setConfig = ReadFlashConfig(mobile->config_eeprom); 
-    switch (setConfig){
-        case 0:
-            haveAdapterConfig = false;
-            haveWifiConfig = false;
-        break;
-        case 1:
-            haveAdapterConfig = true;
-            haveWifiConfig = false;
-        break;
-        case 2:
-            haveAdapterConfig = true;
-            haveWifiConfig = true;
-        break;
-        case 3:
-            haveAdapterConfig = false;
-            haveWifiConfig = true;
-        break;
-        default:
-        break;
-    }
-
-    if(haveWifiConfig){
-        for(int i = CONFIG_OFFSET_WIFI_SSID; i < CONFIG_OFFSET_WIFI_SSID+CONFIG_OFFSET_WIFI_SIZE; i++){
-            WiFiSSID[i-CONFIG_OFFSET_WIFI_SSID] = (char)mobile->config_eeprom[i];
-        }
-        for(int i = CONFIG_OFFSET_WIFI_PASS; i < CONFIG_OFFSET_WIFI_PASS+CONFIG_OFFSET_WIFI_SIZE; i++){
-            WiFiPASS[i-CONFIG_OFFSET_WIFI_PASS] = (char)mobile->config_eeprom[i];
-        }
-    }else{
-        //Set a Default value (need to create a method to configure this setttings later. Maybe a dual boot with a custom GB rom?)
-        sprintf(WiFiSSID,"SSID%s","WiFi_Network");
-        sprintf(WiFiPASS,"PASS%s","P@$$w0rd");
-        for(int i = CONFIG_OFFSET_WIFI_SSID-4; i < CONFIG_OFFSET_WIFI_SSID+CONFIG_OFFSET_WIFI_SIZE; i++){
-            mobile->config_eeprom[i] = WiFiSSID[i-CONFIG_OFFSET_WIFI_SSID];
-        }
-        for(int i = CONFIG_OFFSET_WIFI_PASS-4; i < CONFIG_OFFSET_WIFI_PASS+CONFIG_OFFSET_WIFI_SIZE; i++){
-            mobile->config_eeprom[i] = WiFiPASS[i-CONFIG_OFFSET_WIFI_PASS];
-        }
-    }
 
 //////////////////////
 // CONFIGURE THE ESP
@@ -593,26 +548,28 @@ void main(){
         multicore_launch_core1(core1_context);
         FlushATBuff();
 
-        //
+
         //char dado[60] = "GET /01/CGB-B9AJ/index.php HTTP/1.0\r\nHost: 192.168.0.126\r\n\r\n";
         //uint8_t dadoudp [] = {0x00,0x01,0x01,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x07,0x67,0x61,0x6D,0x65,0x62,0x6F,0x79,0x0A,0x64,0x61,0x74,0x61,0x63,0x65,0x6E,0x74,0x65,0x72,0x02,0x6E,0x65,0x02,0x6A,0x70,0x00,0x00,0x01,0x00,0x01};
-
+        //
         //ESP_OpenSockConn(UART_ID,0,"TCP","192.168.0.126",80,0,0);
         //ESP_OpenSockConn(UART_ID,1,"UDP","192.168.0.126",53,0,2);
-
+        //
         //ESP_GetSockStatus(UART_ID,0,mobile);
         //ESP_GetSockStatus(UART_ID,1,mobile);
-        
-
+        //
+        //
         //ESP_SendData(UART_ID,0,"TCP","192.168.0.126",80,dado,60);
         //ESP_SendData(UART_ID,1,"UDP","192.168.0.126",53,dadoudp,sizeof(dadoudp));
-
-        //Delay_Timer(SEC(5));
-
-        //ESP_ReqDataBuff(UART_ID,0,100);
-
-        //ESP_SendData(UART_ID,1,"UDP","192.168.0.126",57318,dado,60);
         //
+        //Delay_Timer(SEC(5));
+        //
+        //ESP_ReqDataBuff(UART_ID,0,100);
+        //
+        //ESP_SendData(UART_ID,1,"UDP","192.168.0.126",57318,dado,60);
+
+
+
 
         LED_OFF;
         while (true) {

@@ -12,7 +12,7 @@ Based on: [Libmobile](https://github.com/REONTeam/libmobile) by [REON Team](http
 * Pokemon Crystal Odd Egg event
 
 ### What need to do:
-* Prepare the "flash first setup" on Pico to save the "eeprom-like" config
+* Create a "flash first setup" on Pico to save the "eeprom-like" config
 * Save the custom DNSs, P2P port and "unmetered" parameters on flash as well
 * Insert a "CONFIG" text at the beginning of the flash (move other contents) to identify if the flash was already formatted. 
 * Implement the "sock_accept" and "sock_listen" functions to communicate as P2P connection.

@@ -125,9 +125,8 @@ void mobile_board_serial_enable(A_UNUSED void *user) {
 
 bool mobile_board_config_read(void *user, void *dest, const uintptr_t offset, const size_t size) {
     struct mobile_user *mobile = (struct mobile_user *)user;
-    int newOffset = OFFSET_MAGB + offset;
     for(int i = 0; i < size; i++){
-        ((char *)dest)[i] = (char)mobile->config_eeprom[newOffset + i];
+        ((char *)dest)[i] = (char)mobile->config_eeprom[OFFSET_MAGB + offset + i];
     }
     return true;
 }

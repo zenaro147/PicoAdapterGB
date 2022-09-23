@@ -360,88 +360,88 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     char remoteIP[50] = {0};
 
     //Checking if there is any UDP data in the buffer
-    if(mobile->esp_sockets[conn].host_type == 2){
-        
-        //Apply to read UDP from ESP buffer, instead this
-        char cmdCheck[10];
-        sprintf(cmdCheck,"+IPD,%i,",conn);
-        if(ESP_SerialFind(buffATrx,cmdCheck,SEC(5),false,true)){
-            Delay_Timer(SEC(1));
-
-            int buffAT_size = sizeof(buffATrx);
-            char buffAT_cpy[buffAT_size];
-            
-            memset(buffAT_cpy,0x00,sizeof(buffAT_cpy));
-            memcpy(buffAT_cpy,buffATrx,buffAT_size);
-
-            int cmdIndex = ESP_GetCmdIndexBuffer(buffAT_cpy, cmdCheck);
-            int lastpointer = 0;
-            char numipd[5];
-
-            printf("check0\n");
-            // Read the ammount of received data
-            for(int i = cmdIndex+strlen(cmdCheck); i < buffAT_size; i++){
-                if(buffAT_cpy[i] == ','){
-                    numipd[i-(cmdIndex+strlen(cmdCheck))] = 0x00;
-                    lastpointer = i+1;
-                    break;
-                }else{
-                    numipd[i-(cmdIndex+strlen(cmdCheck))] = buffAT_cpy[i];
-                }
-            }
-            printf("check0\n");
-            if(atoi(numipd) > 0) len = atoi(numipd);
-            printf("ESP-01 UDP Bytes Received: %i\n", len);
-
-            // Read the remote IP from the UDP answer  
-            for(int i = lastpointer; i < buffAT_size; i++){
-                if(buffAT_cpy[i] == ','){
-                    remoteIP[i-(lastpointer)] = 0x00;
-                    lastpointer = i+1;
-                    break;
-                }else{
-                    remoteIP[i-(lastpointer)] = buffAT_cpy[i];
-                }
-            }
-
-            // Read the remote Port from the UDP answer  
-            char remotePORT[10];
-            for(int i = lastpointer; i < buffAT_size; i++){
-                if(buffAT_cpy[i] == ':'){
-                    remotePORT[i-(lastpointer)] = 0x00;
-                    lastpointer = i+1;
-                    break;
-                }else{
-                    remotePORT[i-(lastpointer)] = buffAT_cpy[i];
-                }
-            }
-            numRemotePort = atoi(remotePORT);
-            
-            if(len > 0 && data){
-                memcpy(data, buffAT_cpy + lastpointer, len); //memcpy with offset in source
-            }
-
-            if (addr && strlen(remoteIP) > 0){
-                unsigned char ip[MOBILE_PTON_MAXLEN];
-                int rc = mobile_pton(MOBILE_PTON_ANY, remoteIP, ip);
-
-                switch (rc) {
-                case MOBILE_PTON_IPV4:
-                    addr4->type = MOBILE_ADDRTYPE_IPV4;
-                    addr4->port = numRemotePort;
-                    memcpy(addr4->host, ip, sizeof(addr4->host));
-                    break;
-                case MOBILE_PTON_IPV6:
-                    addr6->type = MOBILE_ADDRTYPE_IPV6;
-                    addr6->port = numRemotePort;
-                    memcpy(addr6->host, ip, sizeof(addr6->host));
-                    break;
-                default:
-                    break;
-                }
-            }
-        }
-    }
+    //if(mobile->esp_sockets[conn].host_type == 2){
+    //    
+    //    //Apply to read UDP from ESP buffer, instead this
+    //    char cmdCheck[10];
+    //    sprintf(cmdCheck,"+IPD,%i,",conn);
+    //    if(ESP_SerialFind(buffATrx,cmdCheck,SEC(5),false,true)){
+    //        Delay_Timer(SEC(1));
+    //
+    //        int buffAT_size = sizeof(buffATrx);
+    //        char buffAT_cpy[buffAT_size];
+    //        
+    //        memset(buffAT_cpy,0x00,sizeof(buffAT_cpy));
+    //        memcpy(buffAT_cpy,buffATrx,buffAT_size);
+    //
+    //        int cmdIndex = ESP_GetCmdIndexBuffer(buffAT_cpy, cmdCheck);
+    //        int lastpointer = 0;
+    //        char numipd[5];
+    //
+    //        printf("check0\n");
+    //        // Read the ammount of received data
+    //        for(int i = cmdIndex+strlen(cmdCheck); i < buffAT_size; i++){
+    //            if(buffAT_cpy[i] == ','){
+    //                numipd[i-(cmdIndex+strlen(cmdCheck))] = 0x00;
+    //                lastpointer = i+1;
+    //                break;
+    //            }else{
+    //                numipd[i-(cmdIndex+strlen(cmdCheck))] = buffAT_cpy[i];
+    //            }
+    //        }
+    //        printf("check0\n");
+    //        if(atoi(numipd) > 0) len = atoi(numipd);
+    //        printf("ESP-01 UDP Bytes Received: %i\n", len);
+    //
+    //        // Read the remote IP from the UDP answer  
+    //        for(int i = lastpointer; i < buffAT_size; i++){
+    //            if(buffAT_cpy[i] == ','){
+    //                remoteIP[i-(lastpointer)] = 0x00;
+    //                lastpointer = i+1;
+    //                break;
+    //            }else{
+    //                remoteIP[i-(lastpointer)] = buffAT_cpy[i];
+    //            }
+    //        }
+    //
+    //        // Read the remote Port from the UDP answer  
+    //        char remotePORT[10];
+    //        for(int i = lastpointer; i < buffAT_size; i++){
+    //            if(buffAT_cpy[i] == ':'){
+    //                remotePORT[i-(lastpointer)] = 0x00;
+    //                lastpointer = i+1;
+    //                break;
+    //            }else{
+    //                remotePORT[i-(lastpointer)] = buffAT_cpy[i];
+    //            }
+    //        }
+    //        numRemotePort = atoi(remotePORT);
+    //        
+    //        if(len > 0 && data){
+    //            memcpy(data, buffAT_cpy + lastpointer, len); //memcpy with offset in source
+    //        }
+    //
+    //        if (addr && strlen(remoteIP) > 0){
+    //            unsigned char ip[MOBILE_PTON_MAXLEN];
+    //            int rc = mobile_pton(MOBILE_PTON_ANY, remoteIP, ip);
+    //
+    //            switch (rc) {
+    //            case MOBILE_PTON_IPV4:
+    //                addr4->type = MOBILE_ADDRTYPE_IPV4;
+    //                addr4->port = numRemotePort;
+    //                memcpy(addr4->host, ip, sizeof(addr4->host));
+    //                break;
+    //            case MOBILE_PTON_IPV6:
+    //                addr6->type = MOBILE_ADDRTYPE_IPV6;
+    //                addr6->port = numRemotePort;
+    //                memcpy(addr6->host, ip, sizeof(addr6->host));
+    //                break;
+    //            default:
+    //                break;
+    //            }
+    //        }
+    //    }
+    //}
     printf("check1\n");
     FlushATBuff();
     if (!data){
@@ -452,7 +452,7 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
         }
     }
     
-    if(mobile->esp_sockets[conn].host_type == 1){         
+    //if(mobile->esp_sockets[conn].host_type == 1){         
         if(!ESP_GetSockStatus(UART_ID,conn,user)){
             if(ipdVal[conn] <= 0){
                 if(ESP_ReadBuffSize(UART_ID,conn) == 0){
@@ -464,6 +464,16 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
         }
         
         len = ESP_ReqDataBuff(UART_ID,conn,size);
+        //Need to parse the received info from for UDP --- +CIPRECVDATA:5,"192.168.0.126",56214,TESTE
+        // +IPD,1,636
+        // End for TCP is now
+        //OK                             OK
+        //                               1,CLOSED
+        //+IPD,1,382                               
+
+        //UDP -- must read ALL BUFFER... if read less, it will lost everything
+        // +CIPRECVDATA:3,"192.168.0.126",56214,TES
+        //OK
 
         if(len > 0 ){
             memcpy(data,buffRecData + buffRecData_pointer,len);
@@ -471,13 +481,12 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
             if(buffRecData_pointer >= ipdVal[conn]){
                 buffRecData_pointer = 0;
                 ipdVal[conn] = 0;
-            } 
-            //ipdVal[conn] = ipdVal[conn] - len;
+            }
         }else{
             printf("Return %i bytes.\n",len);
             return len;
         }
-    }
+    //}
     printf("Return %i bytes.\n",len);
     return len;
 }

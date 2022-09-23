@@ -187,7 +187,7 @@ uint8_t ESP_SendData(uart_inst_t * uart, uint8_t connID, char * sock_type, char 
             sprintf(cmdSend,"AT+CIPSEND=%i,%i", connID, datasize);
         }
         ESP_SendCmd(uart,cmdSend,0);
-        if(ESP_SerialFind(buffATrx,"> ",MS(300),true,false)){
+        if(ESP_SerialFind(buffATrx,">",MS(300),true,false)){
             uint8_t * datasend = (uint8_t *)databuff;
             printf("ESP-01 Sending Data: Sending %i bytes...\n",datasize);
             ESP_SendCmd(uart,datasend,datasize);

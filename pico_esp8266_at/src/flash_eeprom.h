@@ -42,7 +42,6 @@ bool ReadFlashConfig(uint8_t * buff){
     printf("Reading the target region... ");
     memcpy(buff,flash_target_contents,FLASH_DATA_SIZE);
     bool needWrite = false;
-    FormatFlashConfig();
     //Check if the Flash is already formated 
     if(memmem(buff+OFFSET_CONFIG,strlen(KEY_CONFIG),KEY_CONFIG,strlen(KEY_CONFIG)) == NULL){
         char tmp_config[16];

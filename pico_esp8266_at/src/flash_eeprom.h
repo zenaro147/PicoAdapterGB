@@ -42,11 +42,7 @@ void FormatFlashConfig(){
 }
 
 //Read flash memory and set the configs
-// 0 = No config
-// 1 = Have only Mobile Adapter Config
-// 2 = Have Mobile Adapter and Wifi Config
-// 3 = Have only WiFi Config
-uint8_t ReadFlashConfig(uint8_t * buff){
+bool ReadFlashConfig(uint8_t * buff){
     printf("Reading the target region... ");
     memcpy(buff,flash_target_contents,FLASH_DATA_SIZE);
     bool needWrite = false;

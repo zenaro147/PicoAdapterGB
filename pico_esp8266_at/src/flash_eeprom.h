@@ -105,6 +105,9 @@ bool ReadFlashConfig(uint8_t * buff){
     haveDNS2Config = true;
     #endif
 
+    //P2P Port have 16 bytes (need parse to INT)
+    //Unmetered config have 16 bytes (should receive 1 or 0... transform that to TRUE or FALSE)
+
     if(needWrite){        
         flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);
         needWrite = false;
@@ -116,8 +119,6 @@ bool ReadFlashConfig(uint8_t * buff){
 
 void SaveFlashConfig(uint8_t * buff){
     printf("Programming target region... ");
-    //FormatFlashConfig();
-    //flash_range_program(FLASH_TARGET_OFFSET, dummy_config, FLASH_DATA_SIZE);
     flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);
     printf("Done.\n");
 }

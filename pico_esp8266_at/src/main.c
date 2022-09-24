@@ -360,16 +360,13 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
 
     //Checking if there is any UDP data in the buffer
     if(mobile->esp_sockets[conn].host_type == 2){
-        
-        //Apply to read UDP from ESP buffer, instead this
         char cmdCheck[10];
         sprintf(cmdCheck,"+IPD,%i,",conn);
-        if(ESP_SerialFind(buffATrx,cmdCheck,SEC(5),false,true)){
-            Delay_Timer(SEC(1));
+        if(ESP_SerialFind(buffATrx,cmdCheck,SEC(5),false,false)){
+            Delay_Timer(MS(300));
 
             int buffAT_size = sizeof(buffATrx);
             char buffAT_cpy[buffAT_size];
-            
             memset(buffAT_cpy,0x00,sizeof(buffAT_cpy));
             memcpy(buffAT_cpy,buffATrx,buffAT_size);
 
@@ -377,7 +374,6 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
             int lastpointer = 0;
             char numipd[5];
 
-            printf("check0\n");
             // Read the ammount of received data
             for(int i = cmdIndex+strlen(cmdCheck); i < buffAT_size; i++){
                 if(buffAT_cpy[i] == ','){
@@ -388,7 +384,6 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
                     numipd[i-(cmdIndex+strlen(cmdCheck))] = buffAT_cpy[i];
                 }
             }
-            printf("check0\n");
             if(atoi(numipd) > 0) len = atoi(numipd);
             printf("ESP-01 UDP Bytes Received: %i\n", len);
 
@@ -441,7 +436,7 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
             }
         }
     }
-    printf("check1\n");
+
     FlushATBuff();
     if (!data){
         if(!ESP_GetSockStatus(UART_ID,conn,user)){
@@ -552,6 +547,29 @@ void main(){
         mobile_init(&mobile->adapter, mobile, &adapter_config);
         multicore_launch_core1(core1_context);
         FlushATBuff();
+
+
+        //char dado[60] = "GET /01/CGB-B9AJ/index.php HTTP/1.0\r\nHost: 192.168.0.126\r\n\r\n";
+        //uint8_t dadoudp [] = {0x00,0x01,0x01,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x07,0x67,0x61,0x6D,0x65,0x62,0x6F,0x79,0x0A,0x64,0x61,0x74,0x61,0x63,0x65,0x6E,0x74,0x65,0x72,0x02,0x6E,0x65,0x02,0x6A,0x70,0x00,0x00,0x01,0x00,0x01};
+        //
+        //ESP_OpenSockConn(UART_ID,0,"TCP","192.168.0.126",80,0,0);
+        //ESP_OpenSockConn(UART_ID,1,"UDP","192.168.0.126",53,0,2);
+        //
+        //ESP_GetSockStatus(UART_ID,0,mobile);
+        //ESP_GetSockStatus(UART_ID,1,mobile);
+        //
+        //
+        //ESP_SendData(UART_ID,0,"TCP","192.168.0.126",80,dado,60);
+        //ESP_SendData(UART_ID,1,"UDP","192.168.0.126",53,dadoudp,sizeof(dadoudp));
+        //
+        //Delay_Timer(SEC(5));
+        //
+        //ESP_ReqDataBuff(UART_ID,0,100);
+        //
+        //ESP_SendData(UART_ID,1,"UDP","192.168.0.126",57318,dado,60);
+
+
+
 
         LED_OFF;
         while (true) {

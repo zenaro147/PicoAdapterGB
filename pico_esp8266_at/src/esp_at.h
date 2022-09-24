@@ -155,22 +155,18 @@ int ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize){
             dataSize=(tmp_idp-buffRecData_pointer);
         }
 
-        int reqSize = ipdVal[connID] <= BUFF_AT_SIZE ? ipdVal[connID] : BUFF_AT_SIZE;
         if(buffRecData_pointer == 0){
             char cmdRead[25]={};
-            sprintf(cmdRead,"AT+CIPRECVDATA=%i,%i",connID,reqSize);
+            sprintf(cmdRead,"AT+CIPRECVDATA=%i,%i",connID,ipdVal[connID] < BUFF_AT_SIZE ? ipdVal[connID] : BUFF_AT_SIZE);
             FlushATBuff();
             ESP_SendCmd(uart,cmdRead,0); //Must igonre the OK at the end, and the "+CIPRECVDATA,<size>:" at the beginning
             if(!ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(10),false,true)){
-                printf("ESP-01 Read Request: Error on Read %i bytes.\n",reqSize);
+                printf("ESP-01 Read Request: Error on Read %i bytes.\n",ipdVal[connID] <= BUFF_AT_SIZE ? ipdVal[connID] : BUFF_AT_SIZE);
                 return -1;
             }
-            Delay_Timer(MS(100));
-            char cmdoffset[20];
-            sprintf(cmdoffset,"+CIPRECVDATA:%i,",reqSize);
-            int cmdReadSize = strlen(cmdoffset);
-            //Must igonre the OK at the end, and the "+CIPRECVDATA:<size>," at the beginning
-            memcpy(&buffRecData, buffATrx + cmdoffset, reqSize); //memcpy with offset in source
+            Delay_Timer(MS(100)); 
+            int cmdReadSize = strlen(cmdRead)-1;             
+            memcpy(&buffRecData, buffATrx + cmdReadSize, ipdVal[connID] < BUFF_AT_SIZE ? ipdVal[connID] : BUFF_AT_SIZE); //memcpy with offset in source
             FlushATBuff();
         }
         return dataSize;

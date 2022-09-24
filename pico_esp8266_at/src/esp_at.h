@@ -30,7 +30,7 @@ void on_uart_rx(){
     while (uart_is_readable(use_uart0 ? uart0 : uart1)) {
         char ch = uart_getc(use_uart0 ? uart0 : uart1);
         buffATrx[buffATrx_pointer++] = ch;
-        if (buffATrx_pointer >= BUFF_AT_SIZE){
+        if (buffATrx_pointer >= sizeof(buffATrx)){
             buffATrx_pointer = 0;
         }
     }
@@ -357,6 +357,44 @@ bool ESP_CloseSockConn(uart_inst_t * uart, uint8_t connID){
     }
 }
 
+//Open an ESP server to accept new connections
+bool ESP_OpenServer(uart_inst_t * uart, uint8_t connID, int remotePort){
+    char cmd[25];
+    sprintf(cmd,"AT+CIPSERVER=1,%i",remotePort);
+    ESP_SendCmd(uart,cmd,0);
+    if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(2),true,false)){
+        printf("ESP-01 Open Server: OK\n");
+        return true;
+    }else{
+        printf("ESP-01 Open Server: ERROR\n"); 
+        return false;
+    }
+}
+
+//Close an ESP server and all opened sockets
+bool ESP_CloseServer(uart_inst_t * uart){
+    ESP_SendCmd(uart,"AT+CIPSERVER=0",0);
+    if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(2),true,false)){
+        printf("ESP-01 Close Server: OK\n");
+        return true;
+    }else{
+        printf("ESP-01 Close Server: ERROR\n"); 
+        return false;
+    }
+}
+bool ESP_CheckIncommingConn(uart_inst_t * uart, uint8_t connID){
+    char cmd[15];
+    sprintf(cmd,"%i,CONNECT",connID);
+    if(ESP_SerialFind(buffATrx,cmd,MS(100),false,false)){
+        FlushATBuff();
+        printf("ESP-01 New Connection: OK\n");
+        return true;
+    }else{
+        printf("ESP-01 New Connection: Waiting...\n"); 
+        return false;
+    }
+}
+
 // Initialize the ESP-01 UART communication
 bool EspAT_Init(uart_inst_t * uart, int baudrate, int txpin, int rxpin){
     // Set up our UART with the required speed.
@@ -417,7 +455,6 @@ bool ESP_ConnectWifi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int
         }else{
             printf(" ERROR\n");
         }
-        
     }else{
        printf("ESP-01 Connectivity: ERROR\n"); 
     }

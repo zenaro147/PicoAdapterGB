@@ -288,7 +288,7 @@ bool mobile_board_sock_listen(void *user, unsigned conn){
     // error, libmobile shall never do this.
 
     //Start CIPSERVER
-    //Keep listening for a "0,CONNECTED"
+    //Keep listening for a "0,CONNECTED" for true
     struct mobile_user *mobile = (struct mobile_user *)user;
     FlushATBuff();
     printf("mobile_board_sock_listen\n");
@@ -301,6 +301,8 @@ bool mobile_board_sock_accept(void *user, unsigned conn){
     // - conn: Socket number
     // Performing this operation on a socket that isn't listening or is already
     // connected should produce an error, libmobile shall never do this.
+
+    //the server close must be run at the SOCK_CLOSE for ESP NonOS
     struct mobile_user *mobile = (struct mobile_user *)user;
     FlushATBuff();
     printf("mobile_board_sock_accept\n");

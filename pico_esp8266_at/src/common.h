@@ -16,11 +16,11 @@ bool haveP2PConfig = false;
 bool haveUNMETConfig = false;
 
 //LED Config
-#define LED_PIN         25
-#define LED_SET(A)      (gpio_put(LED_PIN, (A)))
-#define LED_ON          LED_SET(true)
-#define LED_OFF         LED_SET(false)
-#define LED_TOGGLE      (gpio_put(LED_PIN, !gpio_get(LED_PIN)))
+#define LED_PIN       		  	25
+#define LED_SET(A)    		  	(gpio_put(LED_PIN, (A)))
+#define LED_ON        		  	LED_SET(true)
+#define LED_OFF       		  	LED_SET(false)
+#define LED_TOGGLE    		  	(gpio_put(LED_PIN, !gpio_get(LED_PIN)))
 
 //Time Config
 #define MKS(A)                  (A)
@@ -29,9 +29,9 @@ bool haveUNMETConfig = false;
 
 //UART RX Buffer Config
 #define BUFF_AT_SIZE 2048 //2048 is the maximun you can receive from esp01
-uint8_t buffATrx[BUFF_AT_SIZE+64] = {0x0}; // + extra bytes to hold the AT command answer echo
+uint8_t buffATrx[BUFF_AT_SIZE+64] = {0}; // + extra bytes to hold the AT command answer echo
 int buffATrx_pointer = 0;
-uint8_t buffRecData[BUFF_AT_SIZE] = {0x0};
+uint8_t buffRecData[BUFF_AT_SIZE] = {0};
 int buffRecData_pointer = 0;
 int ipdVal[5] = {0,0,0,0,0};
 

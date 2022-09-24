@@ -51,8 +51,8 @@ uint64_t last_readable = 0;
 #define CONFIG_OFFSET_WIFI_SIZE     28 //28bytes (+4 to identify the config, "SSID" in ascii)
 
 bool isESPDetected = false;
-
 bool haveConfigToWrite = false;
+bool isServerOpened = false;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -149,22 +149,6 @@ bool mobile_board_time_check_ms(A_UNUSED void *user, enum mobile_timers timer, u
     return (time_us_64() - millis_latch) > MS(ms);
 }
 
-/*
-you don't need to support everything it says right out of the gate, for example IPv6 isn't used currently.
-and UDP is only necessary for DNS
-similarly the bind() functionality is only used for receiving calls.
-so you can just check for all the things you don't support and return errors for now 
-This API might not map exactly to the AT commands the ESP has but it should be close-ish
-For example, sock_open() should do nothing in your case but initialize a structure that keeps track of the socket's type, and then when sock_connect() is called, AT+CIPSTART needs to be called with the socket type specified in sock_open() and the address specified in sock_connect().
-Same for sock_listen() but the AT command would be AT+CIPSERVER
-sock_accept() would check if anything has connected to the AT+CIPSERVER socket
-All of sock_connect(), sock_listen() and sock_accept() are for TCP
-For UDP the destination address is specified in sock_send(), and apparently this mirrors the AT+CIPSENDEX command.
-Similarly for TCP connections sock_send() is an AT+CIPSEND command.
-sock_recv() would depend on whether you're using active or passive mode for receiving, but I'm seeing there's no passive mode reception command for UDP which might be an issue.
-sock_recv() is also a funky one because it needs to signal to libmobile whether the connection has been closed (if it's a TCP connection) and it needs to know where the message came from (especially for UDP sockets) 
-*/
-
 bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
     struct mobile_user *mobile = (struct mobile_user *)user;
     printf("mobile_board_sock_open\n");
@@ -199,15 +183,18 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
     mobile->esp_sockets[conn].local_port = bindport;
 
     if(mobile->esp_sockets[conn].host_type == 2 && !mobile->esp_sockets[conn].sock_status){
-        mobile->esp_sockets[conn].sock_status = ESP_OpenSockConn(UART_ID, conn, mobile->esp_sockets[conn].host_iptype == MOBILE_ADDRTYPE_IPV4 ? "UDP" : "UDPv6", mobile->esp_sockets[conn].host_iptype == MOBILE_ADDRTYPE_IPV4 ? "127.0.0.1" : "0:0:0:0:0:0:0:1", 1, mobile->esp_sockets[conn].local_port, 2);
-        if(!mobile->esp_sockets[conn].sock_status){
+        bool checkUDPsock = false;
+        checkUDPsock = ESP_OpenSockConn(UART_ID, conn, mobile->esp_sockets[conn].host_iptype == MOBILE_ADDRTYPE_IPV4 ? "UDP" : "UDPv6", mobile->esp_sockets[conn].host_iptype == MOBILE_ADDRTYPE_IPV4 ? "127.0.0.1" : "0:0:0:0:0:0:0:1", 1, mobile->esp_sockets[conn].local_port, 2);
+        if(!checkUDPsock){
             mobile->esp_sockets[conn].host_id = -1;
             mobile->esp_sockets[conn].local_port = -1;
             mobile->esp_sockets[conn].sock_status = false;
+        }else{
+            mobile->esp_sockets[conn].sock_status = checkUDPsock;
         }
-        return mobile->esp_sockets[conn].sock_status;
+        return checkUDPsock;
     }
-    return true;    
+    return true;
 }
 
 void mobile_board_sock_close(void *user, unsigned conn){
@@ -220,6 +207,11 @@ void mobile_board_sock_close(void *user, unsigned conn){
             mobile->esp_sockets[conn].local_port = -1;
             mobile->esp_sockets[conn].sock_status = false;
         }
+    }
+    if(isServerOpened){
+        printf("mobile_board_sock_close - Server\n");
+        ESP_CloseServer(UART_ID);
+        isServerOpened = false;
     }
 }
 
@@ -278,35 +270,28 @@ int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_add
     return -1;
 }
 
-//mobile-windows.exe 127.0.0.1 8764
 // https://discord.com/channels/375413108467957761/541384270636384259/1022599202582298624
 bool mobile_board_sock_listen(void *user, unsigned conn){
-    // Returns: true if socket started listening, false on error
-    // Parameters:
-    // - conn: Socket number
-    // Listening on an UDP socket, or a connected TCP socket should produce an
-    // error, libmobile shall never do this.
-
-    //Start CIPSERVER
-    //Keep listening for a "0,CONNECTED" for true
     struct mobile_user *mobile = (struct mobile_user *)user;
-    FlushATBuff();
     printf("mobile_board_sock_listen\n");
-    return false;
+    bool sockP2Pcheck = false;
+    if(!isServerOpened && mobile->esp_sockets[conn].host_type == 1){
+        sockP2Pcheck = ESP_OpenServer(UART_ID,conn,mobile->esp_sockets[conn].local_port);
+        isServerOpened = sockP2Pcheck;
+    }
+    return sockP2Pcheck;
 }
 bool mobile_board_sock_accept(void *user, unsigned conn){
-    // Returns: true if a connection was accepted,
-    //          false if there's no incoming connections
-    // Parameters:
-    // - conn: Socket number
-    // Performing this operation on a socket that isn't listening or is already
-    // connected should produce an error, libmobile shall never do this.
-
-    //the server close must be run at the SOCK_CLOSE for ESP NonOS
     struct mobile_user *mobile = (struct mobile_user *)user;
-    FlushATBuff();
     printf("mobile_board_sock_accept\n");
-    return false;
+    bool sockP2Pconn = false;
+    if(isServerOpened){
+        sockP2Pconn = ESP_CheckIncommingConn(UART_ID,conn);
+        if(sockP2Pconn){
+            mobile->esp_sockets[conn].sock_status = true;
+        }
+    }    
+    return sockP2Pconn;
 }
  
 int mobile_board_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){    
@@ -357,19 +342,15 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
 }
 
 int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
-    //! TCP SOCKETS CLOSES AS SOON THE DATA ARRIVES, BUT IT KEEPS THE DATA INTO THE BUFFER
-    //! UDP SOCKETS KEEP THE SOCKET OPEN, BUT DON'T STORE THE DATA INTO ANY BUFFER
     printf("mobile_board_sock_recv\n");
 
     struct mobile_user *mobile = (struct mobile_user *)user;
     struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
     struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
     
-    //if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status
-    //    && ESP_ReadBuffSize(UART_ID,conn) == 0 
-    //    && ipdVal[conn] == 0){
-    //    return -1;
-    //}
+    if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status && mobile->esp_sockets[conn].host_iptype == MOBILE_ADDRTYPE_NONE){
+        return -1;
+    }
 
     int len = -1;
     int numRemotePort=-1;
@@ -486,7 +467,6 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
                 buffRecData_pointer = 0;
                 ipdVal[conn] = 0;
             } 
-            //ipdVal[conn] = ipdVal[conn] - len;
         }else{
             printf("Return %i bytes.\n",len);
             return len;
@@ -525,9 +505,6 @@ void main(){
 
     mobile = malloc(sizeof(struct mobile_user));
     struct mobile_adapter_config adapter_config = MOBILE_ADAPTER_CONFIG_DEFAULT;
-
-
-
 
     memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
     ReadFlashConfig(mobile->config_eeprom);

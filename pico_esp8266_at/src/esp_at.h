@@ -113,7 +113,12 @@ int ESP_ReadBuffSize(uart_inst_t * uart, uint8_t connID){
         // loop through the string to extract all other tokens
         while(token != NULL) {
             if(strcmp(token, "+CIPRECVLEN") != 0){
-                tmp_ipd[connID_pointer++] = atoi(token);
+                if (atoi(token) == -1){
+                    tmp_ipd[connID_pointer++] = 0;
+                }else{
+                    tmp_ipd[connID_pointer++] = atoi(token);
+                }
+                
             }
             token = strtok(NULL, ",");
         }
@@ -127,7 +132,7 @@ int ESP_ReadBuffSize(uart_inst_t * uart, uint8_t connID){
 }
 
 // Retrieve data from the ESP buffer (only TCP) and store to the internal buffer (max Data Size = 2048)
-int ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize){
+int ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize,char * remoteIP, char * remotePORT){
     FlushATBuff();
 
     //Search on ESP if there is more data to read
@@ -136,8 +141,9 @@ int ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize){
         ipdVal[connID] = ESP_ReadBuffSize(uart,connID);
         printf("ESP-01 Read Request: New IPD %i.\n",ipdVal[connID]);
     }
-    if(ipdVal[connID] == 0){
+    if(ipdVal[connID] <= 0){
         printf("ESP-01 Read Request: You don't have data to read.\n");
+        ipdVal[connID] = 0;
         return 0;
     }else{
         if (dataSize < 0){
@@ -160,17 +166,57 @@ int ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize){
             char cmdRead[25]={};
             sprintf(cmdRead,"AT+CIPRECVDATA=%i,%i",connID,reqSize);
             FlushATBuff();
-            ESP_SendCmd(uart,cmdRead,0); //Must igonre the OK at the end, and the "+CIPRECVDATA,<size>:" at the beginning
+            ESP_SendCmd(uart,cmdRead,0);
             if(!ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(10),false,true)){
                 printf("ESP-01 Read Request: Error on Read %i bytes.\n",reqSize);
                 return -1;
             }
             Delay_Timer(MS(100));
-            char cmdoffset[20];
+            char cmdoffset[100];
             sprintf(cmdoffset,"+CIPRECVDATA:%i,",reqSize);
+            int cmdIndex = ESP_GetCmdIndexBuffer(buffATrx, cmdoffset);
             int cmdReadSize = strlen(cmdoffset);
-            //Must igonre the OK at the end, and the "+CIPRECVDATA:<size>," at the beginning
-            memcpy(&buffRecData, buffATrx + cmdoffset, reqSize); //memcpy with offset in source
+            
+            //Must igonre the OK at the end, and the "+CIPRECVDATA:<sie>," at the beginning but must read the <remote IP>,<remote port>, from it
+            int lastpointer = 0;
+            int buffAT_size = buffATrx_pointer;
+
+            //char numipd[5];
+            // Read the ammount of received data
+            //for(int i = cmdIndex+cmdReadSize; i < buffATrx_pointer; i++){
+            //    if(buffATrx[i] == ','){
+            //        numipd[i-(cmdIndex+cmdReadSize)] = 0x00;
+            //        lastpointer = i+1;
+            //        break;
+            //    }else{
+            //        numipd[i-(cmdIndex+cmdReadSize)] = buffATrx[i];
+            //    }
+            //}
+            //if(atoi(numipd) > 0) len = atoi(numipd);
+
+            // Read the remote IP from the UDP answer  
+            for(int i = cmdIndex+cmdReadSize; i < buffATrx_pointer; i++){
+                if(buffATrx[i] == ','){
+                    remoteIP[i-(cmdIndex+cmdReadSize)] = 0x00;
+                    lastpointer = i+1;
+                    break;
+                }else{
+                    remoteIP[i-(cmdIndex+cmdReadSize)] = buffATrx[i];
+                }
+            }
+    
+            // Read the remote Port from the UDP answer  
+            for(int i = lastpointer; i < buffATrx_pointer; i++){
+                if(buffATrx[i] == ','){
+                    remotePORT[i-(lastpointer)] = 0x00;
+                    lastpointer = i+1;
+                    break;
+                }else{
+                    remotePORT[i-(lastpointer)] = buffATrx[i];
+                }
+            }
+
+            memcpy(&buffRecData, buffATrx + lastpointer, reqSize); //memcpy with offset in source
             FlushATBuff();
         }
         return dataSize;
@@ -207,7 +253,7 @@ uint8_t ESP_SendData(uart_inst_t * uart, uint8_t connID, char * sock_type, char 
 
 // Establish a connection to the Host (Mobile Adapter GB server)
 bool ESP_OpenSockConn(uart_inst_t * uart, uint8_t connID, char * sock_type, char * conn_host, int conn_port, int conn_localport, uint8_t conn_mode){
-    if(ipdVal[connID] != 0){
+    if(ipdVal[connID] > 0){
         printf("ESP-01 Start Host Connection: You can't open a connection now.\n");
         return false;
     }
@@ -406,11 +452,22 @@ bool ESP_ConnectWifi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int
     if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(2),true,false)){
         printf("ESP-01 Connectivity: Checking...");
         ESP_SendCmd(uart,"AT+RST",0);
-        if(ESP_SerialFind(buffATrx,"\r\nWIFI GOT IP\r\n",SEC(10),true,true)){
+        if(ESP_SerialFind(buffATrx,"ready",SEC(10),true,true)){
             printf(" OK\n");
+            if(ESP_SerialFind(buffATrx,"\r\nWIFI GOT IP\r\n",SEC(10),true,true)){
+                printf(" Wifi Connected\n");
+                    // Disable auto-connect during the boot
+                    ESP_SendCmd(uart,"AT+CWAUTOCONN=0",0);
+                    if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(1),true,false)){
+                        printf("ESP-01 Auto Connect on Boot: OK\n");
+                    }else{
+                    printf("ESP-01 Auto Connect on Boot: ERROR\n"); 
+                    }  
+            }
         }else{
             printf(" ERROR\n");
         }
+        
     }else{
        printf("ESP-01 Connectivity: ERROR\n"); 
     }
@@ -423,7 +480,15 @@ bool ESP_ConnectWifi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int
        printf("ESP-01 Disable Echo: ERROR\n"); 
     }
     
-    // Disable echo 
+    // Set System messages to 2 (pops a +LINK_CONN:0,0,"TCP",1,"192.168.0.126",53342,1234 when a new socket was open) 
+    //ESP_SendCmd(uart,"AT+SYSMSG=2",0);
+    //if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(1),true,false)){
+    //     printf("ESP-01 System Messages: OK\n");
+    //}else{
+    //   printf("ESP-01 System Messages: ERROR\n"); 
+    //}  
+    
+    // Shows the origin info on IPD 
     ESP_SendCmd(uart,"AT+CIPDINFO=1",0);
     if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(1),true,false)){
          printf("ESP-01 UDP IDP info: OK\n");

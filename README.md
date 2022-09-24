@@ -13,4 +13,3 @@ Based on: [Libmobile](https://github.com/REONTeam/libmobile) by [REON Team](http
 
 ### What need to do:
 * If necessary, save the custom P2P port and "unmetered" parameters on flash as well
-* Implement the "sock_accept" and "sock_listen" functions to communicate as P2P connection.

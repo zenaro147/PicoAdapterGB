@@ -430,6 +430,14 @@ bool ESP_ConnectWifi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int
        printf("ESP-01 Disable Echo: ERROR\n"); 
     }
     
+    // Only 1 P2P Connection
+    ESP_SendCmd(uart,"AT+CIPSERVERMAXCONN=1",0);
+    if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(1),true,false)){
+         printf("ESP-01 Only 1 P2P Connection: OK\n");
+    }else{
+       printf("ESP-01 Only 1 P2P Connection: ERROR\n"); 
+    }
+
     // Shows the origin info on IPD 
     ESP_SendCmd(uart,"AT+CIPDINFO=1",0);
     if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(1),true,false)){

@@ -441,20 +441,23 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     FlushATBuff();
     if (!data){
         if(!ESP_GetSockStatus(UART_ID,conn,user)){
+            printf("check0\n");
             return -2;
         }else{
+            printf("check1\n");
             return 0;
         }
     }
     
     if(mobile->esp_sockets[conn].host_type == 1){         
         if(!ESP_GetSockStatus(UART_ID,conn,user)){
-            if(ipdVal[conn] <= 0){
+            if(ipdVal[conn] == 0){
                 if(ESP_ReadBuffSize(UART_ID,conn) == 0){
+                    printf("check2\n");
                     return -2;
                 }
             }else{
-                if (ipdVal[conn] < 0) return -1;
+                if (ipdVal[conn] < 0){printf("check3\n"); return -1;}
             }
         }
         

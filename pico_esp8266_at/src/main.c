@@ -279,7 +279,6 @@ int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_add
 }
 
 //mobile-windows.exe 127.0.0.1 8764
-// https://discord.com/channels/375413108467957761/541384270636384259/1022599202582298624
 bool mobile_board_sock_listen(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
     FlushATBuff();

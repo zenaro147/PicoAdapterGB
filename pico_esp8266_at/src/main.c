@@ -281,12 +281,26 @@ int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_add
 //mobile-windows.exe 127.0.0.1 8764
 // https://discord.com/channels/375413108467957761/541384270636384259/1022599202582298624
 bool mobile_board_sock_listen(void *user, unsigned conn){
+    // Returns: true if socket started listening, false on error
+    // Parameters:
+    // - conn: Socket number
+    // Listening on an UDP socket, or a connected TCP socket should produce an
+    // error, libmobile shall never do this.
+
+    //Start CIPSERVER
+    //Keep listening for a "0,CONNECTED"
     struct mobile_user *mobile = (struct mobile_user *)user;
     FlushATBuff();
     printf("mobile_board_sock_listen\n");
     return false;
 }
 bool mobile_board_sock_accept(void *user, unsigned conn){
+    // Returns: true if a connection was accepted,
+    //          false if there's no incoming connections
+    // Parameters:
+    // - conn: Socket number
+    // Performing this operation on a socket that isn't listening or is already
+    // connected should produce an error, libmobile shall never do this.
     struct mobile_user *mobile = (struct mobile_user *)user;
     FlushATBuff();
     printf("mobile_board_sock_accept\n");

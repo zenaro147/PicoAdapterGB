@@ -279,6 +279,7 @@ int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_add
 }
 
 //mobile-windows.exe 127.0.0.1 8764
+//
 bool mobile_board_sock_listen(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
     FlushATBuff();
@@ -348,11 +349,11 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
     struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
     
-    if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status
-        && ESP_ReadBuffSize(UART_ID,conn) == 0 
-        && ipdVal[conn] == 0){
-        return -1;
-    }
+    //if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status
+    //    && ESP_ReadBuffSize(UART_ID,conn) == 0 
+    //    && ipdVal[conn] == 0){
+    //    return -1;
+    //}
 
     int len = -1;
     int numRemotePort=-1;

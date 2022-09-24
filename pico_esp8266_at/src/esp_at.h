@@ -402,11 +402,22 @@ bool ESP_ConnectWifi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int
     if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(2),true,false)){
         printf("ESP-01 Connectivity: Checking...");
         ESP_SendCmd(uart,"AT+RST",0);
-        if(ESP_SerialFind(buffATrx,"\r\nWIFI GOT IP\r\n",SEC(10),true,true)){
+        if(ESP_SerialFind(buffATrx,"ready",SEC(10),true,true)){
             printf(" OK\n");
+            if(ESP_SerialFind(buffATrx,"\r\nWIFI GOT IP\r\n",SEC(10),true,true)){
+                printf(" Wifi Connected\n");
+                    // Disable auto-connect during the boot
+                    ESP_SendCmd(uart,"AT+CWAUTOCONN=0",0);
+                    if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(1),true,false)){
+                        printf("ESP-01 Auto Connect on Boot: OK\n");
+                    }else{
+                    printf("ESP-01 Auto Connect on Boot: ERROR\n"); 
+                    }  
+            }
         }else{
             printf(" ERROR\n");
         }
+        
     }else{
        printf("ESP-01 Connectivity: ERROR\n"); 
     }
@@ -419,7 +430,7 @@ bool ESP_ConnectWifi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int
        printf("ESP-01 Disable Echo: ERROR\n"); 
     }
     
-    // Disable echo 
+    // Shows the origin info on IPD 
     ESP_SendCmd(uart,"AT+CIPDINFO=1",0);
     if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(1),true,false)){
          printf("ESP-01 UDP IDP info: OK\n");

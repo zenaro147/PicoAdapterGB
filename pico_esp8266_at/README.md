@@ -1,6 +1,6 @@
 # Hardware Setup
 
-## Esp8266 ESP-01
+### Esp8266 ESP-01
 You need flash your ESP with the [Latest NonOS Firmware](https://github.com/espressif/ESP8266_NONOS_SDK/releases/latest/) and download the [Latest Flash Download Tool](https://www.espressif.com/en/support/download/other-tools) from espressif.
 
 You will need an USB adapter to flash the firmware and solder a pushbutton on GPIO 0 and GND on the adapter. Connect the adapter with the button pressed and release after 2 seconds after connected, this will put the ESP into "programmable mode" to flash the firmware.
@@ -36,7 +36,7 @@ Currently it's not supports the ESP-AT firmware (v2.2 for ESP8266 or newer versi
 
 **⚠If this doesn't work, try to flip around GPIO 4 and GPIO 5.⚠**
 
-## Link Cable
+### Link Cable
 ```
  __________
 |  6  4  2 |

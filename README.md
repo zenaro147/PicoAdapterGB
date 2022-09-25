@@ -12,4 +12,4 @@ Refer to the implementation's README.md for more details.
 ### What need to do:
 * If necessary, save the custom P2P port and "unmetered" parameters on flash as well
 * Some method to apply new configurations, such as new SSID, password and DNS.
-* Implement/test 32bits mode
+* Implement/test 32bits mode for GBA

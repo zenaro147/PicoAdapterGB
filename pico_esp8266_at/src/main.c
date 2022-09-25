@@ -70,7 +70,7 @@ static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
     reset_block(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
     unreset_block_wait(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
 
-    spi_set_baudrate(spi, baudrate);
+    spi_set_baudrate(spi, baudrate);    
     spi_set_format(spi, 8, SPI_CPOL_1, SPI_CPOL_1, SPI_MSB_FIRST);
     hw_set_bits(&spi_get_hw(spi)->dmacr, SPI_SSPDMACR_TXDMAE_BITS | SPI_SSPDMACR_RXDMAE_BITS);
     spi_set_slave(spi, true);
@@ -115,11 +115,16 @@ void mobile_board_debug_log(void *user, const char *line){
     fprintf(stderr, "%s\n", line);
 }
 
-void mobile_board_serial_disable(A_UNUSED void *user) {
+void mobile_board_serial_disable(void *user) {
+    (void)user;
     spi_deinit(SPI_PORT);
 }
 
-void mobile_board_serial_enable(A_UNUSED void *user) {  
+void mobile_board_serial_enable(void *user) { 
+    (void)user;
+    //struct mobile_user *mobile = (struct mobile_user *)user;
+    //struct mobile_adapter_serial *s = &mobile->adapter.serial;
+    //trigger_spi(SPI_PORT,SPI_BAUDRATE,s->mode_32bit);
     trigger_spi(SPI_PORT,SPI_BAUDRATE);
 }
 

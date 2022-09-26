@@ -45,11 +45,6 @@ bool speed_240_MHz = false;
 volatile uint64_t time_us_now = 0;
 uint64_t last_readable = 0;
 
-#define CONFIG_OFFSET_MAGB          0 // Up to 256ytes
-#define CONFIG_OFFSET_WIFI_SSID     260 //28bytes (+4 to identify the config, "SSID" in ascii)
-#define CONFIG_OFFSET_WIFI_PASS     292 //28bytes (+4 to identify the config, "PASS" in ascii)
-#define CONFIG_OFFSET_WIFI_SIZE     28 //28bytes (+4 to identify the config, "SSID" in ascii)
-
 bool isESPDetected = false;
 bool haveConfigToWrite = false;
 bool isServerOpened = false;

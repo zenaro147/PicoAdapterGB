@@ -66,6 +66,7 @@ static uint8_t set_initial_data() {
 
 static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
     //spi_init
+    if(is32bitsMode) printf("32bits mode.\n");
     reset_block(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
     unreset_block_wait(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
 
@@ -78,12 +79,14 @@ static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
     if(!is32bitsMode){
         spi_get_hw(spi)->dr = 0xD2;
     }else{
-        for(int i = 0 ; i < 4 ; i++){
-            spi_get_hw(spi)->dr = 0xD2;
-        }
+        spi_get_hw(spi)->dr = 0xD2;
+        spi_get_hw(spi)->dr = 0xD2;
+        spi_get_hw(spi)->dr = 0xD2;
+        spi_get_hw(spi)->dr = 0xD2;
     } 
 
     hw_set_bits(&spi_get_hw(spi)->cr1, SPI_SSPCR1_SSE_BITS);
+    if(is32bitsMode) printf("32bits mode.\n");
 }
 
 ///////////////////////////////////////
@@ -494,8 +497,9 @@ void core1_context() {
 
     while (true) {
         if(spi_is_readable(SPI_PORT)) {
+            //spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, spi_get_hw(SPI_PORT)->dr);
             if(!is32bitsMode){
-                spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, spi_get_hw(SPI_PORT)->dr);
+               spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, spi_get_hw(SPI_PORT)->dr);
             }else{
                 // Mario Kart Data Sample
                 // 0x99661900  0xD2D2D2D2  // Start signal, command 0x19 (read eeprom)
@@ -512,7 +516,7 @@ void core1_context() {
                     //for(int x = 0 ; x < 4 ; x++){                   
                     //    spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, buff32[x]);  
                     //}
-                    
+
                     //for(int x = 0 ; x < 4 ; x++){                   
                     //    tmpbuff[x] = mobile_transfer(&mobile->adapter, buff32[3-x]);
                     //}
@@ -528,10 +532,10 @@ void core1_context() {
                     tmpbuff[1] = mobile_transfer(&mobile->adapter, buff32[1]);
                     tmpbuff[2] = mobile_transfer(&mobile->adapter, buff32[2]);
                     tmpbuff[3] = mobile_transfer(&mobile->adapter, buff32[3]);
-                    spi_get_hw(SPI_PORT)->dr = tmpbuff[3];
-                    spi_get_hw(SPI_PORT)->dr = tmpbuff[2];
-                    spi_get_hw(SPI_PORT)->dr = tmpbuff[1];
                     spi_get_hw(SPI_PORT)->dr = tmpbuff[0];
+                    spi_get_hw(SPI_PORT)->dr = tmpbuff[1];
+                    spi_get_hw(SPI_PORT)->dr = tmpbuff[2];
+                    spi_get_hw(SPI_PORT)->dr = tmpbuff[3];
                     buff32_pointer -= 4;
                     //buff32_pointer += 4;
                 }

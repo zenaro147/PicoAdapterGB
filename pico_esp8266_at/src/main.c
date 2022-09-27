@@ -52,7 +52,8 @@ bool isServerOpened = false;
 bool is32bitsMode = false;
 
 uint8_t buff32[4];
-int8_t buff32_pointer = 4;
+volatile int8_t buff32_pointer = 0;
+volatile bool spiLock = false;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////
@@ -66,7 +67,6 @@ static uint8_t set_initial_data() {
 
 static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
     //spi_init
-    if(is32bitsMode) printf("32bits mode.\n");
     reset_block(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
     unreset_block_wait(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
 
@@ -86,7 +86,6 @@ static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
     } 
 
     hw_set_bits(&spi_get_hw(spi)->cr1, SPI_SSPCR1_SSE_BITS);
-    if(is32bitsMode) printf("32bits mode.\n");
 }
 
 ///////////////////////////////////////
@@ -124,21 +123,29 @@ void mobile_board_debug_log(void *user, const char *line){
 }
 
 void mobile_board_serial_disable(void *user) {
+    gpio_put(10, true);
     (void)user;
     struct mobile_user *mobile = (struct mobile_user *)user;
+    while(spiLock){
+        if(!spiLock) break;
+    }
     is32bitsMode = mobile->adapter.serial.mode_32bit;
     spi_deinit(SPI_PORT);
+        
 }
 
-void mobile_board_serial_enable(void *user) { 
+void mobile_board_serial_enable(void *user) {
     (void)user;
     struct mobile_user *mobile = (struct mobile_user *)user;
-    is32bitsMode = mobile->adapter.serial.mode_32bit;
-    if(is32bitsMode){
-        trigger_spi(SPI_PORT,SPI_BAUDRATE_512);
-    }else{
-        trigger_spi(SPI_PORT,SPI_BAUDRATE_256);
-    }
+    is32bitsMode = mobile->adapter.serial.mode_32bit;    
+    trigger_spi(SPI_PORT,SPI_BAUDRATE_512);
+
+    //if(is32bitsMode){
+    //    trigger_spi(SPI_PORT,SPI_BAUDRATE_512);
+    //}else{
+    //    trigger_spi(SPI_PORT,SPI_BAUDRATE_256);
+    //}
+    gpio_put(10, false);
 }
 
 bool mobile_board_config_read(void *user, void *dest, const uintptr_t offset, const size_t size) {
@@ -496,7 +503,8 @@ void core1_context() {
     irq_set_mask_enabled(0xffffffff, false);
 
     while (true) {
-        if(spi_is_readable(SPI_PORT)) {
+        if(spi_is_readable(SPI_PORT)){
+            spiLock = true;
             //spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, spi_get_hw(SPI_PORT)->dr);
             if(!is32bitsMode){
                spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, spi_get_hw(SPI_PORT)->dr);
@@ -507,11 +515,9 @@ void core1_context() {
                 // 0x0000009B  0xD2D2D2D2  // Padding, 2-byte checksum (0x009B)
                 // 0x81000000  0x88990000  // Device ID (0x81 = GBA, 0x88 = Blue adapter), acknowledgement (0x19 ^ 0x80) = 0x99 for current command
 
-
                 buff32[buff32_pointer++] = spi_get_hw(SPI_PORT)->dr;
-                //buff32[--buff32_pointer] = spi_get_hw(SPI_PORT)->dr;
                 if(buff32_pointer >= 4){
-                //if(buff32_pointer <= 0){
+                    gpio_put(9, true);
                     uint8_t tmpbuff[4];
                     //for(int x = 0 ; x < 4 ; x++){                   
                     //    spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, buff32[x]);  
@@ -537,9 +543,10 @@ void core1_context() {
                     spi_get_hw(SPI_PORT)->dr = tmpbuff[2];
                     spi_get_hw(SPI_PORT)->dr = tmpbuff[3];
                     buff32_pointer -= 4;
-                    //buff32_pointer += 4;
+                    gpio_put(9, false);
                 }
             }
+            spiLock = false;
         }
     }
 }
@@ -547,6 +554,14 @@ void core1_context() {
 void main(){
     speed_240_MHz = set_sys_clock_khz(240000, false);
     stdio_init_all();
+
+    gpio_init(9);
+    gpio_set_dir(9, GPIO_OUT);
+    gpio_put(9, false);
+
+    gpio_init(10);
+    gpio_set_dir(10, GPIO_OUT);
+    gpio_put(10, false);
 
     // For toggle_led
     gpio_init(LED_PIN);
@@ -599,29 +614,6 @@ void main(){
         mobile_init(&mobile->adapter, mobile, &adapter_config);
         multicore_launch_core1(core1_context);
         FlushATBuff();
-
-
-        //char dado[60] = "GET /01/CGB-B9AJ/index.php HTTP/1.0\r\nHost: 192.168.0.126\r\n\r\n";
-        //uint8_t dadoudp [] = {0x00,0x01,0x01,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x07,0x67,0x61,0x6D,0x65,0x62,0x6F,0x79,0x0A,0x64,0x61,0x74,0x61,0x63,0x65,0x6E,0x74,0x65,0x72,0x02,0x6E,0x65,0x02,0x6A,0x70,0x00,0x00,0x01,0x00,0x01};
-        //
-        //ESP_OpenSockConn(UART_ID,0,"TCP","192.168.0.126",80,0,0);
-        //ESP_OpenSockConn(UART_ID,1,"UDP","192.168.0.126",53,0,2);
-        //
-        //ESP_GetSockStatus(UART_ID,0,mobile);
-        //ESP_GetSockStatus(UART_ID,1,mobile);
-        //
-        //
-        //ESP_SendData(UART_ID,0,"TCP","192.168.0.126",80,dado,60);
-        //ESP_SendData(UART_ID,1,"UDP","192.168.0.126",53,dadoudp,sizeof(dadoudp));
-        //
-        //Delay_Timer(SEC(5));
-        //
-        //ESP_ReqDataBuff(UART_ID,0,100);
-        //
-        //ESP_SendData(UART_ID,1,"UDP","192.168.0.126",57318,dado,60);
-
-
-
 
         LED_OFF;
         while (true) {

@@ -8,18 +8,13 @@
 // ---- https://docs.espressif.com/projects/esp-at/en/release-v2.2.0.0_esp8266/AT_Command_Set/index.html
 ////////////////////////////////////
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/timer.h"
 #include "hardware/gpio.h"
-#include "hardware/irq.h"
-#include "hardware/uart.h"
 #include "hardware/spi.h"
 #include "hardware/resets.h"
-//#include "hardware/clocks.h"
 #include "hardware/flash.h"
 
 #include "common.h"
@@ -67,6 +62,7 @@ static uint8_t set_initial_data() {
 
 static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
     //spi_init
+    buff32_pointer = 0;
     reset_block(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
     unreset_block_wait(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
 
@@ -126,9 +122,7 @@ void mobile_board_serial_disable(void *user) {
     gpio_put(10, true);
     (void)user;
     struct mobile_user *mobile = (struct mobile_user *)user;
-    while(spiLock){
-        if(!spiLock) break;
-    }
+    while(spiLock);
     is32bitsMode = mobile->adapter.serial.mode_32bit;
     spi_deinit(SPI_PORT);
         

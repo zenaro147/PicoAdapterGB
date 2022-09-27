@@ -1,11 +1,6 @@
 #ifndef ESP_AT_H
 #define ESP_AT_H
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include "hardware/uart.h"
-#include "hardware/irq.h"
 #include "common.h"
 
 bool use_uart0 = true;

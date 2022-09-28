@@ -8,18 +8,12 @@
 // ---- https://docs.espressif.com/projects/esp-at/en/release-v2.2.0.0_esp8266/AT_Command_Set/index.html
 ////////////////////////////////////
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/timer.h"
 #include "hardware/gpio.h"
-#include "hardware/irq.h"
-#include "hardware/uart.h"
 #include "hardware/spi.h"
 #include "hardware/resets.h"
-//#include "hardware/clocks.h"
 #include "hardware/flash.h"
 
 #include "common.h"
@@ -45,11 +39,6 @@ bool speed_240_MHz = false;
 volatile uint64_t time_us_now = 0;
 uint64_t last_readable = 0;
 
-#define CONFIG_OFFSET_MAGB          0 // Up to 256ytes
-#define CONFIG_OFFSET_WIFI_SSID     260 //28bytes (+4 to identify the config, "SSID" in ascii)
-#define CONFIG_OFFSET_WIFI_PASS     292 //28bytes (+4 to identify the config, "PASS" in ascii)
-#define CONFIG_OFFSET_WIFI_SIZE     28 //28bytes (+4 to identify the config, "SSID" in ascii)
-
 bool isESPDetected = false;
 bool haveConfigToWrite = false;
 bool isServerOpened = false;
@@ -70,7 +59,7 @@ static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
     reset_block(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
     unreset_block_wait(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
 
-    spi_set_baudrate(spi, baudrate);
+    spi_set_baudrate(spi, baudrate);    
     spi_set_format(spi, 8, SPI_CPOL_1, SPI_CPOL_1, SPI_MSB_FIRST);
     hw_set_bits(&spi_get_hw(spi)->dmacr, SPI_SSPDMACR_TXDMAE_BITS | SPI_SSPDMACR_RXDMAE_BITS);
     spi_set_slave(spi, true);
@@ -115,11 +104,16 @@ void mobile_board_debug_log(void *user, const char *line){
     fprintf(stderr, "%s\n", line);
 }
 
-void mobile_board_serial_disable(A_UNUSED void *user) {
+void mobile_board_serial_disable(void *user) {
+    (void)user;
     spi_deinit(SPI_PORT);
 }
 
-void mobile_board_serial_enable(A_UNUSED void *user) {  
+void mobile_board_serial_enable(void *user) { 
+    (void)user;
+    //struct mobile_user *mobile = (struct mobile_user *)user;
+    //struct mobile_adapter_serial *s = &mobile->adapter.serial;
+    //trigger_spi(SPI_PORT,SPI_BAUDRATE,s->mode_32bit);
     trigger_spi(SPI_PORT,SPI_BAUDRATE);
 }
 
@@ -270,7 +264,6 @@ int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_add
     return -1;
 }
 
-// https://discord.com/channels/375413108467957761/541384270636384259/1022599202582298624
 bool mobile_board_sock_listen(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
     printf("mobile_board_sock_listen\n");
@@ -348,9 +341,9 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
     struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
     
-    if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status && mobile->esp_sockets[conn].host_iptype == MOBILE_ADDRTYPE_NONE){
-        return -1;
-    }
+    //if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status && mobile->esp_sockets[conn].host_iptype == MOBILE_ADDRTYPE_NONE){
+    //    return -1;
+    //}
 
     int len = -1;
     int numRemotePort=-1;
@@ -438,10 +431,8 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     FlushATBuff();
     if (!data){
         if(!ESP_GetSockStatus(UART_ID,conn,user)){
-            printf("check0\n");
             return -2;
         }else{
-            printf("check1\n");
             return 0;
         }
     }
@@ -450,11 +441,10 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
         if(!ESP_GetSockStatus(UART_ID,conn,user)){
             if(ipdVal[conn] == 0){
                 if(ESP_ReadBuffSize(UART_ID,conn) == 0){
-                    printf("check2\n");
                     return -2;
                 }
             }else{
-                if (ipdVal[conn] < 0){printf("check3\n"); return -1;}
+                if (ipdVal[conn] < 0) return -1;
             }
         }
         
@@ -468,11 +458,9 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
                 ipdVal[conn] = 0;
             } 
         }else{
-            printf("Return %i bytes.\n",len);
             return len;
         }
     }
-    printf("Return %i bytes.\n",len);
     return len;
 }
 
@@ -544,29 +532,6 @@ void main(){
         mobile_init(&mobile->adapter, mobile, &adapter_config);
         multicore_launch_core1(core1_context);
         FlushATBuff();
-
-
-        //char dado[60] = "GET /01/CGB-B9AJ/index.php HTTP/1.0\r\nHost: 192.168.0.126\r\n\r\n";
-        //uint8_t dadoudp [] = {0x00,0x01,0x01,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x07,0x67,0x61,0x6D,0x65,0x62,0x6F,0x79,0x0A,0x64,0x61,0x74,0x61,0x63,0x65,0x6E,0x74,0x65,0x72,0x02,0x6E,0x65,0x02,0x6A,0x70,0x00,0x00,0x01,0x00,0x01};
-        //
-        //ESP_OpenSockConn(UART_ID,0,"TCP","192.168.0.126",80,0,0);
-        //ESP_OpenSockConn(UART_ID,1,"UDP","192.168.0.126",53,0,2);
-        //
-        //ESP_GetSockStatus(UART_ID,0,mobile);
-        //ESP_GetSockStatus(UART_ID,1,mobile);
-        //
-        //
-        //ESP_SendData(UART_ID,0,"TCP","192.168.0.126",80,dado,60);
-        //ESP_SendData(UART_ID,1,"UDP","192.168.0.126",53,dadoudp,sizeof(dadoudp));
-        //
-        //Delay_Timer(SEC(5));
-        //
-        //ESP_ReqDataBuff(UART_ID,0,100);
-        //
-        //ESP_SendData(UART_ID,1,"UDP","192.168.0.126",57318,dado,60);
-
-
-
 
         LED_OFF;
         while (true) {

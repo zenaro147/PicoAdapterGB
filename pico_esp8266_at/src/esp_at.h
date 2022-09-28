@@ -1,11 +1,6 @@
 #ifndef ESP_AT_H
 #define ESP_AT_H
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include "hardware/uart.h"
-#include "hardware/irq.h"
 #include "common.h"
 
 bool use_uart0 = true;
@@ -169,6 +164,7 @@ int ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize){
             memcpy(&buffRecData, buffATrx + cmdReadSize, ipdVal[connID] < BUFF_AT_SIZE ? ipdVal[connID] : BUFF_AT_SIZE); //memcpy with offset in source
             FlushATBuff();
         }
+        printf("ESP-01 Read Request: Return %i bytes.\n",dataSize);
         return dataSize;
     }
 }
@@ -508,7 +504,7 @@ bool ESP_ConnectWifi(uart_inst_t * uart, char * SSID_WiFi, char * Pass_WiFi, int
         sprintf(espComm,"AT+CWJAP=\"%s\",\"%s\"",SSID_WiFi,Pass_WiFi);
         ESP_SendCmd(uart, espComm,0);
         
-        if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(10),true,false)){
+        if(ESP_SerialFind(buffATrx,"\r\nOK\r\n",SEC(10),true,true)){
             printf("ESP-01 Connecting Wifi: OK\n");
             return true;
         }else{

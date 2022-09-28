@@ -1,6 +1,11 @@
 #ifndef MAGB_COMMON_H
 #define MAGB_COMMON_H
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "hardware/uart.h"
+#include "hardware/irq.h"
 #include "libmobile/mobile.h"
 #include "libmobile/inet_pton.h"
 

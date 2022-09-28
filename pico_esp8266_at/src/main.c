@@ -25,7 +25,8 @@ bool speed_240_MHz = false;
 
 // SPI pins
 #define SPI_PORT        spi0
-#define SPI_BAUDRATE    64 * 1024 * 8
+#define SPI_BAUDRATE_512    64 * 1024 * 8
+#define SPI_BAUDRATE_256    32 * 1024 * 8
 #define PIN_SPI_SIN     16
 #define PIN_SPI_SCK     18
 #define PIN_SPI_SOUT    19 
@@ -42,7 +43,11 @@ uint64_t last_readable = 0;
 bool isESPDetected = false;
 bool haveConfigToWrite = false;
 bool isServerOpened = false;
+bool is32bitsMode = false;
 
+uint8_t buff32[4];
+volatile int8_t buff32_pointer = 0;
+volatile bool spiLock = false;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////
@@ -56,6 +61,7 @@ static uint8_t set_initial_data() {
 
 static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
     //spi_init
+    buff32_pointer = 0;
     reset_block(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
     unreset_block_wait(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
 
@@ -65,7 +71,14 @@ static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
     spi_set_slave(spi, true);
     
     // Set the first data into the buffer
-    spi_get_hw(spi)->dr = set_initial_data();
+    if(!is32bitsMode){
+        spi_get_hw(spi)->dr = 0xD2;
+    }else{
+        spi_get_hw(spi)->dr = 0xD2;
+        spi_get_hw(spi)->dr = 0xD2;
+        spi_get_hw(spi)->dr = 0xD2;
+        spi_get_hw(spi)->dr = 0xD2;
+    } 
 
     hw_set_bits(&spi_get_hw(spi)->cr1, SPI_SSPCR1_SSE_BITS);
 }
@@ -105,16 +118,28 @@ void mobile_board_debug_log(void *user, const char *line){
 }
 
 void mobile_board_serial_disable(void *user) {
+    gpio_put(10, true);
     (void)user;
+    struct mobile_user *mobile = (struct mobile_user *)user;
+    while(spiLock);
+    is32bitsMode = mobile->adapter.serial.mode_32bit;
+
     spi_deinit(SPI_PORT);
+        
 }
 
-void mobile_board_serial_enable(void *user) { 
+void mobile_board_serial_enable(void *user) {
     (void)user;
-    //struct mobile_user *mobile = (struct mobile_user *)user;
-    //struct mobile_adapter_serial *s = &mobile->adapter.serial;
-    //trigger_spi(SPI_PORT,SPI_BAUDRATE,s->mode_32bit);
-    trigger_spi(SPI_PORT,SPI_BAUDRATE);
+    struct mobile_user *mobile = (struct mobile_user *)user;
+    is32bitsMode = mobile->adapter.serial.mode_32bit;    
+    trigger_spi(SPI_PORT,SPI_BAUDRATE_512);
+
+    //if(is32bitsMode){
+    //    trigger_spi(SPI_PORT,SPI_BAUDRATE_512);
+    //}else{
+    //    trigger_spi(SPI_PORT,SPI_BAUDRATE_256);
+    //}
+    gpio_put(10, false);
 }
 
 bool mobile_board_config_read(void *user, void *dest, const uintptr_t offset, const size_t size) {
@@ -440,9 +465,7 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
     if(mobile->esp_sockets[conn].host_type == 1){         
         if(!ESP_GetSockStatus(UART_ID,conn,user)){
             if(ipdVal[conn] == 0){
-                if(ESP_ReadBuffSize(UART_ID,conn) == 0){
-                    return -2;
-                }
+                if(ESP_ReadBuffSize(UART_ID,conn) == 0) return -2;
             }else{
                 if (ipdVal[conn] < 0) return -1;
             }
@@ -470,9 +493,52 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
 
 void core1_context() {
     irq_set_mask_enabled(0xffffffff, false);
+
     while (true) {
-        if (spi_is_readable(SPI_PORT)) {
-            spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, spi_get_hw(SPI_PORT)->dr);
+        if(spi_is_readable(SPI_PORT)){
+            spiLock = true;
+            //spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, spi_get_hw(SPI_PORT)->dr);
+            if(!is32bitsMode){
+               spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, spi_get_hw(SPI_PORT)->dr);
+            }else{
+                // Mario Kart Data Sample
+                // 0x99661900  0xD2D2D2D2  // Start signal, command 0x19 (read eeprom)
+                // 0x00020080  0xD2D2D2D2  // Packet size 2, data = [0x00, 0x80] (read from offset 0, 0x80 bytes)
+                // 0x0000009B  0xD2D2D2D2  // Padding, 2-byte checksum (0x009B)
+                // 0x81000000  0x88990000  // Device ID (0x81 = GBA, 0x88 = Blue adapter), acknowledgement (0x19 ^ 0x80) = 0x99 for current command
+
+                buff32[buff32_pointer++] = spi_get_hw(SPI_PORT)->dr;
+                if(buff32_pointer >= 4){
+                    gpio_put(9, true);
+                    uint8_t tmpbuff[4];
+                    //for(int x = 0 ; x < 4 ; x++){                   
+                    //    spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, buff32[x]);  
+                    //}
+
+                    //for(int x = 0 ; x < 4 ; x++){                   
+                    //    tmpbuff[x] = mobile_transfer(&mobile->adapter, buff32[3-x]);
+                    //}
+                    //for(int x = 0 ; x < 4 ; x++){                   
+                    //    spi_get_hw(SPI_PORT)->dr = tmpbuff[3-x];
+                    //}
+
+                    //buff32[0] = spi_get_hw(SPI_PORT)->dr;
+                    //buff32[1] = spi_get_hw(SPI_PORT)->dr;
+                    //buff32[2] = spi_get_hw(SPI_PORT)->dr;
+                    //buff32[3] = spi_get_hw(SPI_PORT)->dr;
+                    tmpbuff[0] = mobile_transfer(&mobile->adapter, buff32[0]);
+                    tmpbuff[1] = mobile_transfer(&mobile->adapter, buff32[1]);
+                    tmpbuff[2] = mobile_transfer(&mobile->adapter, buff32[2]);
+                    tmpbuff[3] = mobile_transfer(&mobile->adapter, buff32[3]);
+                    spi_get_hw(SPI_PORT)->dr = tmpbuff[0];
+                    spi_get_hw(SPI_PORT)->dr = tmpbuff[1];
+                    spi_get_hw(SPI_PORT)->dr = tmpbuff[2];
+                    spi_get_hw(SPI_PORT)->dr = tmpbuff[3];
+                    buff32_pointer -= 4;
+                    gpio_put(9, false);
+                }
+            }
+            spiLock = false;
         }
     }
 }
@@ -480,6 +546,14 @@ void core1_context() {
 void main(){
     speed_240_MHz = set_sys_clock_khz(240000, false);
     stdio_init_all();
+
+    gpio_init(9);
+    gpio_set_dir(9, GPIO_OUT);
+    gpio_put(9, false);
+
+    gpio_init(10);
+    gpio_set_dir(10, GPIO_OUT);
+    gpio_put(10, false);
 
     // For toggle_led
     gpio_init(LED_PIN);

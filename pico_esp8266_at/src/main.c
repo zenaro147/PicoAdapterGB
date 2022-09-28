@@ -8,7 +8,6 @@
 // ---- https://docs.espressif.com/projects/esp-at/en/release-v2.2.0.0_esp8266/AT_Command_Set/index.html
 ////////////////////////////////////
 
-
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/timer.h"
@@ -124,6 +123,7 @@ void mobile_board_serial_disable(void *user) {
     struct mobile_user *mobile = (struct mobile_user *)user;
     while(spiLock);
     is32bitsMode = mobile->adapter.serial.mode_32bit;
+
     spi_deinit(SPI_PORT);
         
 }
@@ -481,11 +481,9 @@ int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size,
                 ipdVal[conn] = 0;
             } 
         }else{
-            printf("Return %i bytes.\n",len);
             return len;
         }
     }
-    printf("Return %i bytes.\n",len);
     return len;
 }
 

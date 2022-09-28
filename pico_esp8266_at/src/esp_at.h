@@ -164,6 +164,7 @@ int ESP_ReqDataBuff(uart_inst_t * uart, uint8_t connID, int dataSize){
             memcpy(&buffRecData, buffATrx + cmdReadSize, ipdVal[connID] < BUFF_AT_SIZE ? ipdVal[connID] : BUFF_AT_SIZE); //memcpy with offset in source
             FlushATBuff();
         }
+        printf("ESP-01 Read Request: Return %i bytes.\n",dataSize);
         return dataSize;
     }
 }

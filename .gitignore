@@ -58,3 +58,4 @@ dkms.conf
 /concept/esp_ariscop_project*
 **/src/examples/*
 **/common-Zenaro.h
+**/common-Original.h

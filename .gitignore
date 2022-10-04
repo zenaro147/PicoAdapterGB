@@ -57,3 +57,4 @@ dkms.conf
 **/copy.bat
 /concept/esp_ariscop_project*
 **/src/examples/*
+**/common-Zenaro.h

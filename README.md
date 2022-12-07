@@ -9,8 +9,9 @@ Based on: [Libmobile](https://github.com/REONTeam/libmobile) by [REON Team](http
 Refer to the implementation's README.md for more details.
 
 -----------------------
-### What need to do:
-* If necessary, save the custom P2P port and "unmetered" parameters on flash as well
+### To-do:
+* Let the libmobile controls the connections timeout, instead Pico code.
+* Implement/test 32bits mode for GBA.
+* If necessary, save a custom P2P port and "unmetered" parameters on flash as well.
 * Some method to apply new configurations, such as new SSID, password and DNS.
-* Implement/test 32bits mode for GBA
-* Clean code
+* Code review.

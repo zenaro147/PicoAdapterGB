@@ -15,6 +15,7 @@
 #define KEY_DNS2 "DNS2"
 #define KEY_P2PPORT "P2PP"
 #define KEY_PKMUNMETERED "UNME"
+#define KEY_DNSPORT "DNSP"
 
 
 #define OFFSET_CONFIG 0
@@ -24,7 +25,8 @@
 #define OFFSET_DNS1 336
 #define OFFSET_DNS2 400
 #define OFFSET_P2PPORT 464
-#define OFFSET_PKMUNMETERED 480
+#define OFFSET_PKMUNMETERED 473
+#define OFFSET_DNSPORT 478
 
 
 #define FLASH_TARGET_OFFSET (FLASH_DATA_SIZE * 1024)
@@ -51,7 +53,7 @@ bool ReadFlashConfig(uint8_t * buff){
         needWrite = true;
     }
 
-    //Read the Mobile Adapter Config
+    //Read the Mobile Adapter Config (256 bytes)
     if(memmem(buff+OFFSET_MAGB,strlen(KEY_MAGB),KEY_CONFIG,strlen(KEY_MAGB)) != NULL){
         haveAdapterConfig = true;
     }
@@ -107,8 +109,24 @@ bool ReadFlashConfig(uint8_t * buff){
     haveDNS2Config = true;
     #endif
 
-    //P2P Port have 16 bytes (need parse to INT)
-    //Unmetered config have 16 bytes (should receive 1 or 0... transform that to TRUE or FALSE)
+    //P2P Port have 9 bytes (need parse to INT)
+    //Unmetered config have 5 bytes (should receive 1 or 0... transform that to TRUE or FALSE)
+    
+    #ifdef USE_CUSTOM_DNS_PORT
+    //Read custom DNS Port config (up to 9 bytes)
+    if(memmem(buff+OFFSET_DNSPORT,strlen(KEY_DNSPORT),KEY_DNSPORT,strlen(KEY_DNSPORT)) != NULL){
+        memset(MAGB_DNSPORT,0x00,sizeof(MAGB_DNSPORT));
+        memcpy(MAGB_DNSPORT,buff+(OFFSET_DNSPORT+strlen(KEY_DNSPORT)),9-strlen(KEY_DNSPORT));
+        
+    }else{
+        char tmp_dnsport[9];
+        memset(tmp_dnsport,0x00,sizeof(tmp_dnsport));
+        sprintf(tmp_dnsport,"%s%s",KEY_DNSPORT,MAGB_DNSPORT);
+        memcpy(buff+OFFSET_DNSPORT,tmp_dnsport,sizeof(tmp_dnsport));
+        needWrite = true;
+    }
+    #endif
+
 
     if(needWrite){
         FormatFlashConfig();

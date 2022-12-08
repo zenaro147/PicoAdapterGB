@@ -44,11 +44,15 @@ int ipdVal[5] = {0,0,0,0,0};
 bool isConnectedWiFi = false;
 char WiFiSSID[32] = "WiFi_Network";
 char WiFiPASS[32] = "P@$$w0rd";
+
 #define USE_CUSTOM_DNS1
 char MAGB_DNS1[64] = "192.168.0.126";
-//#define USE_CUSTOM_DNS2
+#define USE_CUSTOM_DNS2
 char MAGB_DNS2[64] = "192.168.0.127";
-char P2P_port[5] = "1027";
+#define USE_CUSTOM_DNS_PORT
+char MAGB_DNSPORT[5] = "53";
+
+char P2P_PORT[5] = "1027";
 char PKM_UNMETERED = '1';
 
 

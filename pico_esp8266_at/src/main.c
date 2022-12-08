@@ -112,6 +112,22 @@ void main_parse_addr(struct mobile_addr *dest, char *argv){
     }
 }
 
+void main_set_port(struct mobile_addr *dest, unsigned port)
+{
+    struct mobile_addr4 *dest4 = (struct mobile_addr4 *)dest;
+    struct mobile_addr6 *dest6 = (struct mobile_addr6 *)dest;
+    switch (dest->type) {
+    case MOBILE_ADDRTYPE_IPV4:
+        dest4->port = port;
+        break;
+    case MOBILE_ADDRTYPE_IPV6:
+        dest6->port = port;
+        break;
+    default:
+        break;
+    }
+}
+
 void mobile_board_debug_log(void *user, const char *line){
     (void)user;
     fprintf(stderr, "%s\n", line);
@@ -132,12 +148,12 @@ void mobile_board_serial_enable(void *user) {
     (void)user;
     struct mobile_user *mobile = (struct mobile_user *)user;
     is32bitsMode = mobile->adapter.serial.mode_32bit;    
-    trigger_spi(SPI_PORT,SPI_BAUDRATE_512);
+    //trigger_spi(SPI_PORT,SPI_BAUDRATE_512);
 
     //if(is32bitsMode){
     //    trigger_spi(SPI_PORT,SPI_BAUDRATE_512);
     //}else{
-    //    trigger_spi(SPI_PORT,SPI_BAUDRATE_256);
+        trigger_spi(SPI_PORT,SPI_BAUDRATE_256);
     //}
     gpio_put(10, false);
 }
@@ -578,7 +594,10 @@ void main(){
     main_parse_addr(&adapter_config.dns2, MAGB_DNS2);
     #endif
     //adapter_config.p2p_port = 1027
-    //adapter_config.unmetered = true;
+    //adapter_config.unmetered = true;    
+    // Set the DNS ports MAGB_DNSPORT
+    main_set_port(&adapter_config.dns1, atoi(MAGB_DNSPORT));
+    main_set_port(&adapter_config.dns2, atoi(MAGB_DNSPORT));
 
 
 //////////////////////
@@ -629,6 +648,9 @@ void main(){
             }
         }
     }else{
-        //do something
+        printf("Error during Pico setup! =( \n");
+        while(true){
+            //do something
+        }
     }
 }

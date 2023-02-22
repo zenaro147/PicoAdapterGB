@@ -10,7 +10,7 @@
 #include "libmobile/inet_pton.h"
 
 //Flash Config
-#define FLASH_DATA_SIZE (FLASH_PAGE_SIZE * 2)
+#define FLASH_DATA_SIZE (FLASH_PAGE_SIZE * 3)
 
 // Control the configs on Flash
 bool haveAdapterConfig = false;
@@ -48,7 +48,7 @@ char WiFiPASS[32] = "P@$$w0rd";
 #define USE_CUSTOM_DNS1
 char MAGB_DNS1[64] = "192.168.0.126";
 #define USE_CUSTOM_DNS2
-char MAGB_DNS2[64] = "192.168.0.127";
+char MAGB_DNS2[64] = "51.79.70.215";
 #define USE_CUSTOM_DNS_PORT
 char MAGB_DNSPORT[5] = "53";
 

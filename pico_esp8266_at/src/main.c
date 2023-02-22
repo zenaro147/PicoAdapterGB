@@ -1,7 +1,7 @@
 ////////////////////////////////////
 // - Change the Strings comps to string finds and read the buffer directly?
 // - Optimize the ESP_AT.H file! Specially to handle the UDP connections better (fast)
-// - Add the mobile_board_sock_* functions to handle the Request functions (only the necessary for now) - https://discord.com/channels/375413108467957761/541384270636384259/1017548420866654280
+// - Add the mobile_impl_sock_* functions to handle the Request functions (only the necessary for now) - https://discord.com/channels/375413108467957761/541384270636384259/1017548420866654280
 // -- Docs about AT commands 
 // ---- https://www.espressif.com/sites/default/files/documentation/4a-esp8266_at_instruction_set_en.pdf
 // ---- https://github.com/espressif/ESP8266_AT/wiki/ATE
@@ -22,6 +22,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool speed_240_MHz = false;
+
+//#define DEBUG_SIGNAL_PINS
 
 // SPI pins
 #define SPI_PORT        spi0
@@ -97,18 +99,18 @@ void main_parse_addr(struct mobile_addr *dest, char *argv){
     struct mobile_addr4 *dest4 = (struct mobile_addr4 *)dest;
     struct mobile_addr6 *dest6 = (struct mobile_addr6 *)dest;
     switch (rc) {
-    case MOBILE_PTON_IPV4:
-        dest4->type = MOBILE_ADDRTYPE_IPV4;
-        dest4->port = MOBILE_DNS_PORT;
-        memcpy(dest4->host, ip, sizeof(dest4->host));
-        break;
-    case MOBILE_PTON_IPV6:
-        dest6->type = MOBILE_ADDRTYPE_IPV6;
-        dest6->port = MOBILE_DNS_PORT;
-        memcpy(dest6->host, ip, sizeof(dest6->host));
-        break;
-    default:
-        break;
+        case MOBILE_PTON_IPV4:
+            dest4->type = MOBILE_ADDRTYPE_IPV4;
+            dest4->port = MOBILE_DNS_PORT;
+            memcpy(dest4->host, ip, sizeof(dest4->host));
+            break;
+        case MOBILE_PTON_IPV6:
+            dest6->type = MOBILE_ADDRTYPE_IPV6;
+            dest6->port = MOBILE_DNS_PORT;
+            memcpy(dest6->host, ip, sizeof(dest6->host));
+            break;
+        default:
+            break;
     }
 }
 
@@ -128,37 +130,39 @@ void main_set_port(struct mobile_addr *dest, unsigned port)
     }
 }
 
-void mobile_board_debug_log(void *user, const char *line){
+void mobile_impl_debug_log(void *user, const char *line){
     (void)user;
     fprintf(stderr, "%s\n", line);
 }
 
-void mobile_board_serial_disable(void *user) {
+void mobile_impl_serial_disable(void *user) {
+    #ifdef DEBUG_SIGNAL_PINS
     gpio_put(10, true);
+    #endif
     (void)user;
     struct mobile_user *mobile = (struct mobile_user *)user;
     while(spiLock);
     is32bitsMode = mobile->adapter.serial.mode_32bit;
 
-    spi_deinit(SPI_PORT);
-        
+    spi_deinit(SPI_PORT);    
 }
 
-void mobile_board_serial_enable(void *user) {
+void mobile_impl_serial_enable(void *user) {
     (void)user;
     struct mobile_user *mobile = (struct mobile_user *)user;
-    is32bitsMode = mobile->adapter.serial.mode_32bit;    
-    //trigger_spi(SPI_PORT,SPI_BAUDRATE_512);
+    is32bitsMode = mobile->adapter.serial.mode_32bit;
 
     //if(is32bitsMode){
     //    trigger_spi(SPI_PORT,SPI_BAUDRATE_512);
     //}else{
         trigger_spi(SPI_PORT,SPI_BAUDRATE_256);
     //}
+    #ifdef DEBUG_SIGNAL_PINS
     gpio_put(10, false);
+    #endif
 }
 
-bool mobile_board_config_read(void *user, void *dest, const uintptr_t offset, const size_t size) {
+bool mobile_impl_config_read(void *user, void *dest, const uintptr_t offset, const size_t size) {
     struct mobile_user *mobile = (struct mobile_user *)user;
     for(int i = 0; i < size; i++){
         ((char *)dest)[i] = (char)mobile->config_eeprom[OFFSET_MAGB + offset + i];
@@ -166,7 +170,7 @@ bool mobile_board_config_read(void *user, void *dest, const uintptr_t offset, co
     return true;
 }
 
-bool mobile_board_config_write(void *user, const void *src, const uintptr_t offset, const size_t size) {
+bool mobile_impl_config_write(void *user, const void *src, const uintptr_t offset, const size_t size) {
     struct mobile_user *mobile = (struct mobile_user *)user;
     for(int i = 0; i < size; i++){
         mobile->config_eeprom[OFFSET_MAGB + offset + i] = ((uint8_t *)src)[i];
@@ -176,17 +180,18 @@ bool mobile_board_config_write(void *user, const void *src, const uintptr_t offs
     return true;
 }
 
-void mobile_board_time_latch(A_UNUSED void *user, enum mobile_timers timer) {
+void mobile_impl_time_latch(A_UNUSED void *user, enum mobile_timers timer) {
     millis_latch = time_us_64();
 }
 
-bool mobile_board_time_check_ms(A_UNUSED void *user, enum mobile_timers timer, unsigned ms) {
+bool mobile_impl_time_check_ms(A_UNUSED void *user, enum mobile_timers timer, unsigned ms) {
     return (time_us_64() - millis_latch) > MS(ms);
 }
 
-bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
+bool mobile_impl_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
+    // Returns: true if socket was created successfully, false on error
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_board_sock_open\n");
+    printf("mobile_impl_sock_open\n");
     FlushATBuff();
 
     if(mobile->esp_sockets[conn].host_id != -1 && !mobile->esp_sockets[conn].sock_status){
@@ -232,9 +237,9 @@ bool mobile_board_sock_open(void *user, unsigned conn, enum mobile_socktype sock
     return true;
 }
 
-void mobile_board_sock_close(void *user, unsigned conn){
+void mobile_impl_sock_close(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_board_sock_close\n");
+    printf("mobile_impl_sock_close\n");
     if(mobile->esp_sockets[conn].sock_status){
         if(ESP_GetSockStatus(UART_ID,conn,user)){
             ESP_CloseSockConn(UART_ID, conn);
@@ -244,15 +249,16 @@ void mobile_board_sock_close(void *user, unsigned conn){
         }
     }
     if(isServerOpened){
-        printf("mobile_board_sock_close - Server\n");
+        printf("mobile_impl_sock_close - Server\n");
         ESP_CloseServer(UART_ID);
         isServerOpened = false;
     }
 }
 
-int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
+int mobile_impl_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
+    // Returns: 1 on success, 0 if connect is in progress, -1 on error
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_board_sock_connect\n");
+    printf("mobile_impl_sock_connect\n");
 
     if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status){
         return -1;
@@ -305,9 +311,11 @@ int mobile_board_sock_connect(void *user, unsigned conn, const struct mobile_add
     return -1;
 }
 
-bool mobile_board_sock_listen(void *user, unsigned conn){
+bool mobile_impl_sock_listen(void *user, unsigned conn){
+    // Returns: true if a connection was accepted,
+    //          false if there's no incoming connections    
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_board_sock_listen\n");
+    printf("mobile_impl_sock_listen\n");
     bool sockP2Pcheck = false;
     if(!isServerOpened && mobile->esp_sockets[conn].host_type == 1){
         sockP2Pcheck = ESP_OpenServer(UART_ID,conn,mobile->esp_sockets[conn].local_port);
@@ -315,9 +323,11 @@ bool mobile_board_sock_listen(void *user, unsigned conn){
     }
     return sockP2Pcheck;
 }
-bool mobile_board_sock_accept(void *user, unsigned conn){
+bool mobile_impl_sock_accept(void *user, unsigned conn){
+    // Returns: true if a connection was accepted,
+    //          false if there's no incoming connections
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_board_sock_accept\n");
+    printf("mobile_impl_sock_accept\n");
     bool sockP2Pconn = false;
     if(isServerOpened){
         sockP2Pconn = ESP_CheckIncommingConn(UART_ID,conn);
@@ -328,9 +338,10 @@ bool mobile_board_sock_accept(void *user, unsigned conn){
     return sockP2Pconn;
 }
  
-int mobile_board_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){    
+int mobile_impl_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){    
+    // Returns: non-negative amount of data sent on success, -1 on error
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_board_sock_send\n");
+    printf("mobile_impl_sock_send\n");
     
     if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status){
         return -1;
@@ -375,8 +386,11 @@ int mobile_board_sock_send(void *user, unsigned conn, const void *data, const un
     }
 }
 
-int mobile_board_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
-    printf("mobile_board_sock_recv\n");
+int mobile_impl_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
+    // Returns: amount of data received on success,
+    //          -1 on error,
+    //          -2 on remote disconnect
+    printf("mobile_impl_sock_recv\n");
 
     struct mobile_user *mobile = (struct mobile_user *)user;
     struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
@@ -525,7 +539,9 @@ void core1_context() {
 
                 buff32[buff32_pointer++] = spi_get_hw(SPI_PORT)->dr;
                 if(buff32_pointer >= 4){
+                    #ifdef DEBUG_SIGNAL_PINS
                     gpio_put(9, true);
+                    #endif
                     uint8_t tmpbuff[4];
                     //for(int x = 0 ; x < 4 ; x++){                   
                     //    spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, buff32[x]);  
@@ -551,7 +567,9 @@ void core1_context() {
                     spi_get_hw(SPI_PORT)->dr = tmpbuff[2];
                     spi_get_hw(SPI_PORT)->dr = tmpbuff[3];
                     buff32_pointer -= 4;
+                    #ifdef DEBUG_SIGNAL_PINS
                     gpio_put(9, false);
+                    #endif
                 }
             }
             spiLock = false;
@@ -560,9 +578,11 @@ void core1_context() {
 }
 
 void main(){
+    //Setup Pico
     speed_240_MHz = set_sys_clock_khz(240000, false);
     stdio_init_all();
 
+    #ifdef DEBUG_SIGNAL_PINS
     gpio_init(9);
     gpio_set_dir(9, GPIO_OUT);
     gpio_put(9, false);
@@ -570,6 +590,7 @@ void main(){
     gpio_init(10);
     gpio_set_dir(10, GPIO_OUT);
     gpio_put(10, false);
+    #endif
 
     // For toggle_led
     gpio_init(LED_PIN);
@@ -583,6 +604,8 @@ void main(){
 
     mobile = malloc(sizeof(struct mobile_user));
     struct mobile_adapter_config adapter_config = MOBILE_ADAPTER_CONFIG_DEFAULT;
+
+    FormatFlashConfig();
 
     memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
     ReadFlashConfig(mobile->config_eeprom);
@@ -599,17 +622,17 @@ void main(){
     main_set_port(&adapter_config.dns1, atoi(MAGB_DNSPORT));
     main_set_port(&adapter_config.dns2, atoi(MAGB_DNSPORT));
 
-
-//////////////////////
-// CONFIGURE THE ESP
-//////////////////////
+    //////////////////////
+    // CONFIGURE THE ESP
+    //////////////////////
     isESPDetected = EspAT_Init(UART_ID, BAUD_RATE, UART_TX_PIN, UART_RX_PIN);
     if(isESPDetected){
         isConnectedWiFi = ESP_ConnectWifi(UART_ID, WiFiSSID, WiFiPASS,SEC(10));
     }
-//////////////////
-// END CONFIGURE
-//////////////////
+    //////////////////
+    // END CONFIGURE
+    //////////////////
+    
     if(isConnectedWiFi){
 
         mobile->action = MOBILE_ACTION_NONE;

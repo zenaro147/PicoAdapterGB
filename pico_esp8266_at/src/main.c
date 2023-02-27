@@ -92,6 +92,7 @@ static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
 unsigned long millis_latch = 0;
 #define A_UNUSED __attribute__((unused))
 
+//Auxiliar function
 void main_parse_addr(struct mobile_addr *dest, char *argv){
     unsigned char ip[MOBILE_PTON_MAXLEN];
     int rc = mobile_pton(MOBILE_PTON_ANY, argv, ip);
@@ -129,6 +130,7 @@ void main_set_port(struct mobile_addr *dest, unsigned port){
     }
 }
 
+
 static void impl_debug_log(void *user, const char *line){
     (void)user;
     fprintf(stderr, "%s\n", line);
@@ -141,12 +143,12 @@ static void impl_serial_disable(void *user) {
     (void)user;
     struct mobile_user *mobile = (struct mobile_user *)user;
     while(spiLock);
-    is32bitsMode = mobile->adapter.serial.mode_32bit;
 
     spi_deinit(SPI_PORT);    
 }
 
-static void impl_serial_enable(void *user, bool mode_32bit) {
+//static void impl_serial_enable(void *user, bool mode_32bit) {
+static void impl_serial_enable(void *user) {
     (void)user;
     struct mobile_user *mobile = (struct mobile_user *)user;
     //is32bitsMode = mode_32bit;
@@ -178,11 +180,11 @@ static bool impl_config_write(void *user, const void *src, const uintptr_t offse
     return true;
 }
 
-static void impl_time_latch(A_UNUSED void *user, enum mobile_timers timer) {
+static void impl_time_latch(A_UNUSED void *user, unsigned timer) {
     millis_latch = time_us_64();
 }
 
-static bool impl_time_check_ms(A_UNUSED void *user, enum mobile_timers timer, unsigned ms) {
+static bool impl_time_check_ms(A_UNUSED void *user, unsigned timer, unsigned ms) {
     return (time_us_64() - millis_latch) > MS(ms);
 }
 
@@ -515,7 +517,7 @@ static int impl_sock_recv(void *user, unsigned conn, void *data, unsigned size, 
     return len;
 }
 
-static void mobile_impl_update_number(void *user, enum mobile_number type, const char *number){
+static void impl_update_number(void *user, enum mobile_number type, const char *number){
     struct mobile_user *mobile = (struct mobile_user *)user;
 
     char *dest = NULL;
@@ -546,7 +548,7 @@ void core1_context() {
             spiLock = true;
             //spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, spi_get_hw(SPI_PORT)->dr);
             if(!is32bitsMode){
-               spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, spi_get_hw(SPI_PORT)->dr);
+               spi_get_hw(SPI_PORT)->dr = mobile_transfer(mobile->adapter, spi_get_hw(SPI_PORT)->dr);
             }else{
                 // Mario Kart Data Sample
                 // 0x99661900  0xD2D2D2D2  // Start signal, command 0x19 (read eeprom)
@@ -575,10 +577,10 @@ void core1_context() {
                     //buff32[1] = spi_get_hw(SPI_PORT)->dr;
                     //buff32[2] = spi_get_hw(SPI_PORT)->dr;
                     //buff32[3] = spi_get_hw(SPI_PORT)->dr;
-                    tmpbuff[0] = mobile_transfer(&mobile->adapter, buff32[0]);
-                    tmpbuff[1] = mobile_transfer(&mobile->adapter, buff32[1]);
-                    tmpbuff[2] = mobile_transfer(&mobile->adapter, buff32[2]);
-                    tmpbuff[3] = mobile_transfer(&mobile->adapter, buff32[3]);
+                    tmpbuff[0] = mobile_transfer(mobile->adapter, buff32[0]);
+                    tmpbuff[1] = mobile_transfer(mobile->adapter, buff32[1]);
+                    tmpbuff[2] = mobile_transfer(mobile->adapter, buff32[2]);
+                    tmpbuff[3] = mobile_transfer(mobile->adapter, buff32[3]);
                     spi_get_hw(SPI_PORT)->dr = tmpbuff[0];
                     spi_get_hw(SPI_PORT)->dr = tmpbuff[1];
                     spi_get_hw(SPI_PORT)->dr = tmpbuff[2];
@@ -632,7 +634,6 @@ void main(){
     unsigned char relay_token_buf[MOBILE_RELAY_TOKEN_SIZE];
 
     mobile = malloc(sizeof(struct mobile_user));
-    struct mobile_adapter_config adapter_config = MOBILE_ADAPTER_CONFIG_DEFAULT;
 
     FormatFlashConfig();
 
@@ -646,8 +647,8 @@ void main(){
     main_parse_addr(&dns2, MAGB_DNS2);
     #endif
     // Set the DNS ports MAGB_DNSPORT
-    main_set_port(&adapter_config.dns1, atoi(MAGB_DNSPORT));
-    main_set_port(&adapter_config.dns2, atoi(MAGB_DNSPORT));
+    main_set_port(&dns1, atoi(MAGB_DNSPORT));
+    main_set_port(&dns2, atoi(MAGB_DNSPORT));
     //adapter_config.p2p_port = 1027
     //adapter_config.unmetered = true;
 
@@ -710,7 +711,7 @@ void main(){
 
         LED_OFF;
         while (true) {
-            mobile_loop(&mobile->adapter);
+            mobile_loop(mobile->adapter);
 
             if(haveConfigToWrite){
                 time_us_now = time_us_64();

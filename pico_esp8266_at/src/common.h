@@ -11,6 +11,7 @@
 
 //Flash Config
 #define FLASH_DATA_SIZE (FLASH_PAGE_SIZE * 3)
+#define MOBILE_MAX_DATA_SIZE 0xFF
 
 // Control the configs on Flash
 bool haveAdapterConfig = false;

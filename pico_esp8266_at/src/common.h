@@ -46,9 +46,9 @@ char WiFiSSID[32] = "WiFi_Network";
 char WiFiPASS[32] = "P@$$w0rd";
 
 #define USE_CUSTOM_DNS1
-char MAGB_DNS1[64] = "192.168.0.126";
+char MAGB_DNS1[64] = "51.79.70.215";
 #define USE_CUSTOM_DNS2
-char MAGB_DNS2[64] = "51.79.70.215";
+char MAGB_DNS2[64] = "192.168.0.126";
 #define USE_CUSTOM_DNS_PORT
 char MAGB_DNSPORT[5] = "53";
 
@@ -65,10 +65,12 @@ struct esp_sock_config {
 };
 
 struct mobile_user {
-    struct mobile_adapter adapter;
+    struct mobile_adapter *adapter;
     enum mobile_action action;
     uint8_t config_eeprom[FLASH_DATA_SIZE];
     struct esp_sock_config esp_sockets[MOBILE_MAX_CONNECTIONS];
+    char number_user[MOBILE_MAX_NUMBER_SIZE + 1];
+    char number_peer[MOBILE_MAX_NUMBER_SIZE + 1];
 };
 struct mobile_user *mobile;
 

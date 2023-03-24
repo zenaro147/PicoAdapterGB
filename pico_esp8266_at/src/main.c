@@ -94,18 +94,18 @@ unsigned long millis_latch = 0;
 
 //Auxiliar function
 void main_parse_addr(struct mobile_addr *dest, char *argv){
-    unsigned char ip[MOBILE_PTON_MAXLEN];
-    int rc = mobile_pton(MOBILE_PTON_ANY, argv, ip);
+    unsigned char ip[MOBILE_INET_PTON_MAXLEN];
+    int rc = mobile_inet_pton(MOBILE_INET_PTON_ANY, argv, ip);
 
     struct mobile_addr4 *dest4 = (struct mobile_addr4 *)dest;
     struct mobile_addr6 *dest6 = (struct mobile_addr6 *)dest;
     switch (rc) {
-        case MOBILE_PTON_IPV4:
+        case MOBILE_INET_PTON_IPV4:
             dest4->type = MOBILE_ADDRTYPE_IPV4;
             dest4->port = MOBILE_DNS_PORT;
             memcpy(dest4->host, ip, sizeof(dest4->host));
             break;
-        case MOBILE_PTON_IPV6:
+        case MOBILE_INET_PTON_IPV6:
             dest6->type = MOBILE_ADDRTYPE_IPV6;
             dest6->port = MOBILE_DNS_PORT;
             memcpy(dest6->host, ip, sizeof(dest6->host));
@@ -147,9 +147,8 @@ static void impl_serial_disable(void *user) {
     spi_deinit(SPI_PORT);    
 }
 
-//static void impl_serial_enable(void *user, bool mode_32bit) {
-static void impl_serial_enable(void *user) {
-    (void)user;
+static void impl_serial_enable(void *user, bool mode_32bit) {
+    (void)mode_32bit;
     struct mobile_user *mobile = (struct mobile_user *)user;
     //is32bitsMode = mode_32bit;
     //if(mode_32bit){
@@ -462,16 +461,16 @@ static int impl_sock_recv(void *user, unsigned conn, void *data, unsigned size, 
             }
 
             if (addr && strlen(remoteIP) > 0){
-                unsigned char ip[MOBILE_PTON_MAXLEN];
-                int rc = mobile_pton(MOBILE_PTON_ANY, remoteIP, ip);
+                unsigned char ip[MOBILE_INET_PTON_MAXLEN];
+                int rc = mobile_inet_pton(MOBILE_INET_PTON_ANY, remoteIP, ip);
 
                 switch (rc) {
-                case MOBILE_PTON_IPV4:
+                case MOBILE_INET_PTON_IPV4:
                     addr4->type = MOBILE_ADDRTYPE_IPV4;
                     addr4->port = numRemotePort;
                     memcpy(addr4->host, ip, sizeof(addr4->host));
                     break;
-                case MOBILE_PTON_IPV6:
+                case MOBILE_INET_PTON_IPV6:
                     addr6->type = MOBILE_ADDRTYPE_IPV6;
                     addr6->port = numRemotePort;
                     memcpy(addr6->host, ip, sizeof(addr6->host));
@@ -635,7 +634,7 @@ void main(){
 
     mobile = malloc(sizeof(struct mobile_user));
 
-    FormatFlashConfig();
+    //FormatFlashConfig();
 
     memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
     ReadFlashConfig(mobile->config_eeprom);
@@ -708,6 +707,8 @@ void main(){
             mobile_config_set_relay_token(mobile->adapter, relay_token);
         }
         mobile_config_save(mobile->adapter);
+
+        mobile_start(mobile->adapter);
 
         LED_OFF;
         while (true) {

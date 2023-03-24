@@ -16,6 +16,7 @@
 #define KEY_P2PPORT "P2PP"
 #define KEY_PKMUNMETERED "UNME"
 #define KEY_DNSPORT "DNSP"
+#define KEY_P2PSERVER "P2PS"
 
 
 #define OFFSET_CONFIG 0
@@ -27,6 +28,8 @@
 #define OFFSET_P2PPORT 720 //OFFSET_SSID+64
 #define OFFSET_PKMUNMETERED 729 //OFFSET_SSID+9
 #define OFFSET_DNSPORT 734 //OFFSET_SSID+5
+#define OFFSET_P2PSERVER 743 //OFFSET_SSID+5
+
 
 
 #define FLASH_TARGET_OFFSET (FLASH_DATA_SIZE * 1024)
@@ -126,7 +129,19 @@ bool ReadFlashConfig(uint8_t * buff){
         needWrite = true;
     }
     #endif
-
+    
+    //Read P2P relay server (up to 15 bytes)
+    if(memmem(buff+OFFSET_P2PSERVER,strlen(KEY_P2PSERVER),KEY_P2PSERVER,strlen(KEY_P2PSERVER)) != NULL){
+        memset(P2P_SERVER,0x00,sizeof(P2P_SERVER));
+        memcpy(P2P_SERVER,buff+(OFFSET_P2PSERVER+strlen(KEY_P2PSERVER)),9-strlen(KEY_P2PSERVER));
+        
+    }else{
+        char tmp_dnsport[9];
+        memset(tmp_dnsport,0x00,sizeof(tmp_dnsport));
+        sprintf(tmp_dnsport,"%s%s",KEY_P2PSERVER,P2P_SERVER);
+        memcpy(buff+OFFSET_P2PSERVER,tmp_dnsport,sizeof(tmp_dnsport));
+        needWrite = true;
+    }
 
     if(needWrite){
         FormatFlashConfig();

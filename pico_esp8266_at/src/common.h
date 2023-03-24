@@ -53,7 +53,9 @@ char MAGB_DNS2[64] = "192.168.0.126";
 #define USE_CUSTOM_DNS_PORT
 char MAGB_DNSPORT[5] = "53";
 
+char P2P_SERVER[15] = "0.0.0.0";
 char P2P_PORT[5] = "1027";
+
 char PKM_UNMETERED = '1';
 
 

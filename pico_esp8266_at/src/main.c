@@ -6,6 +6,7 @@
 // ---- https://www.espressif.com/sites/default/files/documentation/4a-esp8266_at_instruction_set_en.pdf
 // ---- https://github.com/espressif/ESP8266_AT/wiki/ATE
 // ---- https://docs.espressif.com/projects/esp-at/en/release-v2.2.0.0_esp8266/AT_Command_Set/index.html
+// ---- MOBILE_ENABLE_NO32BIT - try to build with this option enabled to handle GBA games
 ////////////////////////////////////
 
 #include "pico/stdlib.h"
@@ -24,6 +25,7 @@
 bool speed_240_MHz = false;
 
 //#define DEBUG_SIGNAL_PINS
+//#define MOBILE_ENABLE_NO32BIT
 
 // SPI pins
 #define SPI_PORT        spi0

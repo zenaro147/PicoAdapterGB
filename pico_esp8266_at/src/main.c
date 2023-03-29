@@ -92,7 +92,10 @@ static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
 unsigned long millis_latch = 0;
 #define A_UNUSED __attribute__((unused))
 
-//Auxiliar function
+////////////////////////
+// Auxiliar functions
+////////////////////////
+
 void main_parse_addr(struct mobile_addr *dest, char *argv){
     unsigned char ip[MOBILE_INET_PTON_MAXLEN];
     int rc = mobile_inet_pton(MOBILE_INET_PTON_ANY, argv, ip);
@@ -130,6 +133,9 @@ void main_set_port(struct mobile_addr *dest, unsigned port){
     }
 }
 
+/////////////////////////
+// Libmobile Functions
+/////////////////////////
 
 static void impl_debug_log(void *user, const char *line){
     (void)user;
@@ -606,6 +612,8 @@ void StoreNewConfigs(){
     char newP2P_SERVER[15] = "0.0.0.0";
     char newP2P_PORT[5] = "0";
 
+    char newDEVICE_UNMETERED[1] = "1";
+
     memcpy(WiFiSSID,newSSID,sizeof(newSSID));
     memcpy(WiFiPASS,newPASS,sizeof(newPASS));
     
@@ -616,7 +624,14 @@ void StoreNewConfigs(){
     memcpy(P2P_SERVER,newP2P_SERVER,sizeof(newP2P_SERVER));
     memcpy(P2P_PORT,newP2P_PORT,sizeof(newP2P_PORT));
 
+    memcpy(DEVICE_UNMETERED,newDEVICE_UNMETERED,sizeof(newDEVICE_UNMETERED));
+
     RefreshConfigBuff(mobile->config_eeprom);
+
+    printf("New configuration defined! Please comment the \'#define CONFIG_MODE\' again to back the adapter to the normal operation.\n");
+    while (1){
+        //do something
+    }
 }
 
 void main(){
@@ -677,6 +692,8 @@ void main(){
     }
     if(haveDNSPConfig){
         dns_port = atoi(MAGB_DNSPORT);
+        main_set_port(&dns1, dns_port);
+        main_set_port(&dns2, dns_port);
     }
 
     if(haveP2PSConfig){
@@ -685,9 +702,10 @@ void main(){
     if(haveP2PPConfig){
         p2p_port = atoi(P2P_PORT);
     }
-    //device_unmetered = true;
 
-
+    if(haveUNMETConfig){
+        device_unmetered = atoi(DEVICE_UNMETERED) == 1 ? true : false;
+    }
 
     //////////////////////
     // CONFIGURE THE ESP

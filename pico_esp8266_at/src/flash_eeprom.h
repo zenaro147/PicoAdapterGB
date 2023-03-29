@@ -35,7 +35,7 @@
 #define FLASH_TARGET_OFFSET (FLASH_DATA_SIZE * 1024)
 const uint8_t *flash_target_contents = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET);
 
-//256 bytes for the Mobile Adapter GB config and 256 bytes to WiFi Config and other stuffs
+//512 bytes for the Mobile Adapter GB + Adapter Configs and 256 bytes to WiFi Config and other stuffs
 void FormatFlashConfig(){
     printf("Erasing target region... ");
     flash_range_erase(FLASH_TARGET_OFFSET, FLASH_DATA_SIZE);
@@ -112,11 +112,8 @@ bool ReadFlashConfig(uint8_t * buff){
     haveDNS2Config = true;
     #endif
 
-    //P2P Port have 9 bytes (need parse to INT)
-    //Unmetered config have 5 bytes (should receive 1 or 0... transform that to TRUE or FALSE)
-    
-    #ifdef USE_CUSTOM_DNS_PORT
     //Read custom DNS Port config (up to 9 bytes)
+    #ifdef USE_CUSTOM_DNS_PORT
     if(memmem(buff+OFFSET_DNSPORT,strlen(KEY_DNSPORT),KEY_DNSPORT,strlen(KEY_DNSPORT)) != NULL){
         memset(MAGB_DNSPORT,0x00,sizeof(MAGB_DNSPORT));
         memcpy(MAGB_DNSPORT,buff+(OFFSET_DNSPORT+strlen(KEY_DNSPORT)),9-strlen(KEY_DNSPORT));
@@ -128,20 +125,40 @@ bool ReadFlashConfig(uint8_t * buff){
         memcpy(buff+OFFSET_DNSPORT,tmp_dnsport,sizeof(tmp_dnsport));
         needWrite = true;
     }
+    haveDNSPConfig = true;
     #endif
     
     //Read P2P relay server (up to 15 bytes)
+    #ifdef USE_RELAY_SERVER
     if(memmem(buff+OFFSET_P2PSERVER,strlen(KEY_P2PSERVER),KEY_P2PSERVER,strlen(KEY_P2PSERVER)) != NULL){
         memset(P2P_SERVER,0x00,sizeof(P2P_SERVER));
-        memcpy(P2P_SERVER,buff+(OFFSET_P2PSERVER+strlen(KEY_P2PSERVER)),9-strlen(KEY_P2PSERVER));
-        
+        memcpy(P2P_SERVER,buff+(OFFSET_P2PSERVER+strlen(KEY_P2PSERVER)),15-strlen(KEY_P2PSERVER));        
     }else{
-        char tmp_dnsport[9];
-        memset(tmp_dnsport,0x00,sizeof(tmp_dnsport));
-        sprintf(tmp_dnsport,"%s%s",KEY_P2PSERVER,P2P_SERVER);
-        memcpy(buff+OFFSET_P2PSERVER,tmp_dnsport,sizeof(tmp_dnsport));
+        char tmp_p2pserver[15];
+        memset(tmp_p2pserver,0x00,sizeof(tmp_p2pserver));
+        sprintf(tmp_p2pserver,"%s%s",KEY_P2PSERVER,P2P_SERVER);
+        memcpy(buff+OFFSET_P2PSERVER,tmp_p2pserver,sizeof(tmp_p2pserver));
         needWrite = true;
     }
+    haveP2PSConfig = true;
+    #endif
+    
+    //Read P2P Port (up to 5 bytes)
+    #ifdef USE_CUSTOM_P2P_PORT
+    if(memmem(buff+OFFSET_P2PPORT,strlen(KEY_P2PPORT),KEY_P2PPORT,strlen(KEY_P2PPORT)) != NULL){
+        memset(P2P_SERVER,0x00,sizeof(P2P_SERVER));
+        memcpy(P2P_SERVER,buff+(OFFSET_P2PPORT+strlen(KEY_P2PPORT)),5-strlen(KEY_P2PPORT));        
+    }else{
+        char tmp_p2pport[5];
+        memset(tmp_p2pport,0x00,sizeof(tmp_p2pport));
+        sprintf(tmp_p2pport,"%s%s",KEY_P2PPORT,P2P_PORT);
+        memcpy(buff+OFFSET_P2PPORT,tmp_p2pport,sizeof(tmp_p2pport));
+        needWrite = true;
+    }
+    haveP2PPConfig = true;
+    #endif
+    
+    //Unmetered config have 5 bytes (should receive 1 or 0... transform that to TRUE or FALSE)
 
     if(needWrite){
         FormatFlashConfig();
@@ -157,5 +174,39 @@ void SaveFlashConfig(uint8_t * buff){
     printf("Programming target region... ");
     flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);
     printf("Done.\n");
+}
+
+void RefreshConfigBuff(uint8_t * buff){    
+    char tmp_ssid[32];
+    memset(tmp_ssid,0x00,sizeof(tmp_ssid));
+    sprintf(tmp_ssid,"%s%s",KEY_SSID,WiFiSSID);
+    memcpy(buff+OFFSET_SSID,tmp_ssid,sizeof(tmp_ssid));
+    char tmp_pass[32];
+    memset(tmp_pass,0x00,sizeof(tmp_pass));
+    sprintf(tmp_pass,"%s%s",KEY_PASS,WiFiPASS);
+    memcpy(buff+OFFSET_PASS,tmp_pass,sizeof(tmp_pass));
+
+    char tmp_dns1[64];
+    memset(tmp_dns1,0x00,sizeof(tmp_dns1));
+    sprintf(tmp_dns1,"%s%s",KEY_DNS1,MAGB_DNS1);
+    memcpy(buff+OFFSET_DNS1,tmp_dns1,sizeof(tmp_dns1));
+
+    char tmp_dns2[64];
+    memset(tmp_dns2,0x00,sizeof(tmp_dns2));
+    sprintf(tmp_dns2,"%s%s",KEY_DNS2,MAGB_DNS2);
+    memcpy(buff+OFFSET_DNS2,tmp_dns2,sizeof(tmp_dns2));
+
+    char tmp_dnsport[9];
+    memset(tmp_dnsport,0x00,sizeof(tmp_dnsport));
+    sprintf(tmp_dnsport,"%s%s",KEY_DNSPORT,MAGB_DNSPORT);
+    memcpy(buff+OFFSET_DNSPORT,tmp_dnsport,sizeof(tmp_dnsport));
+
+    char tmp_p2pserver[15];
+    memset(tmp_p2pserver,0x00,sizeof(tmp_p2pserver));
+    sprintf(tmp_p2pserver,"%s%s",KEY_P2PSERVER,P2P_SERVER);
+    memcpy(buff+OFFSET_P2PSERVER,tmp_p2pserver,sizeof(tmp_p2pserver));
+
+    FormatFlashConfig();
+    flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);
 }
 #endif

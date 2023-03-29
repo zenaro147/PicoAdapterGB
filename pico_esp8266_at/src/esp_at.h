@@ -418,8 +418,10 @@ bool EspAT_Init(uart_inst_t * uart, int baudrate, int txpin, int rxpin){
     // Enable the UART to send interrupts - RX only
     uart_set_irq_enables(uart, true, false);
 
-    printf("Uart Baudrate: %i \n",baud);
-    printf("Uart Enabled: %i \n",(uint8_t)isenabled);
+    if(isenabled){
+        printf("Uart Baudrate: %i \n",baud);
+        printf("Uart Enabled: %i \n",(uint8_t)isenabled);
+    }
     return isenabled;
 }
 

@@ -27,6 +27,9 @@ bool speed_240_MHz = false;
 //#define DEBUG_SIGNAL_PINS
 //#define MOBILE_ENABLE_NO32BIT
 
+//#define ERASE_EEPROM //Encomment this to ERASE ALL stored config (including Adapter config)
+//#define CONFIG_MODE //Uncomment this if you want to reconfigure something
+
 // SPI pins
 #define SPI_PORT        spi0
 #define SPI_BAUDRATE_512    64 * 1024 * 8
@@ -592,6 +595,30 @@ void core1_context() {
     }
 }
 
+void StoreNewConfigs(){
+    char newSSID[32] = "WiFi_SSID";
+    char newPASS[32] = "P@$$w0rd";
+
+    char newMAGB_DNS1[64] = "0.0.0.0";
+    char newMAGB_DNS2[64] = "0.0.0.0";
+    char newMAGB_DNSPORT[5] = "0";
+
+    char newP2P_SERVER[15] = "0.0.0.0";
+    char newP2P_PORT[5] = "0";
+
+    memcpy(WiFiSSID,newSSID,sizeof(newSSID));
+    memcpy(WiFiPASS,newPASS,sizeof(newPASS));
+    
+    memcpy(MAGB_DNS1,newMAGB_DNS1,sizeof(newMAGB_DNS1));
+    memcpy(MAGB_DNS2,newMAGB_DNS2,sizeof(newMAGB_DNS2));
+    memcpy(MAGB_DNSPORT,newMAGB_DNSPORT,sizeof(newMAGB_DNSPORT));
+    
+    memcpy(P2P_SERVER,newP2P_SERVER,sizeof(newP2P_SERVER));
+    memcpy(P2P_PORT,newP2P_PORT,sizeof(newP2P_PORT));
+
+    RefreshConfigBuff(mobile->config_eeprom);
+}
+
 void main(){
     //Setup Pico
     speed_240_MHz = set_sys_clock_khz(240000, false);
@@ -631,9 +658,16 @@ void main(){
 
     mobile = malloc(sizeof(struct mobile_user));
 
-    //FormatFlashConfig();
+    #ifdef ERASE_EEPROM
+    FormatFlashConfig();
+    #endif
+
     memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
     ReadFlashConfig(mobile->config_eeprom); 
+
+    #ifdef CONFIG_MODE
+    StoreNewConfigs();
+    #endif
 
     if(haveDNS1Config){
         main_parse_addr(&dns1, MAGB_DNS1);
@@ -667,9 +701,7 @@ void main(){
     //////////////////
     
     if(isConnectedWiFi){
-
         mobile->action = MOBILE_ACTION_NONE;
-        //mobile->config = config;
         mobile->number_user[0] = '\0';
         mobile->number_peer[0] = '\0';
         for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){

@@ -58,11 +58,6 @@ volatile bool spiLock = false;
 // SPI Functions
 ///////////////////////////////////////
 
-static uint8_t set_initial_data() {
-    //Keeping this function if needs to do something during this call 
-    return 0xD2;
-}
-
 static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
     //spi_init
     buff32_pointer = 0;
@@ -637,21 +632,28 @@ void main(){
     mobile = malloc(sizeof(struct mobile_user));
 
     //FormatFlashConfig();
-
     memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
-    ReadFlashConfig(mobile->config_eeprom);
+    ReadFlashConfig(mobile->config_eeprom); 
 
-    #ifdef USE_CUSTOM_DNS1
-    main_parse_addr(&dns1, MAGB_DNS1);
-    #endif
-    #ifdef USE_CUSTOM_DNS2
-    main_parse_addr(&dns2, MAGB_DNS2);
-    #endif
-    // Set the DNS ports MAGB_DNSPORT
-    main_set_port(&dns1, atoi(MAGB_DNSPORT));
-    main_set_port(&dns2, atoi(MAGB_DNSPORT));
-    //adapter_config.p2p_port = 1027
-    //adapter_config.unmetered = true;
+    if(haveDNS1Config){
+        main_parse_addr(&dns1, MAGB_DNS1);
+    }
+    if(haveDNS2Config){
+        main_parse_addr(&dns2, MAGB_DNS2);
+    }
+    if(haveDNSPConfig){
+        dns_port = atoi(MAGB_DNSPORT);
+    }
+
+    if(haveP2PSConfig){
+        main_parse_addr(&relay, P2P_SERVER);
+    }
+    if(haveP2PPConfig){
+        p2p_port = atoi(P2P_PORT);
+    }
+    //device_unmetered = true;
+
+
 
     //////////////////////
     // CONFIGURE THE ESP

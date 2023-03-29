@@ -18,7 +18,9 @@ bool haveAdapterConfig = false;
 bool haveWifiConfig = false;
 bool haveDNS1Config = false;
 bool haveDNS2Config = false;
-bool haveP2PConfig = false;
+bool haveDNSPConfig = false;
+bool haveP2PPConfig = false;
+bool haveP2PSConfig = false;
 bool haveUNMETConfig = false;
 
 //LED Config
@@ -47,13 +49,16 @@ char WiFiSSID[32] = "WiFi_Network";
 char WiFiPASS[32] = "P@$$w0rd";
 
 #define USE_CUSTOM_DNS1
-char MAGB_DNS1[64] = "51.79.70.215";
+char MAGB_DNS1[64] = "0.0.0.0";
 #define USE_CUSTOM_DNS2
-char MAGB_DNS2[64] = "192.168.0.126";
+char MAGB_DNS2[64] = "0.0.0.0";
 #define USE_CUSTOM_DNS_PORT
 char MAGB_DNSPORT[5] = "53";
 
+
+#define USE_RELAY_SERVER
 char P2P_SERVER[15] = "0.0.0.0";
+#define USE_CUSTOM_P2P_PORT
 char P2P_PORT[5] = "1027";
 
 char PKM_UNMETERED = '1';

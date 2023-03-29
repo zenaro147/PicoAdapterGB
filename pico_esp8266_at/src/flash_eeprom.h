@@ -14,7 +14,7 @@
 #define KEY_DNS1 "DNS1"
 #define KEY_DNS2 "DNS2"
 #define KEY_P2PPORT "P2PP"
-#define KEY_PKMUNMETERED "UNME"
+#define KEY_DEVICEUNMETERED "UNME"
 #define KEY_DNSPORT "DNSP"
 #define KEY_P2PSERVER "P2PS"
 
@@ -26,11 +26,11 @@
 #define OFFSET_DNS1 592 //OFFSET_PASS+32
 #define OFFSET_DNS2 656 //OFFSET_DNS1+64
 #define OFFSET_P2PPORT 720 //OFFSET_SSID+64
-#define OFFSET_PKMUNMETERED 729 //OFFSET_SSID+9
+#define OFFSET_DEVICEUNMETERED 729 //OFFSET_SSID+9
 #define OFFSET_DNSPORT 734 //OFFSET_SSID+5
 #define OFFSET_P2PSERVER 743 //OFFSET_SSID+5
 
-
+bool needWrite = false;
 
 #define FLASH_TARGET_OFFSET (FLASH_DATA_SIZE * 1024)
 const uint8_t *flash_target_contents = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET);
@@ -42,11 +42,24 @@ void FormatFlashConfig(){
     printf("Done.\n");
 }
 
+bool ReadConfigOption(uint8_t * buff, int offset, char *key, int datasize, char *varConfig){
+    if(memmem(buff+offset,strlen(key),key,strlen(key)) != NULL){
+        memset(varConfig,0x00,sizeof(varConfig));
+        memcpy(varConfig,buff+(offset+strlen(key)),64-strlen(key));        
+    }else{
+        char tmp_config[datasize];
+        memset(tmp_config,0x00,sizeof(tmp_config));
+        sprintf(tmp_config,"%s%s",key,varConfig);
+        memcpy(buff+offset,tmp_config,sizeof(tmp_config));
+        needWrite = true;
+    }
+    return true;
+}
+
 //Read flash memory and set the configs
 bool ReadFlashConfig(uint8_t * buff){
     printf("Reading the target region... ");
     memcpy(buff,flash_target_contents,FLASH_DATA_SIZE);
-    bool needWrite = false;
     //Check if the Flash is already formated 
     if(memmem(buff+OFFSET_CONFIG,strlen(KEY_CONFIG),KEY_CONFIG,strlen(KEY_CONFIG)) == NULL){
         char tmp_config[16];
@@ -82,83 +95,32 @@ bool ReadFlashConfig(uint8_t * buff){
     haveWifiConfig = true;
 
     #ifdef USE_CUSTOM_DNS1
-    //Read DNS1 config (up to 64 bytes)
-    if(memmem(buff+OFFSET_DNS1,strlen(KEY_DNS1),KEY_DNS1,strlen(KEY_DNS1)) != NULL){
-        memset(MAGB_DNS1,0x00,sizeof(MAGB_DNS1));
-        memcpy(MAGB_DNS1,buff+(OFFSET_DNS1+strlen(KEY_DNS1)),64-strlen(KEY_DNS1));        
-    }else{
-        char tmp_dns1[64];
-        memset(tmp_dns1,0x00,sizeof(tmp_dns1));
-        sprintf(tmp_dns1,"%s%s",KEY_DNS1,MAGB_DNS1);
-        memcpy(buff+OFFSET_DNS1,tmp_dns1,sizeof(tmp_dns1));
-        needWrite = true;
-    }
-    haveDNS1Config = true;
+    haveDNS1Config = ReadConfigOption(buff, OFFSET_DNS1,KEY_DNS1,64,MAGB_DNS1);
     #endif
 
     #ifdef USE_CUSTOM_DNS2
-    //Read DNS2 config (up to 64 bytes)
-    if(memmem(buff+OFFSET_DNS2,strlen(KEY_DNS2),KEY_DNS2,strlen(KEY_DNS2)) != NULL){
-        memset(MAGB_DNS2,0x00,sizeof(MAGB_DNS2));
-        memcpy(MAGB_DNS2,buff+(OFFSET_DNS2+strlen(KEY_DNS2)),64-strlen(KEY_DNS2));
-        
-    }else{
-        char tmp_dns2[64];
-        memset(tmp_dns2,0x00,sizeof(tmp_dns2));
-        sprintf(tmp_dns2,"%s%s",KEY_DNS2,MAGB_DNS2);
-        memcpy(buff+OFFSET_DNS2,tmp_dns2,sizeof(tmp_dns2));
-        needWrite = true;
-    }
-    haveDNS2Config = true;
+    haveDNS2Config = ReadConfigOption(buff, OFFSET_DNS2, KEY_DNS2, 64, MAGB_DNS2);
     #endif
 
     //Read custom DNS Port config (up to 9 bytes)
     #ifdef USE_CUSTOM_DNS_PORT
-    if(memmem(buff+OFFSET_DNSPORT,strlen(KEY_DNSPORT),KEY_DNSPORT,strlen(KEY_DNSPORT)) != NULL){
-        memset(MAGB_DNSPORT,0x00,sizeof(MAGB_DNSPORT));
-        memcpy(MAGB_DNSPORT,buff+(OFFSET_DNSPORT+strlen(KEY_DNSPORT)),9-strlen(KEY_DNSPORT));
-        
-    }else{
-        char tmp_dnsport[9];
-        memset(tmp_dnsport,0x00,sizeof(tmp_dnsport));
-        sprintf(tmp_dnsport,"%s%s",KEY_DNSPORT,MAGB_DNSPORT);
-        memcpy(buff+OFFSET_DNSPORT,tmp_dnsport,sizeof(tmp_dnsport));
-        needWrite = true;
-    }
-    haveDNSPConfig = true;
+    haveDNSPConfig = ReadConfigOption(buff, OFFSET_DNSPORT, KEY_DNSPORT, 9, MAGB_DNSPORT);
     #endif
     
     //Read P2P relay server (up to 15 bytes)
     #ifdef USE_RELAY_SERVER
-    if(memmem(buff+OFFSET_P2PSERVER,strlen(KEY_P2PSERVER),KEY_P2PSERVER,strlen(KEY_P2PSERVER)) != NULL){
-        memset(P2P_SERVER,0x00,sizeof(P2P_SERVER));
-        memcpy(P2P_SERVER,buff+(OFFSET_P2PSERVER+strlen(KEY_P2PSERVER)),15-strlen(KEY_P2PSERVER));        
-    }else{
-        char tmp_p2pserver[15];
-        memset(tmp_p2pserver,0x00,sizeof(tmp_p2pserver));
-        sprintf(tmp_p2pserver,"%s%s",KEY_P2PSERVER,P2P_SERVER);
-        memcpy(buff+OFFSET_P2PSERVER,tmp_p2pserver,sizeof(tmp_p2pserver));
-        needWrite = true;
-    }
-    haveP2PSConfig = true;
+    haveP2PSConfig = ReadConfigOption(buff, OFFSET_P2PSERVER, KEY_P2PSERVER, 19, P2P_SERVER);
     #endif
     
     //Read P2P Port (up to 5 bytes)
     #ifdef USE_CUSTOM_P2P_PORT
-    if(memmem(buff+OFFSET_P2PPORT,strlen(KEY_P2PPORT),KEY_P2PPORT,strlen(KEY_P2PPORT)) != NULL){
-        memset(P2P_SERVER,0x00,sizeof(P2P_SERVER));
-        memcpy(P2P_SERVER,buff+(OFFSET_P2PPORT+strlen(KEY_P2PPORT)),5-strlen(KEY_P2PPORT));        
-    }else{
-        char tmp_p2pport[5];
-        memset(tmp_p2pport,0x00,sizeof(tmp_p2pport));
-        sprintf(tmp_p2pport,"%s%s",KEY_P2PPORT,P2P_PORT);
-        memcpy(buff+OFFSET_P2PPORT,tmp_p2pport,sizeof(tmp_p2pport));
-        needWrite = true;
-    }
-    haveP2PPConfig = true;
+    haveP2PPConfig = ReadConfigOption(buff, OFFSET_P2PPORT, KEY_P2PPORT, 9, P2P_PORT);
     #endif
     
-    //Unmetered config have 5 bytes (should receive 1 or 0... transform that to TRUE or FALSE)
+    //Read Device Unmetered (1 byte)
+    #ifdef USE_CUSTOM_DEVICE_UNMETERED
+    haveUNMETConfig = ReadConfigOption(buff, OFFSET_DEVICEUNMETERED, KEY_DEVICEUNMETERED, 5, DEVICE_UNMETERED);
+    #endif
 
     if(needWrite){
         FormatFlashConfig();
@@ -201,10 +163,20 @@ void RefreshConfigBuff(uint8_t * buff){
     sprintf(tmp_dnsport,"%s%s",KEY_DNSPORT,MAGB_DNSPORT);
     memcpy(buff+OFFSET_DNSPORT,tmp_dnsport,sizeof(tmp_dnsport));
 
-    char tmp_p2pserver[15];
+    char tmp_p2pserver[19];
     memset(tmp_p2pserver,0x00,sizeof(tmp_p2pserver));
     sprintf(tmp_p2pserver,"%s%s",KEY_P2PSERVER,P2P_SERVER);
     memcpy(buff+OFFSET_P2PSERVER,tmp_p2pserver,sizeof(tmp_p2pserver));
+
+    char tmp_p2pport[9];
+    memset(tmp_p2pport,0x00,sizeof(tmp_p2pport));
+    sprintf(tmp_p2pport,"%s%s",KEY_P2PPORT,P2P_PORT);
+    memcpy(buff+OFFSET_P2PPORT,tmp_p2pport,sizeof(tmp_p2pport));
+
+    char tmp_unmetered[5];
+    memset(tmp_unmetered,0x00,sizeof(tmp_unmetered));
+    sprintf(tmp_unmetered,"%s%s",KEY_DEVICEUNMETERED,DEVICE_UNMETERED);
+    memcpy(buff+OFFSET_DEVICEUNMETERED,tmp_unmetered,sizeof(tmp_unmetered));
 
     FormatFlashConfig();
     flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);

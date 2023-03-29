@@ -610,7 +610,7 @@ void StoreNewConfigs(){
     char newP2P_SERVER[15] = "0.0.0.0";
     char newP2P_PORT[5] = "0";
 
-    char newDEVICE_UNMETERED[1] = "1";
+    char newDEVICE_UNMETERED[1] = "0";
 
     memcpy(WiFiSSID,newSSID,sizeof(newSSID));
     memcpy(WiFiPASS,newPASS,sizeof(newPASS));

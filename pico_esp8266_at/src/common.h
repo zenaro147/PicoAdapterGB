@@ -62,7 +62,7 @@ char P2P_SERVER[15] = "0.0.0.0";
 char P2P_PORT[5] = "1027";
 
 #define USE_CUSTOM_DEVICE_UNMETERED
-char DEVICE_UNMETERED[1] = "1";
+char DEVICE_UNMETERED[1] = "0";
 
 struct esp_sock_config {
     int host_id;

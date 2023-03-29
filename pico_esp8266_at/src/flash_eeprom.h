@@ -45,7 +45,7 @@ void FormatFlashConfig(){
 bool ReadConfigOption(uint8_t * buff, int offset, char *key, int datasize, char *varConfig){
     if(memmem(buff+offset,strlen(key),key,strlen(key)) != NULL){
         memset(varConfig,0x00,sizeof(varConfig));
-        memcpy(varConfig,buff+(offset+strlen(key)),64-strlen(key));        
+        memcpy(varConfig,buff+(offset+strlen(key)),datasize-strlen(key));        
     }else{
         char tmp_config[datasize];
         memset(tmp_config,0x00,sizeof(tmp_config));

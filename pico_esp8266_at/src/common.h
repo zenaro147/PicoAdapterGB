@@ -55,7 +55,6 @@ char MAGB_DNS2[64] = "0.0.0.0";
 #define USE_CUSTOM_DNS_PORT
 char MAGB_DNSPORT[5] = "53";
 
-
 #define USE_RELAY_SERVER
 char P2P_SERVER[15] = "0.0.0.0";
 #define USE_CUSTOM_P2P_PORT

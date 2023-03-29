@@ -105,12 +105,10 @@ void main_parse_addr(struct mobile_addr *dest, char *argv){
     switch (rc) {
         case MOBILE_INET_PTON_IPV4:
             dest4->type = MOBILE_ADDRTYPE_IPV4;
-            dest4->port = MOBILE_DNS_PORT;
             memcpy(dest4->host, ip, sizeof(dest4->host));
             break;
         case MOBILE_INET_PTON_IPV6:
             dest6->type = MOBILE_ADDRTYPE_IPV6;
-            dest6->port = MOBILE_DNS_PORT;
             memcpy(dest6->host, ip, sizeof(dest6->host));
             break;
         default:
@@ -698,6 +696,7 @@ void main(){
 
     if(haveP2PSConfig){
         main_parse_addr(&relay, P2P_SERVER);
+        main_set_port(&relay, MOBILE_DEFAULT_RELAY_PORT);
     }
     if(haveP2PPConfig){
         p2p_port = atoi(P2P_PORT);

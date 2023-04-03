@@ -14,14 +14,7 @@
 #define MOBILE_MAX_DATA_SIZE 0xFF
 
 // Control the configs on Flash
-bool haveAdapterConfig = false;
 bool haveWifiConfig = false;
-bool haveDNS1Config = false;
-bool haveDNS2Config = false;
-bool haveDNSPConfig = false;
-bool haveP2PPConfig = false;
-bool haveP2PSConfig = false;
-bool haveUNMETConfig = false;
 
 //LED Config
 #define LED_PIN       		  	25
@@ -45,24 +38,8 @@ int ipdVal[5] = {0,0,0,0,0};
 
 //Wifi and Flash Configs Default
 bool isConnectedWiFi = false;
-char WiFiSSID[32] = "WiFi_Network";
-char WiFiPASS[32] = "P@$$w0rd";
-
-#define USE_CUSTOM_DNS1
-char MAGB_DNS1[64] = "0.0.0.0";
-#define USE_CUSTOM_DNS2
-char MAGB_DNS2[64] = "0.0.0.0";
-#define USE_CUSTOM_DNS_PORT
-char MAGB_DNSPORT[5] = "53";
-
-
-#define USE_RELAY_SERVER
-char P2P_SERVER[15] = "0.0.0.0";
-#define USE_CUSTOM_P2P_PORT
-char P2P_PORT[5] = "1027";
-
-#define USE_CUSTOM_DEVICE_UNMETERED
-char DEVICE_UNMETERED[1] = "0";
+char WiFiSSID[28] = "WiFi_Network";
+char WiFiPASS[28] = "P@$$w0rd";
 
 struct esp_sock_config {
     int host_id;
@@ -81,7 +58,6 @@ struct mobile_user {
     char number_peer[MOBILE_MAX_NUMBER_SIZE + 1];
 };
 struct mobile_user *mobile;
-
 
 // C Funciton to replace strcmp. Necessary to compare strings if the buffer have a 0x00 byte.
 void *memmem(const void *l, size_t l_len, const void *s, size_t s_len){

@@ -13,6 +13,23 @@
 #define FLASH_DATA_SIZE (FLASH_PAGE_SIZE * 3)
 #define MOBILE_MAX_DATA_SIZE 0xFF
 
+// SPI pins
+#define SPI_PORT        spi0
+#define SPI_BAUDRATE_512    64 * 1024 * 8
+#define SPI_BAUDRATE_256    32 * 1024 * 8
+#define PIN_SPI_SIN     16
+#define PIN_SPI_SCK     18
+#define PIN_SPI_SOUT    19 
+volatile bool spiLock = false;
+uint8_t buff32[4];
+volatile int8_t buff32_pointer = 0;
+
+//UART pins
+#define UART_ID uart1
+#define BAUD_RATE 115200
+#define UART_TX_PIN 4
+#define UART_RX_PIN 5
+
 // Control the configs on Flash
 bool haveWifiConfig = false;
 
@@ -27,6 +44,14 @@ bool haveWifiConfig = false;
 #define MKS(A)                  (A)
 #define MS(A)                   ((A) * 1000)
 #define SEC(A)                  ((A) * 1000 * 1000)
+volatile uint64_t time_us_now = 0;
+uint64_t last_readable = 0;
+
+//Control Bools
+bool isESPDetected = false;
+bool haveConfigToWrite = false;
+bool isServerOpened = false;
+bool is32bitsMode = false;
 
 //UART RX Buffer Config
 #define BUFF_AT_SIZE 2048 //2048 is the maximun you can receive from esp01

@@ -59,26 +59,6 @@ void main_parse_addr(struct mobile_addr *dest, char *argv){
     }
 }
 
-static bool main_parse_hex(unsigned char *buf, char *str, unsigned size){
-    unsigned char x = 0;
-    for (unsigned i = 0; i < size * 2; i++) {
-        char c = str[i];
-        if (c >= '0' && c <= '9') c -= '0';
-        else if (c >= 'A' && c <= 'F') c -= 'A' - 10;
-        else if (c >= 'a' && c <= 'f') c -= 'a' - 10;
-        else return false;
-
-        x <<= 4;
-        x |= c;
-
-        if (i % 2 == 1) {
-            buf[i / 2] = x;
-            x = 0;
-        }
-    }
-    return true;
-}
-
 void main_set_port(struct mobile_addr *dest, unsigned port){
     struct mobile_addr4 *dest4 = (struct mobile_addr4 *)dest;
     struct mobile_addr6 *dest6 = (struct mobile_addr6 *)dest;

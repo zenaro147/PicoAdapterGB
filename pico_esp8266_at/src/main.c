@@ -126,6 +126,8 @@ void main(){
     unsigned dns_port = MOBILE_DNS_PORT;
     unsigned p2p_port = MOBILE_DEFAULT_P2P_PORT;
     struct mobile_addr relay = {0};
+    bool relay_token_update = false;
+    unsigned char *relay_token = NULL;
     unsigned char relay_token_buf[MOBILE_RELAY_TOKEN_SIZE];
 
     mobile = malloc(sizeof(struct mobile_user));
@@ -158,17 +160,15 @@ void main(){
     mobile_config_load(mobile->adapter);
 
     #ifdef CONFIG_MODE
-        char newSSID[28] = "Wifi_SSID";
-        char newPASS[28] = "PASSW0RD";
+        char newSSID[28] = "Zenaro";
+        char newPASS[28] = "Zenaro1234!@#$#$#";
 
-        char MAGB_DNS1[60] = "0.0.0.0";
-        char MAGB_DNS2[60] = "0.0.0.0";
+        char MAGB_DNS1[60] = "51.79.70.215";
+        char MAGB_DNS2[60] = "192.168.0.126";
         unsigned MAGB_DNSPORT = 53;
 
-        char RELAY_SERVER[60] = ".0.0.0.0";
+        char RELAY_SERVER[60] = "136.144.185.148";
         unsigned P2P_PORT = 1027;
-        char RELAY_TOKEN[32] = "00000000000000000000000000000000";
-        bool updateRelayToken = false;
 
         bool DEVICE_UNMETERED = false;
 
@@ -190,16 +190,6 @@ void main(){
         mobile_config_set_relay(mobile->adapter, &relay);
         mobile_config_set_p2p_port(mobile->adapter, P2P_PORT);
 
-        //ONLY UNCOMMENT THIS LINE IF YOU WANT TO SETUP A TOKEN MANUALLY
-        if (updateRelayToken) {
-            bool TokenOk = main_parse_hex(relay_token_buf, RELAY_TOKEN, sizeof(relay_token_buf));
-            if(!TokenOk){
-                printf("Invalid Relay Token\n");
-            }else{
-                mobile_config_set_relay_token(mobile->adapter, relay_token_buf);
-            }
-        }
-
         mobile_config_save(mobile->adapter);
         RefreshConfigBuff(mobile->config_eeprom);
 
@@ -210,6 +200,15 @@ void main(){
             LED_OFF;
         }
     #endif
+
+    mobile_config_set_device(mobile->adapter, device, device_unmetered);
+    mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
+    mobile_config_set_p2p_port(mobile->adapter, p2p_port);
+    mobile_config_set_relay(mobile->adapter, &relay);
+    if (relay_token_update) {
+        mobile_config_set_relay_token(mobile->adapter, relay_token);
+    }
+    mobile_config_save(mobile->adapter);
 
     //////////////////////
     // CONFIGURE THE ESP

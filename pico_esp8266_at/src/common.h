@@ -14,7 +14,14 @@
 #define MOBILE_MAX_DATA_SIZE 0xFF
 
 // Control the configs on Flash
+bool haveAdapterConfig = false;
 bool haveWifiConfig = false;
+bool haveDNS1Config = false;
+bool haveDNS2Config = false;
+bool haveDNSPConfig = false;
+bool haveP2PPConfig = false;
+bool haveP2PSConfig = false;
+bool haveUNMETConfig = false;
 
 //LED Config
 #define LED_PIN       		  	25
@@ -27,22 +34,6 @@ bool haveWifiConfig = false;
 #define MKS(A)                  (A)
 #define MS(A)                   ((A) * 1000)
 #define SEC(A)                  ((A) * 1000 * 1000)
-volatile uint64_t time_us_now = 0;
-uint64_t last_readable = 0;
-
-// SPI pins
-#define SPI_PORT        		spi0
-#define SPI_BAUDRATE_512    	64 * 1024 * 8
-#define SPI_BAUDRATE_256    	32 * 1024 * 8
-#define PIN_SPI_SIN    			16
-#define PIN_SPI_SCK    			18
-#define PIN_SPI_SOUT   			19 
-
-//UART pins
-#define UART_ID 				uart1
-#define BAUD_RATE 				115200
-#define UART_TX_PIN 			4
-#define UART_RX_PIN 			5
 
 //UART RX Buffer Config
 #define BUFF_AT_SIZE 2048 //2048 is the maximun you can receive from esp01
@@ -54,20 +45,25 @@ int ipdVal[5] = {0,0,0,0,0};
 
 //Wifi and Flash Configs Default
 bool isConnectedWiFi = false;
-char WiFiSSID[28] = "WiFi_Network";
-char WiFiPASS[28] = "P@$$w0rd";
+char WiFiSSID[32] = "WiFi_Network";
+char WiFiPASS[32] = "P@$$w0rd";
 
-//Control Variables
-bool isESPDetected = false;
-bool haveConfigToWrite = false;
-bool isServerOpened = false;
-bool is32bitsMode = false;
+#define USE_CUSTOM_DNS1
+char MAGB_DNS1[64] = "0.0.0.0";
+#define USE_CUSTOM_DNS2
+char MAGB_DNS2[64] = "0.0.0.0";
+#define USE_CUSTOM_DNS_PORT
+char MAGB_DNSPORT[5] = "53";
 
-uint8_t buff32[4];
-volatile int8_t buff32_pointer = 0;
-volatile bool spiLock = false;
 
-//Libmobile config Structs
+#define USE_RELAY_SERVER
+char P2P_SERVER[15] = "0.0.0.0";
+#define USE_CUSTOM_P2P_PORT
+char P2P_PORT[5] = "1027";
+
+#define USE_CUSTOM_DEVICE_UNMETERED
+char DEVICE_UNMETERED[1] = "0";
+
 struct esp_sock_config {
     int host_id;
     uint8_t host_type; //0=NONE, 1=TCP or 2=UDP

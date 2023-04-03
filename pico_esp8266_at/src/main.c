@@ -685,14 +685,14 @@ void main(){
 
     mobile_config_load(mobile->adapter);
     #ifdef CONFIG_MODE
-        char newSSID[28] = "Zenaro";
-        char newPASS[28] = "Zenaro1234!@#$#$#";
+        char newSSID[28] = "WiFi_SSID";
+        char newPASS[28] = "P@$$w0rd";
 
-        char MAGB_DNS1[60] = "51.79.70.215";
-        char MAGB_DNS2[60] = "192.168.0.126";
+        char MAGB_DNS1[60] = "0.0.0.0";
+        char MAGB_DNS2[60] = "0.0.0.0";
         unsigned MAGB_DNSPORT = 53;
 
-        char RELAY_SERVER[60] = "136.144.185.148";
+        char RELAY_SERVER[60] = "0.0.0.0";
         unsigned P2P_PORT = 1027;
 
         char RELAY_TOKEN[32] = "00000000000000000000000000000000";

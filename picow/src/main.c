@@ -116,6 +116,26 @@ void main_parse_addr(struct mobile_addr *dest, char *argv){
     }
 }
 
+static bool main_parse_hex(unsigned char *buf, char *str, unsigned size){
+    unsigned char x = 0;
+    for (unsigned i = 0; i < size * 2; i++) {
+        char c = str[i];
+        if (c >= '0' && c <= '9') c -= '0';
+        else if (c >= 'A' && c <= 'F') c -= 'A' - 10;
+        else if (c >= 'a' && c <= 'f') c -= 'a' - 10;
+        else return false;
+
+        x <<= 4;
+        x |= c;
+
+        if (i % 2 == 1) {
+            buf[i / 2] = x;
+            x = 0;
+        }
+    }
+    return true;
+}
+
 void main_set_port(struct mobile_addr *dest, unsigned port){
     struct mobile_addr4 *dest4 = (struct mobile_addr4 *)dest;
     struct mobile_addr6 *dest6 = (struct mobile_addr6 *)dest;
@@ -599,39 +619,6 @@ void core1_context() {
     }
 }
 
-void StoreNewConfigs(){
-    char newSSID[32] = "WiFi_SSID";
-    char newPASS[32] = "P@$$w0rd";
-
-    char newMAGB_DNS1[64] = "0.0.0.0";
-    char newMAGB_DNS2[64] = "0.0.0.0";
-    char newMAGB_DNSPORT[5] = "0";
-
-    char newP2P_SERVER[15] = "0.0.0.0";
-    char newP2P_PORT[5] = "0";
-
-    char newDEVICE_UNMETERED[1] = "0";
-
-    memcpy(WiFiSSID,newSSID,sizeof(newSSID));
-    memcpy(WiFiPASS,newPASS,sizeof(newPASS));
-    
-    memcpy(MAGB_DNS1,newMAGB_DNS1,sizeof(newMAGB_DNS1));
-    memcpy(MAGB_DNS2,newMAGB_DNS2,sizeof(newMAGB_DNS2));
-    memcpy(MAGB_DNSPORT,newMAGB_DNSPORT,sizeof(newMAGB_DNSPORT));
-    
-    memcpy(P2P_SERVER,newP2P_SERVER,sizeof(newP2P_SERVER));
-    memcpy(P2P_PORT,newP2P_PORT,sizeof(newP2P_PORT));
-
-    memcpy(DEVICE_UNMETERED,newDEVICE_UNMETERED,sizeof(newDEVICE_UNMETERED));
-
-    RefreshConfigBuff(mobile->config_eeprom);
-
-    printf("New configuration defined! Please comment the \'#define CONFIG_MODE\' again to back the adapter to the normal operation.\n");
-    while (1){
-        //do something
-    }
-}
-
 void main(){
     //Setup Pico
     speed_240_MHz = set_sys_clock_khz(240000, false);
@@ -678,33 +665,79 @@ void main(){
     memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
     ReadFlashConfig(mobile->config_eeprom); 
 
+    // Initialize mobile library
+    mobile->adapter = mobile_new(mobile);
+    mobile_def_debug_log(mobile->adapter, impl_debug_log);
+    mobile_def_serial_disable(mobile->adapter, impl_serial_disable);
+    mobile_def_serial_enable(mobile->adapter, impl_serial_enable);
+    mobile_def_config_read(mobile->adapter, impl_config_read);
+    mobile_def_config_write(mobile->adapter, impl_config_write);
+    mobile_def_time_latch(mobile->adapter, impl_time_latch);
+    mobile_def_time_check_ms(mobile->adapter, impl_time_check_ms);
+    mobile_def_sock_open(mobile->adapter, impl_sock_open);
+    mobile_def_sock_close(mobile->adapter, impl_sock_close);
+    mobile_def_sock_connect(mobile->adapter, impl_sock_connect);
+    mobile_def_sock_listen(mobile->adapter, impl_sock_listen);
+    mobile_def_sock_accept(mobile->adapter, impl_sock_accept);
+    mobile_def_sock_send(mobile->adapter, impl_sock_send);
+    mobile_def_sock_recv(mobile->adapter, impl_sock_recv);
+    mobile_def_update_number(mobile->adapter, impl_update_number);
+
+    mobile_config_load(mobile->adapter);
     #ifdef CONFIG_MODE
-    StoreNewConfigs();
-    #endif
+        char newSSID[28] = "WiFi_SSID";
+        char newPASS[28] = "P@$$w0rd";
 
-    if(haveDNS1Config){
+        char MAGB_DNS1[60] = "0.0.0.0";
+        char MAGB_DNS2[60] = "0.0.0.0";
+        unsigned MAGB_DNSPORT = 53;
+
+        char RELAY_SERVER[60] = "0.0.0.0";
+        unsigned P2P_PORT = 1027;
+
+        char RELAY_TOKEN[32] = "00000000000000000000000000000000";
+        bool updateRelayToken = false;
+
+        bool DEVICE_UNMETERED = false;
+
+        //Set the new values
+        memcpy(WiFiSSID,newSSID,sizeof(newSSID));
+        memcpy(WiFiPASS,newPASS,sizeof(newPASS));
+
         main_parse_addr(&dns1, MAGB_DNS1);
-    }
-    if(haveDNS2Config){
         main_parse_addr(&dns2, MAGB_DNS2);
-    }
-    if(haveDNSPConfig){
-        dns_port = atoi(MAGB_DNSPORT);
-        main_set_port(&dns1, dns_port);
-        main_set_port(&dns2, dns_port);
-    }
+        main_set_port(&dns1, MAGB_DNSPORT);
+        main_set_port(&dns2, MAGB_DNSPORT);
 
-    if(haveP2PSConfig){
-        main_parse_addr(&relay, P2P_SERVER);
+        main_parse_addr(&relay, RELAY_SERVER);
         main_set_port(&relay, MOBILE_DEFAULT_RELAY_PORT);
-    }
-    if(haveP2PPConfig){
-        p2p_port = atoi(P2P_PORT);
-    }
 
-    if(haveUNMETConfig){
-        device_unmetered = atoi(DEVICE_UNMETERED) == 1 ? true : false;
-    }
+        //Set the values to the Adapter config
+        mobile_config_set_device(mobile->adapter, device, DEVICE_UNMETERED);
+        mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
+        mobile_config_set_relay(mobile->adapter, &relay);
+        mobile_config_set_p2p_port(mobile->adapter, P2P_PORT);
+
+        //ONLY UNCOMMENT THIS LINE IF YOU WANT TO SETUP A TOKEN MANUALLY
+        if (updateRelayToken) {
+            bool TokenOk = main_parse_hex(relay_token_buf, RELAY_TOKEN, sizeof(relay_token_buf));
+            if(!TokenOk){
+                printf("Invalid Relay Token\n");
+            }else{
+                mobile_config_set_relay_token(mobile->adapter, relay_token_buf);
+            }
+        }
+
+        mobile_config_save(mobile->adapter);
+        RefreshConfigBuff(mobile->config_eeprom);
+
+        printf("New configuration defined! Please comment the \'#define CONFIG_MODE\' again to back the adapter to the normal operation.\n");
+        while (1){
+            LED_ON;
+            Delay_Timer(MS(300));
+            LED_OFF;
+        }
+    #endif
 
     //////////////////////
     // CONFIGURE THE ESP
@@ -732,34 +765,6 @@ void main(){
 
         multicore_launch_core1(core1_context);
         FlushATBuff();
-
-        // Initialize mobile library
-        mobile->adapter = mobile_new(mobile);
-        mobile_def_debug_log(mobile->adapter, impl_debug_log);
-        mobile_def_serial_disable(mobile->adapter, impl_serial_disable);
-        mobile_def_serial_enable(mobile->adapter, impl_serial_enable);
-        mobile_def_config_read(mobile->adapter, impl_config_read);
-        mobile_def_config_write(mobile->adapter, impl_config_write);
-        mobile_def_time_latch(mobile->adapter, impl_time_latch);
-        mobile_def_time_check_ms(mobile->adapter, impl_time_check_ms);
-        mobile_def_sock_open(mobile->adapter, impl_sock_open);
-        mobile_def_sock_close(mobile->adapter, impl_sock_close);
-        mobile_def_sock_connect(mobile->adapter, impl_sock_connect);
-        mobile_def_sock_listen(mobile->adapter, impl_sock_listen);
-        mobile_def_sock_accept(mobile->adapter, impl_sock_accept);
-        mobile_def_sock_send(mobile->adapter, impl_sock_send);
-        mobile_def_sock_recv(mobile->adapter, impl_sock_recv);
-        mobile_def_update_number(mobile->adapter, impl_update_number);
-
-        mobile_config_load(mobile->adapter);
-        mobile_config_set_device(mobile->adapter, device, device_unmetered);
-        mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
-        mobile_config_set_p2p_port(mobile->adapter, p2p_port);
-        mobile_config_set_relay(mobile->adapter, &relay);
-        if (relay_token_update) {
-            mobile_config_set_relay_token(mobile->adapter, relay_token);
-        }
-        mobile_config_save(mobile->adapter);
 
         mobile_start(mobile->adapter);
 

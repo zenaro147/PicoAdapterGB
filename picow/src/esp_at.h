@@ -99,7 +99,7 @@ int ESP_ReadBuffSize(uart_inst_t * uart, uint8_t connID){
     FlushATBuff();
     ESP_SendCmd(uart,"AT+CIPRECVLEN?",0);
     if(ESP_SerialFind(buffATrx,"+CIPRECVLEN:",SEC(2),false,false)){
-        Delay_Timer(MS(100));
+        
         uint8_t connID_pointer = 0;
         char resp[50];
         memcpy(resp,buffATrx,strlen(buffATrx));

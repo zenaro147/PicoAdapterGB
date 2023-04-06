@@ -107,7 +107,7 @@ int socket_connect(const char *host, const char *port)
     struct addrinfo* result;
     int gai_errno = getaddrinfo(host, port, &hints, &result);
     if (gai_errno) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(gai_errno));
+        //fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(gai_errno));
         return -1;
     }
 

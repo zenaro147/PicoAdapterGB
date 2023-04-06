@@ -3,9 +3,6 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
 set(PICO_BOARD pico_w)
-set(WIFI_SSID "WiFi_Network")
-set(WIFI_PASSWORD "P@$$w0rd")
-set(TEST_TCP_SERVER_IP "192.168.0.1")
 
 include(pico_sdk_import.cmake)
 project(PicoAdapterGB C CXX ASM)
@@ -21,11 +18,10 @@ foreach (_headerFile ${LibMobile_HEADERS})
 endforeach()
 list (REMOVE_DUPLICATES LibMobile_INCLUDE_DIRS)
 
-add_executable(${PROJECT_NAME} src/main.c ${LibMobile_SOURCES})
-target_include_directories(${PROJECT_NAME} PRIVATE ${LibMobile_INCLUDE_DIRS})
+add_executable(${PROJECT_NAME} src/main.c src/socket.c src/socket_impl.c ${LibMobile_SOURCES} )
+target_include_directories(${PROJECT_NAME} PRIVATE ${LibMobile_INCLUDE_DIRS} ${CMAKE_CURRENT_LIST_DIR} )
  
-# Pull in our pico_stdlib which pulls in commonly used features
-target_link_libraries(${PROJECT_NAME} pico_stdlib pico_multicore hardware_spi hardware_uart hardware_flash)
+target_link_libraries(${PROJECT_NAME} pico_stdlib pico_multicore hardware_spi hardware_flash pico_cyw43_arch_lwip_threadsafe_background)
 
 # enable usb output, disable uart output
 #pico_enable_stdio_usb(${PROJECT_NAME} 1)

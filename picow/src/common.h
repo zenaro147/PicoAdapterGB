@@ -4,10 +4,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "hardware/uart.h"
 #include "hardware/irq.h"
 #include "libmobile/mobile.h"
 #include "libmobile/mobile_inet.h"
+
+#define DEBUG_printf printf
 
 //Flash Config
 #define FLASH_DATA_SIZE (FLASH_PAGE_SIZE * 3)
@@ -24,21 +25,15 @@ volatile bool spiLock = false;
 uint8_t buff32[4];
 volatile int8_t buff32_pointer = 0;
 
-//UART pins
-#define UART_ID uart1
-#define BAUD_RATE 115200
-#define UART_TX_PIN 4
-#define UART_RX_PIN 5
-
 // Control the configs on Flash
 bool haveWifiConfig = false;
 
 //LED Config
-#define LED_PIN       		  	25
-#define LED_SET(A)    		  	(gpio_put(LED_PIN, (A)))
+#define LED_PIN       		  	CYW43_WL_GPIO_LED_PIN
+#define LED_SET(A)    		  	(cyw43_arch_gpio_put(LED_PIN, (A)))
 #define LED_ON        		  	LED_SET(true)
 #define LED_OFF       		  	LED_SET(false)
-#define LED_TOGGLE    		  	(gpio_put(LED_PIN, !gpio_get(LED_PIN)))
+#define LED_TOGGLE    		  	(cyw43_arch_gpio_put(LED_PIN, !cyw43_arch_gpio_get(LED_PIN)))
 
 //Time Config
 #define MKS(A)                  (A)

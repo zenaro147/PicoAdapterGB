@@ -17,8 +17,12 @@
 #include "hardware/resets.h"
 #include "hardware/flash.h"
 
+#include "pico/cyw43_arch.h"
+#include "lwip/pbuf.h"
+#include "lwip/tcp.h"
+#include "lwip/udp.h"
+
 #include "common.h"
-#include "esp_at.h"
 #include "flash_eeprom.h"
 #include "libmobile_func.h"
 
@@ -216,9 +220,19 @@ void main(){
     //////////////////////
     // CONFIGURE THE ESP
     //////////////////////
-    isESPDetected = EspAT_Init(UART_ID, BAUD_RATE, UART_TX_PIN, UART_RX_PIN);
-    if(isESPDetected){
-        isConnectedWiFi = ESP_ConnectWifi(UART_ID, WiFiSSID, WiFiPASS,SEC(10));
+    if (cyw43_arch_init()) {
+        DEBUG_printf("failed to initialise\n");
+        isConnectedWiFi = false;
+    }
+    cyw43_arch_enable_sta_mode();
+
+    printf("Connecting to Wi-Fi...\n");
+    if (cyw43_arch_wifi_connect_timeout_ms(WiFiSSID, WiFiPASS, CYW43_AUTH_WPA2_AES_PSK, 100000)) {
+        printf("failed to connect.\n");
+        isConnectedWiFi = false;
+    } else {
+        printf("Connected.\n");
+        isConnectedWiFi = true;
     }
     //////////////////
     // END CONFIGURE
@@ -234,11 +248,9 @@ void main(){
             mobile->esp_sockets[i].host_type = 0;
             mobile->esp_sockets[i].local_port = -1;
             mobile->esp_sockets[i].sock_status = false;
-            ESP_CloseSockConn(UART_ID,i);
         } 
 
         multicore_launch_core1(core1_context);
-        FlushATBuff();
 
         mobile_start(mobile->adapter);
 

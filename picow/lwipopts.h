@@ -5,18 +5,13 @@
 // Common settings used in most of the pico_w examples
 // (see https://www.nongnu.org/lwip/2_1_x/group__lwip__opts.html for details)
 
-//Custom Defines
-#define SO_REUSE                    1
-#define LWIP_TIMEVAL_PRIVATE        0
-#define LWIP_COMPAT_SOCKETS         2
-
 // allow override in some examples
 #ifndef NO_SYS
-#define NO_SYS                      0
+#define NO_SYS                      1
 #endif
 // allow override in some examples
 #ifndef LWIP_SOCKET
-#define LWIP_SOCKET                 1
+#define LWIP_SOCKET                 0
 #endif
 #if PICO_CYW43_ARCH_POLL
 #define MEM_LIBC_MALLOC             1
@@ -49,7 +44,6 @@
 #define LWIP_CHKSUM_ALGORITHM       3
 #define LWIP_DHCP                   1
 #define LWIP_IPV4                   1
-#define LWIP_IPV6                   1
 #define LWIP_TCP                    1
 #define LWIP_UDP                    1
 #define LWIP_DNS                    1

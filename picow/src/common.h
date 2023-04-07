@@ -12,6 +12,11 @@
 
 #include "socket_impl.h"
 
+//lwIP defines
+#define LWIP_SOCKET		1
+#define SO_REUSE		1
+#define LWIP_TIMEVAL_PRIVATE 0
+
 #define DEBUG_printf printf
 
 //Flash Config

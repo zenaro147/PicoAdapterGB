@@ -41,6 +41,23 @@ bool speed_240_MHz = false;
 // Main Functions and Core 1 Loop
 ///////////////////////////////////////
 
+bool PicoW_Connect_WiFi(char *ssid, char *psk, uint32_t timeout){
+    if (cyw43_arch_init()) {
+        DEBUG_printf("failed to initialise\n");
+        return false;
+    }
+    cyw43_arch_enable_sta_mode();
+
+    printf("Connecting to Wi-Fi...\n");
+    if (cyw43_arch_wifi_connect_timeout_ms(ssid, psk, CYW43_AUTH_WPA2_AES_PSK, timeout)) {
+        printf("failed to connect.\n");
+        return false;
+    } else {
+        printf("Connected.\n");
+    }
+    return true;
+}
+
 void core1_context() {
     irq_set_mask_enabled(0xffffffff, false);
 
@@ -217,26 +234,7 @@ void main(){
         }
     #endif
 
-    //////////////////////
-    // CONFIGURE THE ESP
-    //////////////////////
-    if (cyw43_arch_init()) {
-        DEBUG_printf("failed to initialise\n");
-        isConnectedWiFi = false;
-    }
-    cyw43_arch_enable_sta_mode();
-
-    printf("Connecting to Wi-Fi...\n");
-    if (cyw43_arch_wifi_connect_timeout_ms(WiFiSSID, WiFiPASS, CYW43_AUTH_WPA2_AES_PSK, 100000)) {
-        printf("failed to connect.\n");
-        isConnectedWiFi = false;
-    } else {
-        printf("Connected.\n");
-        isConnectedWiFi = true;
-    }
-    //////////////////
-    // END CONFIGURE
-    //////////////////
+    isConnectedWiFi = PicoW_Connect_WiFi(WiFiSSID, WiFiPASS, MS(10));
     
     if(isConnectedWiFi){
         mobile->action = MOBILE_ACTION_NONE;

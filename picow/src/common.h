@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "hardware/irq.h"
-#include "libmobile/mobile.h"
-#include "libmobile/mobile_inet.h"
+#include <mobile.h>
+#include <mobile_inet.h>
 
 #define DEBUG_printf printf
 

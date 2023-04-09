@@ -6,8 +6,8 @@
 #include <string.h>
 #include "hardware/uart.h"
 #include "hardware/irq.h"
-#include "libmobile/mobile.h"
-#include "libmobile/mobile_inet.h"
+#include <mobile.h>
+#include <mobile_inet.h>
 
 //Flash Config
 #define FLASH_DATA_SIZE (FLASH_PAGE_SIZE * 3)

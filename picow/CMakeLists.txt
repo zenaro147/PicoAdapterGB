@@ -1,36 +1,12 @@
-cmake_minimum_required(VERSION 3.12)
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 17)
-
-set(PICO_BOARD pico_w)
-
-include(pico_sdk_import.cmake)
-project(PicoAdapterGB C CXX ASM)
-pico_sdk_init()
-
-file (GLOB_RECURSE LibMobile_SOURCES CONFIGURE_DEPENDS "src/libmobile/*.c")
-file (GLOB_RECURSE LibMobile_HEADERS CONFIGURE_DEPENDS "src/libmobile/*.h")
-
-set (LibMobile_INCLUDE_DIRS "")
-foreach (_headerFile ${LibMobile_HEADERS})
-    get_filename_component(_dir ${_headerFile} PATH)
-    list (APPEND LibMobile_INCLUDE_DIRS ${_dir})
-endforeach()
-list (REMOVE_DUPLICATES LibMobile_INCLUDE_DIRS)
-
-add_executable(${PROJECT_NAME} src/main.c ${LibMobile_SOURCES})
-target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${LibMobile_INCLUDE_DIRS})
+add_executable(${PROJECT_NAME}_PicoW src/main.c)
+target_include_directories(${PROJECT_NAME}_PicoW PRIVATE /.. ${CMAKE_CURRENT_LIST_DIR})
  
 # Pull in our pico_stdlib which pulls in commonly used features
-target_link_libraries(${PROJECT_NAME} pico_stdlib pico_multicore hardware_spi hardware_uart hardware_flash pico_cyw43_arch_lwip_threadsafe_background)
-
-# enable usb output, disable uart output
-#pico_enable_stdio_usb(${PROJECT_NAME} 1)
-#pico_enable_stdio_uart(${PROJECT_NAME} 0)
+target_link_libraries(${PROJECT_NAME}_PicoW libmobile pico_stdlib pico_multicore hardware_spi hardware_flash pico_cyw43_arch_lwip_threadsafe_background)
 
 # disable usb output, enable uart output
-pico_enable_stdio_usb(${PROJECT_NAME} 0)
-pico_enable_stdio_uart(${PROJECT_NAME} 1)
+pico_enable_stdio_usb(${PROJECT_NAME}_PicoW 0)
+pico_enable_stdio_uart(${PROJECT_NAME}_PicoW 1)
 
 # create map/bin/hex file etc.
-pico_add_extra_outputs(${PROJECT_NAME})
+pico_add_extra_outputs(${PROJECT_NAME}_PicoW)

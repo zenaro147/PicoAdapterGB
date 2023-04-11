@@ -4,11 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "hardware/irq.h"
+
 #include <mobile.h>
 #include <mobile_inet.h>
-
-#define DEBUG_printf printf
 
 //Flash Config
 #define FLASH_DATA_SIZE (FLASH_PAGE_SIZE * 3)
@@ -43,9 +41,7 @@ volatile uint64_t time_us_now = 0;
 uint64_t last_readable = 0;
 
 //Control Bools
-bool isESPDetected = false;
 bool haveConfigToWrite = false;
-bool isServerOpened = false;
 bool is32bitsMode = false;
 
 //UART RX Buffer Config

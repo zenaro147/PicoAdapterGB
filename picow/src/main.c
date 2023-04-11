@@ -18,7 +18,6 @@
 #include "common.h"
 #include "flash_eeprom.h"
 #include "libmobile_func.h"
-#include "socket_impl.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool speed_240_MHz = false;
@@ -31,14 +30,13 @@ bool speed_240_MHz = false;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-
 ///////////////////////////////////////
 // Main Functions and Core 1 Loop
 ///////////////////////////////////////
 
-bool PicoW_Init(char *ssid, char *psk, uint32_t timeout){
+bool PicoW_Connect_WiFi(char *ssid, char *psk, uint32_t timeout){
     if (cyw43_arch_init()) {
-        printf("failed to initialise\n");
+        DEBUG_printf("failed to initialise\n");
         return false;
     }
     cyw43_arch_enable_sta_mode();
@@ -72,7 +70,7 @@ void core1_context() {
                 buff32[buff32_pointer++] = spi_get_hw(SPI_PORT)->dr;
                 if(buff32_pointer >= 4){
                     #ifdef DEBUG_SIGNAL_PINS
-                        gpio_put(9, true);
+                    gpio_put(9, true);
                     #endif
                     uint8_t tmpbuff[4];
                     //for(int x = 0 ; x < 4 ; x++){                   
@@ -100,7 +98,7 @@ void core1_context() {
                     spi_get_hw(SPI_PORT)->dr = tmpbuff[3];
                     buff32_pointer -= 4;
                     #ifdef DEBUG_SIGNAL_PINS
-                        gpio_put(9, false);
+                    gpio_put(9, false);
                     #endif
                 }
             }
@@ -115,13 +113,13 @@ void main(){
     stdio_init_all();
 
     #ifdef DEBUG_SIGNAL_PINS
-        gpio_init(9);
-        gpio_set_dir(9, GPIO_OUT);
-        gpio_put(9, false);
+    gpio_init(9);
+    gpio_set_dir(9, GPIO_OUT);
+    gpio_put(9, false);
 
-        gpio_init(10);
-        gpio_set_dir(10, GPIO_OUT);
-        gpio_put(10, false);
+    gpio_init(10);
+    gpio_set_dir(10, GPIO_OUT);
+    gpio_put(10, false);
     #endif
 
     // For toggle_led
@@ -229,15 +227,18 @@ void main(){
         }
     #endif
 
-    isConnectedWiFi = PicoW_Init(WiFiSSID, WiFiPASS, MS(10));
+    isConnectedWiFi = PicoW_Connect_WiFi(WiFiSSID, WiFiPASS, MS(10));
     
     if(isConnectedWiFi){
         mobile->action = MOBILE_ACTION_NONE;
         mobile->number_user[0] = '\0';
         mobile->number_peer[0] = '\0';
         for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
-            mobile->picow_sockets[i].sock_id = -1;
-            mobile->picow_sockets[i].sock_type = -1;
+            mobile->esp_sockets[i].host_id = -1;
+            mobile->esp_sockets[i].host_iptype = MOBILE_ADDRTYPE_NONE;
+            mobile->esp_sockets[i].host_type = 0;
+            mobile->esp_sockets[i].local_port = -1;
+            mobile->esp_sockets[i].sock_status = false;
         } 
 
         multicore_launch_core1(core1_context);

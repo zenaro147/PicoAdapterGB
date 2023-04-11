@@ -1,4 +1,4 @@
-add_executable(${PROJECT_NAME}_PicoW src/main.c src/picow_socket.c src/socket_impl.c)
+add_executable(${PROJECT_NAME}_PicoW src/main.c)
 target_include_directories(${PROJECT_NAME}_PicoW PRIVATE /.. ${CMAKE_CURRENT_LIST_DIR})
  
 # Pull in our pico_stdlib which pulls in commonly used features

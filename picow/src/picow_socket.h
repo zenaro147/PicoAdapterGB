@@ -4,7 +4,6 @@
 #include "lwip/tcp.h"
 #include "lwip/udp.h"
 
-#include <mobile.h>
 
 // UDP functions
 void socket_new_udp(void *arg);

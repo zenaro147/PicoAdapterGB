@@ -1,12 +1,5 @@
 ////////////////////////////////////
-// - Change the Strings comps to string finds and read the buffer directly?
-// - Optimize the ESP_AT.H file! Specially to handle the UDP connections better (fast)
-// - Add the mobile_impl_sock_* functions to handle the Request functions (only the necessary for now) - https://discord.com/channels/375413108467957761/541384270636384259/1017548420866654280
-// -- Docs about AT commands 
-// ---- https://www.espressif.com/sites/default/files/documentation/4a-esp8266_at_instruction_set_en.pdf
-// ---- https://github.com/espressif/ESP8266_AT/wiki/ATE
-// ---- https://docs.espressif.com/projects/esp-at/en/release-v2.2.0.0_esp8266/AT_Command_Set/index.html
-// ---- MOBILE_ENABLE_NO32BIT - try to build with this option enabled to handle GBA games
+// -- MOBILE_ENABLE_NO32BIT - try to build with this option enabled to handle GBA games
 ////////////////////////////////////
 
 #include "pico/stdlib.h"

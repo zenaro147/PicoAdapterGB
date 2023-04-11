@@ -8,11 +8,9 @@
 #include <mobile.h>
 #include <mobile_inet.h>
 
-#include "picow_socket.h"
-#include "socket_impl.h"
-
 //Flash Config
-#define FLASH_DATA_SIZE ((1u << 8) * 3)
+#define FLASH_DATA_SIZE (FLASH_PAGE_SIZE * 3)
+#define MOBILE_MAX_DATA_SIZE 0xFF
 
 // SPI pins
 #define SPI_PORT        spi0
@@ -46,22 +44,36 @@ uint64_t last_readable = 0;
 bool haveConfigToWrite = false;
 bool is32bitsMode = false;
 
+//UART RX Buffer Config
+#define BUFF_AT_SIZE 2048 //2048 is the maximun you can receive from esp01
+uint8_t buffATrx[BUFF_AT_SIZE+64] = {0}; // + extra bytes to hold the AT command answer echo
+int buffATrx_pointer = 0;
+uint8_t buffRecData[BUFF_AT_SIZE] = {0};
+int buffRecData_pointer = 0;
+int ipdVal[5] = {0,0,0,0,0};
+
 //Wifi and Flash Configs Default
 bool isConnectedWiFi = false;
 char WiFiSSID[28] = "WiFi_Network";
 char WiFiPASS[28] = "P@$$w0rd";
 
+struct esp_sock_config {
+    int host_id;
+    uint8_t host_type; //0=NONE, 1=TCP or 2=UDP
+    enum mobile_addrtype host_iptype; //IPV4, IPV6 or NONE
+    int local_port;
+    bool sock_status;
+};
+
 struct mobile_user {
     struct mobile_adapter *adapter;
     enum mobile_action action;
+    uint8_t config_eeprom[FLASH_DATA_SIZE];
+    struct esp_sock_config esp_sockets[MOBILE_MAX_CONNECTIONS];
     char number_user[MOBILE_MAX_NUMBER_SIZE + 1];
     char number_peer[MOBILE_MAX_NUMBER_SIZE + 1];
-    uint8_t config_eeprom[FLASH_DATA_SIZE];
-    struct picow_sock_config picow_sockets[MOBILE_MAX_CONNECTIONS];
 };
 struct mobile_user *mobile;
-
-
 
 // C Funciton to replace strcmp. Necessary to compare strings if the buffer have a 0x00 byte.
 void *memmem(const void *l, size_t l_len, const void *s, size_t s_len){

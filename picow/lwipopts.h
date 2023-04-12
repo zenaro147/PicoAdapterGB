@@ -47,7 +47,7 @@
 #define LWIP_CHKSUM_ALGORITHM       3
 #define LWIP_DHCP                   1
 #define LWIP_IPV4                   1
-#define LWIP_IPV6                   1
+#define LWIP_IPV6                   0
 #define LWIP_TCP                    1
 #define LWIP_UDP                    1
 #define LWIP_DNS                    1

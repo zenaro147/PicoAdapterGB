@@ -112,7 +112,13 @@ int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *add
         //Need to parse IPV6
         //sprintf(srv_ip, "%u:%u:%u:%u:%u:%u:%u:%u", addr6->host[0], addr6->host[1], addr6->host[2], addr6->host[3], addr6->host[4], addr6->host[5], addr6->host[6], addr6->host[7]);
         if(state->sock_type == SOCK_TCP){
+            err_t err = ERR_CLSD;
             //ip6addr_aton(srv_ip,&state->tcp_pcb->remote_ip);
+            state->tcp_pcb->remote_port = addr6->port;
+            cyw43_arch_lwip_begin();
+            err = tcp_connect(state->tcp_pcb, &state->tcp_pcb->remote_ip, state->tcp_pcb->remote_port, socket_connected_tcp);
+            cyw43_arch_lwip_end();
+            return 0;
             state->tcp_pcb->remote_port=addr6->port;
         }else if (state->sock_type == SOCK_UDP){
             //ip6addr_aton(srv_ip,&state->tcp_pcb->remote_ip);

@@ -1,6 +1,8 @@
 #include "socket_impl.h"
 #include "picow_socket.h"
 
+#include "pico/cyw43_arch.h"
+
 #include <string.h>
 
 bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
@@ -20,13 +22,13 @@ bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, 
             state->sock_type = SOCK_TCP;
             state->tcp_pcb = tcp_new_ip_type(state->sock_addr);
             if(!state->tcp_pcb) return false;
-            state->tcp_pcb->remote_port = bindport;
+            if(bindport != 0) state->tcp_pcb->local_port = bindport;
             break;
         case MOBILE_SOCKTYPE_UDP: 
             state->sock_type = SOCK_UDP;       
             state->udp_pcb = udp_new_ip_type(state->sock_addr);
-            if(!state->udp_pcb) return false;
-            state->udp_pcb->remote_port = bindport;
+            if(!state->udp_pcb) return false;            
+            if(bindport != 0) state->udp_pcb->local_port = bindport;
             break;
         default: 
             return false;
@@ -68,6 +70,60 @@ void socket_impl_close(struct socket_impl *state){
 }
 
 int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *addr){
+    char srv_ip[46];
+    memset(srv_ip,0x00,sizeof(srv_ip));
+
+    //Check if is open
+    if(state->sock_type == SOCK_TCP && state->tcp_pcb->state != CLOSED){
+        switch (state->tcp_pcb->state){
+            case ESTABLISHED:
+                return 1;
+                break;
+            case SYN_SENT:
+            case SYN_RCVD:
+                return 0;
+                break;
+            default:
+                return -1;
+                break;
+        }
+    }
+
+    if (addr->type == MOBILE_ADDRTYPE_IPV4) {
+        const struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
+        sprintf(srv_ip, "%u.%u.%u.%u", addr4->host[0], addr4->host[1], addr4->host[2], addr4->host[3]);
+        if(state->sock_type == SOCK_TCP){
+            err_t err = ERR_CLSD;
+            ip4addr_aton(srv_ip,&state->tcp_pcb->remote_ip);
+            state->tcp_pcb->remote_port = addr4->port;
+            cyw43_arch_lwip_begin();
+            err = tcp_connect(state->tcp_pcb, &state->tcp_pcb->remote_ip, state->tcp_pcb->remote_port, socket_connected_tcp);
+            cyw43_arch_lwip_end();
+            return 0;
+        }else if (state->sock_type == SOCK_UDP){
+            ip4addr_aton(srv_ip,&state->udp_pcb->remote_ip);
+            state->udp_pcb->remote_port = addr4->port;
+            return 1;
+        }else{
+            return -1;
+        }
+    } else if (addr->type == MOBILE_ADDRTYPE_IPV6) {
+        const struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
+        //Need to parse IPV6
+        //sprintf(srv_ip, "%u:%u:%u:%u:%u:%u:%u:%u", addr6->host[0], addr6->host[1], addr6->host[2], addr6->host[3], addr6->host[4], addr6->host[5], addr6->host[6], addr6->host[7]);
+        if(state->sock_type == SOCK_TCP){
+            //ip6addr_aton(srv_ip,&state->tcp_pcb->remote_ip);
+            state->tcp_pcb->remote_port=addr6->port;
+        }else if (state->sock_type == SOCK_UDP){
+            //ip6addr_aton(srv_ip,&state->tcp_pcb->remote_ip);
+            state->udp_pcb->remote_port=addr6->port;
+        }else{
+            return -1;
+        }
+    } else {
+        return -1;
+    }
+
 }
 
 bool socket_impl_listen(struct socket_impl *state){

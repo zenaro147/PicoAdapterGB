@@ -188,6 +188,8 @@ static void impl_sock_close(void *user, unsigned conn){
 }
 
 
+
+
 static int impl_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
     printf("mobile_impl_sock_connect\n"); 
@@ -199,6 +201,7 @@ static bool impl_sock_listen(void *user, unsigned conn){
     printf("mobile_impl_sock_listen\n");
     return socket_impl_listen(&mobile->socket[conn]);
 }
+
 static bool impl_sock_accept(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
     printf("mobile_impl_sock_accept\n"); 

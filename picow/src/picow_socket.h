@@ -17,7 +17,7 @@ void socket_recv_udp(void * arg, struct udp_pcb *pcb, struct pbuf *p, const ip_a
 // TCP Functions
 // void socket_listen_tcp(void *arg);
 // err_t socket_close_tcp(void *arg);
-//err_t socket_connect_tcp(char * IP , int port, struct tcp_pcb *pcb, void * data, int data_size);
+// err_t socket_connect_tcp(char * IP , int port, struct tcp_pcb *pcb, void * data, int data_size);
 err_t socket_connected_tcp(void *arg, struct tcp_pcb *pcb, err_t err);
 // err_t socket_poll_tcp(void *arg, struct tcp_pcb *tpcb);
 void socket_err_tcp(void *arg, err_t err);

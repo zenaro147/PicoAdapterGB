@@ -70,6 +70,12 @@ void socket_impl_close(struct socket_impl *state){
 }
 
 int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *addr){
+    //Check if everything is OK to connect
+    if( 
+        (addr->type == MOBILE_ADDRTYPE_IPV4 && state->sock_addr == IPADDR_TYPE_V6) || 
+        (addr->type == MOBILE_ADDRTYPE_IPV6 && state->sock_addr == IPADDR_TYPE_V4)){
+        return -1;
+    }
     char srv_ip[46];
     memset(srv_ip,0x00,sizeof(srv_ip));
 
@@ -98,9 +104,11 @@ int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *add
             state->tcp_pcb->remote_port = addr4->port;
             cyw43_arch_lwip_begin();
             err = tcp_connect(state->tcp_pcb, &state->tcp_pcb->remote_ip, state->tcp_pcb->remote_port, socket_connected_tcp);
-            cyw43_arch_lwip_end();            
-            if (err != ERR_OK) return -1;
-            return 0;
+            cyw43_arch_lwip_end();
+            if(err != ERR_OK){
+                printf("Connect TCP failed %d\n", err);
+                return -1;
+            } 
         }else if (state->sock_type == SOCK_UDP){
             ip4addr_aton(srv_ip,&state->udp_pcb->remote_ip);
             state->udp_pcb->remote_port = addr4->port;
@@ -119,9 +127,10 @@ int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *add
             cyw43_arch_lwip_begin();
             err = tcp_connect(state->tcp_pcb, &state->tcp_pcb->remote_ip, state->tcp_pcb->remote_port, socket_connected_tcp);
             cyw43_arch_lwip_end();
-            if (err != ERR_OK) return -1;
-            return 0;
-            state->tcp_pcb->remote_port=addr6->port;
+            if(err != ERR_OK){
+                printf("Connect TCP failed %d\n", err);
+                return -1;
+            } 
         }else if (state->sock_type == SOCK_UDP){
             //ip6addr_aton(srv_ip,&state->tcp_pcb->remote_ip);
             state->udp_pcb->remote_port=addr6->port;
@@ -131,17 +140,87 @@ int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *add
     } else {
         return -1;
     }
+    return 0;
+}
 
+int socket_impl_send(struct socket_impl *state, const void *data, const unsigned size, const struct mobile_addr *addr){
+    //Check if everything is OK to send
+    if( 
+        (state->sock_type == SOCK_TCP && (state->tcp_pcb->state == CLOSED || !state->tcp_pcb)) || 
+        (state->sock_type == SOCK_UDP && (!state->udp_pcb && !addr) ||
+        (addr && (addr->type == MOBILE_ADDRTYPE_IPV4 && state->sock_addr == IPADDR_TYPE_V6) || 
+        (addr->type == MOBILE_ADDRTYPE_IPV6 && state->sock_addr == IPADDR_TYPE_V4)))){
+        return -1;
+    }
+
+    err_t err = ERR_ARG;
+    if(state->sock_type == SOCK_TCP){
+        
+        cyw43_arch_lwip_begin();
+        err = tcp_write(state->tcp_pcb,data,size,TCP_WRITE_FLAG_COPY);
+        cyw43_arch_lwip_end();
+    }else if(state->sock_type == SOCK_UDP) {
+        //Set a new IP/Port if receive an addr parameter
+        if(addr){
+            char srv_ip[46];
+            memset(srv_ip,0x00,sizeof(srv_ip));
+            if (addr->type == MOBILE_ADDRTYPE_IPV4) {
+                const struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
+                sprintf(srv_ip, "%u.%u.%u.%u", addr4->host[0], addr4->host[1], addr4->host[2], addr4->host[3]);
+                ip4addr_aton(srv_ip, &state->tcp_pcb->remote_ip);
+                state->udp_pcb->remote_port=addr4->port;
+            } else if (addr->type == MOBILE_ADDRTYPE_IPV6) {
+                const struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
+                //sprintf(srv_ip, "%u:%u:%u:%u:%u:%u:%u:%u", addr6->host[0], addr6->host[1], addr6->host[2], addr6->host[3], addr6->host[4], addr6->host[5], addr6->host[6], addr6->host[7]);
+                //ip6addr_aton(srv_ip,&state->tcp_pcb->remote_ip);
+                state->udp_pcb->remote_port=addr6->port;
+            }else{
+                return -1; 
+            }
+        }
+        struct pbuf * p = pbuf_alloc(PBUF_TRANSPORT,size+1,PBUF_RAM);
+        uint8_t *pt = (uint8_t *) p->payload;
+        memcpy(pt,data,size);
+        pt[size]='\0';
+        
+        cyw43_arch_lwip_begin();
+        err = udp_send(state->udp_pcb,p);
+        cyw43_arch_lwip_end();
+        pbuf_free(p);
+    }else{
+        return -1;
+    }
+    if(err != ERR_OK){
+        printf("Send failed %d\n", err);
+        return -1;
+    } 
+    return size;
+}
+
+int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struct mobile_addr *addr){
+    // if (addr->type == MOBILE_ADDRTYPE_IPV4) {
+    //     if(state->sock_type == SOCK_TCP){
+
+    //     }else if(state->sock_type == SOCK_UDP) {
+
+    //     }else{
+    //         return -1;
+    //     }
+    // }else if (addr->type == MOBILE_ADDRTYPE_IPV6) {
+    //     if(state->sock_type == SOCK_TCP){
+
+    //     }else if(state->sock_type == SOCK_UDP) {
+
+    //     }else{
+    //         return -1;
+    //     }
+    // }else{
+    //     return -1;
+    // }
 }
 
 bool socket_impl_listen(struct socket_impl *state){
 }
 
 bool socket_impl_accept(struct socket_impl *state){
-}
-
-int socket_impl_send(struct socket_impl *state, const void *data, const unsigned size, const struct mobile_addr *addr){
-}
-
-int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struct mobile_addr *addr){
 }

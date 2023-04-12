@@ -187,14 +187,25 @@ static void impl_sock_close(void *user, unsigned conn){
     return socket_impl_close(&mobile->socket[conn]);
 }
 
-
-
-
 static int impl_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
     printf("mobile_impl_sock_connect\n"); 
     return socket_impl_connect(&mobile->socket[conn], addr);
 }
+
+static int impl_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){
+    struct mobile_user *mobile = (struct mobile_user *)user;
+    printf("mobile_impl_sock_send\n");
+    return socket_impl_send(&mobile->socket[conn], data, size, addr);
+}
+
+static int impl_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
+    struct mobile_user *mobile = (struct mobile_user *)user;
+    printf("mobile_impl_sock_recv\n");
+    return socket_impl_recv(&mobile->socket[conn], data, size, addr);
+}
+
+
 
 static bool impl_sock_listen(void *user, unsigned conn){ 
     struct mobile_user *mobile = (struct mobile_user *)user;
@@ -206,18 +217,6 @@ static bool impl_sock_accept(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
     printf("mobile_impl_sock_accept\n"); 
     return socket_impl_accept(&mobile->socket[conn]);
-}
- 
-static int impl_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){
-    struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_send\n");
-    return socket_impl_send(&mobile->socket[conn], data, size, addr);
-}
-
-static int impl_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
-    struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_recv\n");
-    return socket_impl_recv(&mobile->socket[conn], data, size, addr);
 }
 
 static void impl_update_number(void *user, enum mobile_number type, const char *number){

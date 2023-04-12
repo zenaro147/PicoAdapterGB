@@ -31,6 +31,3 @@ err_t socket_send_tcp(char * IP , int port, struct tcp_pcb *pcb, void * data, in
 
 err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err){
 }
-
-
-

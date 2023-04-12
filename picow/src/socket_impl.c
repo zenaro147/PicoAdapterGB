@@ -98,7 +98,8 @@ int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *add
             state->tcp_pcb->remote_port = addr4->port;
             cyw43_arch_lwip_begin();
             err = tcp_connect(state->tcp_pcb, &state->tcp_pcb->remote_ip, state->tcp_pcb->remote_port, socket_connected_tcp);
-            cyw43_arch_lwip_end();
+            cyw43_arch_lwip_end();            
+            if (err != ERR_OK) return -1;
             return 0;
         }else if (state->sock_type == SOCK_UDP){
             ip4addr_aton(srv_ip,&state->udp_pcb->remote_ip);
@@ -118,6 +119,7 @@ int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *add
             cyw43_arch_lwip_begin();
             err = tcp_connect(state->tcp_pcb, &state->tcp_pcb->remote_ip, state->tcp_pcb->remote_port, socket_connected_tcp);
             cyw43_arch_lwip_end();
+            if (err != ERR_OK) return -1;
             return 0;
             state->tcp_pcb->remote_port=addr6->port;
         }else if (state->sock_type == SOCK_UDP){

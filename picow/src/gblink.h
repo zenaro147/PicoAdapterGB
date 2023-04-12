@@ -11,4 +11,4 @@
 #define PIN_SPI_SCK         18
 #define PIN_SPI_SOUT        19 
 
-static inline void trigger_spi(spi_inst_t *spi, uint baudrate);
+void trigger_spi(spi_inst_t *spi, uint baudrate);

@@ -1,6 +1,6 @@
 #include "gblink.h"
 
-static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
+void trigger_spi(spi_inst_t *spi, uint baudrate) {
     //spi_init
     reset_block(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);
     unreset_block_wait(spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS);

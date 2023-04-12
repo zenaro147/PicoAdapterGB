@@ -5,6 +5,7 @@
 // Common settings used in most of the pico_w examples
 // (see https://www.nongnu.org/lwip/2_1_x/group__lwip__opts.html for details)
 
+
 #define SO_REUSE                    1
 
 // allow override in some examples
@@ -46,6 +47,7 @@
 #define LWIP_CHKSUM_ALGORITHM       3
 #define LWIP_DHCP                   1
 #define LWIP_IPV4                   1
+#define LWIP_IPV6                   1
 #define LWIP_TCP                    1
 #define LWIP_UDP                    1
 #define LWIP_DNS                    1
@@ -84,6 +86,8 @@
 #define TCP_QLEN_DEBUG              LWIP_DBG_OFF
 #define TCP_RST_DEBUG               LWIP_DBG_OFF
 #define UDP_DEBUG                   LWIP_DBG_OFF
+#define UDP_INPUT_DEBUG             LWIP_DBG_OFF
+#define UDP_OUTPUT_DEBUG            LWIP_DBG_OFF
 #define TCPIP_DEBUG                 LWIP_DBG_OFF
 #define PPP_DEBUG                   LWIP_DBG_OFF
 #define SLIP_DEBUG                  LWIP_DBG_OFF

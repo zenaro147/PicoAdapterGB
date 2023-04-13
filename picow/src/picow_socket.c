@@ -10,19 +10,24 @@
 //UDP Callbacks
 void socket_recv_udp(void * arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t*addr, u16_t port){
     struct socket_impl *state = (struct socket_impl*)arg;
-
+    printf("UDP Receiving...\n");
     if (p->tot_len > 0) {
+        printf("received UDP from IP: %d.%d.%d.%d port: %d  length: %d\n",
+		addr->addr&0xff,
+		(addr->addr>>8)&0xff,
+		(addr->addr>>16)&0xff,
+		addr->addr>>24,
+        port,
+        p->len);
         // Receive the buffer
         //memcpy(&state->buffer, p->payload, p->tot_len > MOBILE_MAX_TRANSFER_SIZE ? MOBILE_MAX_TRANSFER_SIZE : p->tot_len);
         state->buffer_len = pbuf_copy_partial(p, &state->buffer, p->tot_len > MOBILE_MAX_TRANSFER_SIZE ? MOBILE_MAX_TRANSFER_SIZE : p->tot_len, 0);
+
+        memset(state->udp_remote_srv,0x00,46);
+        sprintf(state->udp_remote_srv, "%d.%d.%d.%d", addr->addr&0xff, (addr->addr>>8)&0xff, (addr->addr>>16)&0xff, addr->addr>>24);
+        state->udp_remote_port = port;
     }
     pbuf_free(p);
-
-    char srv_ip[46];
-    memset(srv_ip,0x00,sizeof(srv_ip));
-    sprintf(srv_ip, "%u.%u.%u.%u", addr->addr&0xff, (addr->addr>>8)&0xff, (addr->addr>>16)&0xff, addr->addr>>24);
-    ip4addr_aton(srv_ip, &pcb->remote_ip);
-    pcb->remote_port = port;
 }
 
 //TCP Callbacks
@@ -49,9 +54,10 @@ err_t socket_sent_tcp(void *arg, struct tcp_pcb *pcb, u16_t len){
 
 err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err){
     struct socket_impl *state = (struct socket_impl*)arg;
-    
+    printf("TCP Receiving...\n");
     cyw43_arch_lwip_check();
     if (p->tot_len > 0) {
+        printf("received %d bytes\n", p->tot_len);
         // Receive the buffer
         //memcpy(&state->buffer, p->payload, p->tot_len > MOBILE_MAX_TRANSFER_SIZE ? MOBILE_MAX_TRANSFER_SIZE : p->tot_len);
         state->buffer_len = pbuf_copy_partial(p, &state->buffer, p->tot_len > MOBILE_MAX_TRANSFER_SIZE ? MOBILE_MAX_TRANSFER_SIZE : p->tot_len, 0);

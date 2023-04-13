@@ -173,31 +173,31 @@ static bool impl_time_check_ms(void *user, unsigned timer, unsigned ms) {
 //Callbacks
 static bool impl_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    //printf("mobile_impl_sock_open\n");
+    printf("mobile_impl_sock_open\n");
     return socket_impl_open(&mobile->socket[conn], socktype, addrtype, bindport);
 }
 
 static void impl_sock_close(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    //printf("mobile_impl_sock_close\n");
+    printf("mobile_impl_sock_close\n");
     return socket_impl_close(&mobile->socket[conn]);
 }
 
 static int impl_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    //printf("mobile_impl_sock_connect\n"); 
+    printf("mobile_impl_sock_connect\n"); 
     return socket_impl_connect(&mobile->socket[conn], addr);
 }
 
 static int impl_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    //printf("mobile_impl_sock_send\n");
+    printf("mobile_impl_sock_send\n");
     return socket_impl_send(&mobile->socket[conn], data, size, addr);
 }
 
 static int impl_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    //printf("mobile_impl_sock_recv\n");
+    printf("mobile_impl_sock_recv\n");
     return socket_impl_recv(&mobile->socket[conn], data, size, addr);
 }
 
@@ -239,7 +239,8 @@ bool PicoW_Connect_WiFi(char *ssid, char *psk, uint32_t timeout){
     cyw43_arch_enable_sta_mode();
 
     printf("Connecting to Wi-Fi...\n");
-    if (cyw43_arch_wifi_connect_timeout_ms(ssid, psk, CYW43_AUTH_WPA2_AES_PSK, timeout)) {
+    //if (cyw43_arch_wifi_connect_timeout_ms(ssid, psk, CYW43_AUTH_WPA2_AES_PSK, timeout)) {
+    if (cyw43_arch_wifi_connect_timeout_ms("ZenWifi", "123indiozinhos", CYW43_AUTH_WPA2_AES_PSK, timeout)) {
         printf("failed to connect.\n");
         return false;
     } else {
@@ -333,19 +334,20 @@ void main(){
     mobile_config_load(mobile->adapter);
 
     #ifdef CONFIG_MODE
-        char newSSID[28] = "Zenaro";
-        char newPASS[28] = "Zenaro1234!@#$#$#";
+        char newSSID[28] = "WiFi_SSID";
+		char newPASS[28] = "P@$$w0rd";
 
-        char MAGB_DNS1[60] = "51.79.70.215";
-        char MAGB_DNS2[60] = "192.168.0.126";
-        unsigned MAGB_DNSPORT = 53;
+		char MAGB_DNS1[60] = "0.0.0.0";
+		char MAGB_DNS2[60] = "0.0.0.0";
+		unsigned MAGB_DNSPORT = 53;
 
-        char RELAY_SERVER[60] = "136.144.185.148";
-        unsigned P2P_PORT = 1027;
-        char RELAY_TOKEN[32] = "00000000000000000000000000000000";
-        bool updateRelayToken = false;
+		char RELAY_SERVER[60] = "0.0.0.0";
+		unsigned P2P_PORT = 1027;
 
-        bool DEVICE_UNMETERED = false;
+		char RELAY_TOKEN[32] = "00000000000000000000000000000000";
+		bool updateRelayToken = false;
+
+		bool DEVICE_UNMETERED = false;
 
         //Set the new values
         memcpy(WiFiSSID,newSSID,sizeof(newSSID));

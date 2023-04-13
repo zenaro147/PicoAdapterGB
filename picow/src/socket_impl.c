@@ -23,12 +23,23 @@ bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, 
             state->tcp_pcb = tcp_new_ip_type(state->sock_addr);
             if(!state->tcp_pcb) return false;
             if(bindport != 0) state->tcp_pcb->local_port = bindport;
+            
+            tcp_arg(state->tcp_pcb, state);
+            //tcp_poll(state->tcp_pcb, NULL, 0);
+            tcp_accept(state->tcp_pcb, socket_accept_tcp);
+            tcp_sent(state->tcp_pcb, socket_sent_tcp);
+            tcp_recv(state->tcp_pcb, socket_recv_tcp);
+            tcp_err(state->tcp_pcb, socket_err_tcp);
+
             break;
         case MOBILE_SOCKTYPE_UDP: 
             state->sock_type = SOCK_UDP;       
             state->udp_pcb = udp_new_ip_type(state->sock_addr);
             if(!state->udp_pcb) return false;            
             if(bindport != 0) state->udp_pcb->local_port = bindport;
+
+            udp_recv(state->udp_pcb, socket_recv_udp, state);
+
             break;
         default: 
             return false;
@@ -47,13 +58,13 @@ void socket_impl_close(struct socket_impl *state){
                 printf("close failed %d, calling abort\n", err);
                 tcp_abort(state->tcp_pcb);
             }
-            state->tcp_pcb = NULL;
-            //tcp_arg(state->tcp_pcb, NULL);
+            tcp_arg(state->tcp_pcb, NULL);
             //tcp_poll(state->tcp_pcb, NULL, 0);
             tcp_accept(state->tcp_pcb, NULL);
             tcp_sent(state->tcp_pcb, NULL);
             tcp_recv(state->tcp_pcb, NULL);
             tcp_err(state->tcp_pcb, NULL);
+            state->tcp_pcb = NULL;
             break;
         case SOCK_UDP:             
             udp_disconnect(state->udp_pcb);
@@ -198,25 +209,77 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
 }
 
 int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struct mobile_addr *addr){
-    // if (addr->type == MOBILE_ADDRTYPE_IPV4) {
-    //     if(state->sock_type == SOCK_TCP){
+    //If the socket is a TCP, check if it's disconnected to return an error
+    if(state->sock_type == SOCK_TCP){
+        if(!data){
+            // CLOSED      = 0,
+            // LISTEN      = 1,
+            // SYN_SENT    = 2,
+            // SYN_RCVD    = 3,
+            // ESTABLISHED = 4,
+            // FIN_WAIT_1  = 5,
+            // FIN_WAIT_2  = 6,
+            // CLOSE_WAIT  = 7,
+            // CLOSING     = 8,
+            // LAST_ACK    = 9,
+            // TIME_WAIT   = 10
+            switch (state->tcp_pcb->state){
+                case ESTABLISHED:
+                case LISTEN:
+                case SYN_SENT:
+                case SYN_RCVD:
+                    return 0;
+                    break;
+                case CLOSED:
+                case CLOSING:
+                case CLOSE_WAIT:
+                    return -2;
+                    break;
+                default:
+                    return -1;
+                    break;
+            }
+        }
+        if(state->tcp_pcb->state == CLOSED || !state->tcp_pcb){
+            return -2;
+        }     
+    }
 
-    //     }else if(state->sock_type == SOCK_UDP) {
+    if (addr && state->sock_type == SOCK_UDP){
+        struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
+        struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
+        unsigned char ip[MOBILE_INET_PTON_MAXLEN];
+        int rc = mobile_inet_pton(MOBILE_INET_PTON_ANY, ipaddr_ntoa(&state->udp_pcb->remote_ip), ip);
 
-    //     }else{
-    //         return -1;
-    //     }
-    // }else if (addr->type == MOBILE_ADDRTYPE_IPV6) {
-    //     if(state->sock_type == SOCK_TCP){
+        switch (rc) {
+            case MOBILE_INET_PTON_IPV4:
+                addr4->type = MOBILE_ADDRTYPE_IPV4;
+                addr4->port = state->udp_pcb->remote_port;
+                memcpy(addr4->host, ipaddr_ntoa(&state->udp_pcb->remote_ip), sizeof(addr4->host));
+                break;
+            case MOBILE_INET_PTON_IPV6:
+                addr6->type = MOBILE_ADDRTYPE_IPV6;
+                addr6->port = state->udp_pcb->remote_port;
+                memcpy(addr6->host, ipaddr_ntoa(&state->udp_pcb->remote_ip), sizeof(addr6->host));
+                break;
+            default:
+                break;
+        }
+    }
 
-    //     }else if(state->sock_type == SOCK_UDP) {
+    int recvd_buff = 0;
+    if(state->buffer_len > 0){
+        recvd_buff = state->buffer_len;
+        state->buffer_len = 0;
 
-    //     }else{
-    //         return -1;
-    //     }
-    // }else{
-    //     return -1;
-    // }
+         memcpy(data,state->buffer,recvd_buff);
+         if(state->sock_type == SOCK_TCP) tcp_recved(state->tcp_pcb,recvd_buff);
+    }else if(state->buffer_len <= 0){
+        return 0;
+    }
+    
+    return recvd_buff;
+
 }
 
 bool socket_impl_listen(struct socket_impl *state){

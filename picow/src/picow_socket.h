@@ -22,6 +22,6 @@ err_t socket_connected_tcp(void *arg, struct tcp_pcb *pcb, err_t err);
 // err_t socket_poll_tcp(void *arg, struct tcp_pcb *tpcb);
 void socket_err_tcp(void *arg, err_t err);
 err_t socket_accept_tcp(void *arg, struct tcp_pcb *pcb, err_t err);
-// err_t socket_sent_tcp(void *arg, struct tcp_pcb *tpcb, u16_t len);
-err_t socket_send_tcp(char * IP , int port, struct tcp_pcb *pcb, void * data, int data_size);
+err_t socket_sent_tcp(void *arg, struct tcp_pcb *tpcb, u16_t len);
+// err_t socket_send_tcp(char * IP , int port, struct tcp_pcb *pcb, void * data, int data_size);
 err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err);

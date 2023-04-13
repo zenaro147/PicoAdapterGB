@@ -44,12 +44,8 @@ volatile bool spiLock = false;
 #define LED_OFF       		  	LED_SET(false)
 #define LED_TOGGLE    		  	(cyw43_arch_gpio_put(LED_PIN, !cyw43_arch_gpio_get(LED_PIN)))
 
-//Time Config
-#define MKS(A)                  (A)
-#define MS(A)                   ((A) * 1000)
-#define SEC(A)                  ((A) * 1000 * 1000)
-volatile uint64_t time_us_now = 0;
-uint64_t last_readable = 0;
+volatile uint64_t time_us_now_check = 0;
+uint64_t last_readable_check = 0;
 
 ////////////////////////
 // AUXILIAR FUNCTIONS //
@@ -162,7 +158,7 @@ static bool impl_config_write(void *user, const void *src, const uintptr_t offse
         mobile->config_eeprom[OFFSET_MAGB + offset + i] = ((uint8_t *)src)[i];
     }
     haveConfigToWrite = true;
-    last_readable = time_us_64();
+    last_readable_check = time_us_64();
     return true;
 }
 
@@ -177,35 +173,33 @@ static bool impl_time_check_ms(void *user, unsigned timer, unsigned ms) {
 //Callbacks
 static bool impl_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_open\n");
+    //printf("mobile_impl_sock_open\n");
     return socket_impl_open(&mobile->socket[conn], socktype, addrtype, bindport);
 }
 
 static void impl_sock_close(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_close\n");
+    //printf("mobile_impl_sock_close\n");
     return socket_impl_close(&mobile->socket[conn]);
 }
 
 static int impl_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_connect\n"); 
+    //printf("mobile_impl_sock_connect\n"); 
     return socket_impl_connect(&mobile->socket[conn], addr);
 }
 
 static int impl_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_send\n");
+    //printf("mobile_impl_sock_send\n");
     return socket_impl_send(&mobile->socket[conn], data, size, addr);
 }
 
 static int impl_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_recv\n");
+    //printf("mobile_impl_sock_recv\n");
     return socket_impl_recv(&mobile->socket[conn], data, size, addr);
 }
-
-
 
 static bool impl_sock_listen(void *user, unsigned conn){ 
     struct mobile_user *mobile = (struct mobile_user *)user;
@@ -236,66 +230,6 @@ static void impl_update_number(void *user, enum mobile_number type, const char *
         dest[0] = '\0';
     }
 }
-
-
-//////////////////////////
-// EDIT CONFIG ON FLASH //
-//////////////////////////
-#ifdef CONFIG_MODE
-void SetNewConfig(){
-    char newSSID[28] = "WiFi_SSID";
-    char newPASS[28] = "P@$$w0rd";
-
-    char MAGB_DNS1[60] = "0.0.0.0";
-    char MAGB_DNS2[60] = "0.0.0.0";
-    unsigned MAGB_DNSPORT = 53;
-
-    char RELAY_SERVER[60] = "0.0.0.0";
-    unsigned P2P_PORT = 1027;
-
-    char RELAY_TOKEN[32] = "00000000000000000000000000000000";
-    bool updateRelayToken = false;
-
-    bool DEVICE_UNMETERED = false;
-
-    //Set the new values
-    memcpy(WiFiSSID,newSSID,sizeof(newSSID));
-    memcpy(WiFiPASS,newPASS,sizeof(newPASS));
-
-    main_parse_addr(&dns1, MAGB_DNS1);
-    main_parse_addr(&dns2, MAGB_DNS2);
-    main_set_port(&dns1, MAGB_DNSPORT);
-    main_set_port(&dns2, MAGB_DNSPORT);
-
-    main_parse_addr(&relay, RELAY_SERVER);
-    main_set_port(&relay, MOBILE_DEFAULT_RELAY_PORT);
-
-    //Set the values to the Adapter config
-    mobile_config_set_device(mobile->adapter, device, DEVICE_UNMETERED);
-    mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
-    mobile_config_set_relay(mobile->adapter, &relay);
-    mobile_config_set_p2p_port(mobile->adapter, P2P_PORT);
-
-    if (updateRelayToken) {
-        bool TokenOk = main_parse_hex(relay_token_buf, RELAY_TOKEN, sizeof(relay_token_buf));
-        if(!TokenOk){
-            printf("Invalid Relay Token\n");
-        }else{
-            mobile_config_set_relay_token(mobile->adapter, relay_token_buf);
-        }
-    }
-
-    mobile_config_save(mobile->adapter);
-    RefreshConfigBuff(mobile->config_eeprom);
-
-    printf("New configuration defined! Please comment the \'#define CONFIG_MODE\' again to back the adapter to the normal operation.\n");
-    while (1){
-        LED_ON;
-        Delay_Timer(MS(300));
-        LED_OFF;
-    }
-}
-#endif
 
 ///////////////////////////////
 // PICO W AUXILIAR FUNCTIONS //
@@ -331,8 +265,12 @@ void core1_context() {
 
 void main(){
     speed_240_MHz = set_sys_clock_khz(240000, false);
-    stdio_init_all();    
+
+    stdio_init_all();
+    printf("Booting...\n");
     cyw43_arch_init();
+
+    Delay_Timer(SEC(5));
 
     #ifdef DEBUG_SIGNAL_PINS
         gpio_init(9);
@@ -369,6 +307,8 @@ void main(){
         FormatFlashConfig();
     #endif
 
+    Delay_Timer(SEC(2));
+    
     memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
     ReadFlashConfig(mobile->config_eeprom, WiFiSSID, WiFiPASS); 
 
@@ -393,7 +333,58 @@ void main(){
     mobile_config_load(mobile->adapter);
 
     #ifdef CONFIG_MODE
-        SetNewConfig();
+        char newSSID[28] = "Zenaro";
+        char newPASS[28] = "Zenaro1234!@#$#$#";
+
+        char MAGB_DNS1[60] = "51.79.70.215";
+        char MAGB_DNS2[60] = "192.168.0.126";
+        unsigned MAGB_DNSPORT = 53;
+
+        char RELAY_SERVER[60] = "136.144.185.148";
+        unsigned P2P_PORT = 1027;
+        char RELAY_TOKEN[32] = "00000000000000000000000000000000";
+        bool updateRelayToken = false;
+
+        bool DEVICE_UNMETERED = false;
+
+        //Set the new values
+        memcpy(WiFiSSID,newSSID,sizeof(newSSID));
+        memcpy(WiFiPASS,newPASS,sizeof(newPASS));
+
+        main_parse_addr(&dns1, MAGB_DNS1);
+        main_parse_addr(&dns2, MAGB_DNS2);
+        main_set_port(&dns1, MAGB_DNSPORT);
+        main_set_port(&dns2, MAGB_DNSPORT);
+
+        main_parse_addr(&relay, RELAY_SERVER);
+        main_set_port(&relay, MOBILE_DEFAULT_RELAY_PORT);
+
+        //Set the values to the Adapter config
+        mobile_config_set_device(mobile->adapter, device, DEVICE_UNMETERED);
+        mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
+        mobile_config_set_relay(mobile->adapter, &relay);
+        mobile_config_set_p2p_port(mobile->adapter, P2P_PORT);
+
+        if (updateRelayToken) {
+            bool TokenOk = main_parse_hex(relay_token_buf, RELAY_TOKEN, sizeof(relay_token_buf));
+            if(!TokenOk){
+                printf("Invalid Relay Token\n");
+            }else{
+                mobile_config_set_relay_token(mobile->adapter, relay_token_buf);
+            }
+        }
+
+        mobile_config_save(mobile->adapter);
+        Delay_Timer(SEC(2));
+        RefreshConfigBuff(mobile->config_eeprom,WiFiSSID,WiFiPASS);
+        Delay_Timer(SEC(2));
+
+        printf("New configuration defined! Please comment the \'#define CONFIG_MODE\' again to back the adapter to the normal operation.\n");
+        while (1){
+            LED_ON;
+            sleep_ms(300);
+            LED_OFF;
+        }
     #endif
 
     isConnectedWiFi = PicoW_Connect_WiFi(WiFiSSID, WiFiPASS, MS(10));
@@ -407,7 +398,7 @@ void main(){
             mobile->socket[i].udp_pcb = NULL;
             mobile->socket[i].sock_addr = -1;
             mobile->socket[i].sock_type = -1;
-            mobile->socket[i].buffer_len = -1;
+            mobile->socket[i].buffer_len = 0;
             memset(mobile->socket[i].buffer,0x00,sizeof(mobile->socket[i].buffer));
         } 
 
@@ -417,25 +408,36 @@ void main(){
 
         LED_OFF;
         while (true) {
+            // if you are using pico_cyw43_arch_poll, then you must poll periodically from your
+            // main loop (not from a timer) to check for Wi-Fi driver or lwIP work that needs to be done.
             cyw43_arch_poll();
+            // you can poll as often as you like, however if you have nothing else to do you can
+            // choose to sleep until either a specified time, or cyw43_arch_poll() has work to do:
+            cyw43_arch_wait_for_work_until(make_timeout_time_ms(1000));
+
+            // Mobile Adapter Main Loop
             mobile_loop(mobile->adapter);
 
+            // Check if there is any new config to write on Flash
             if(haveConfigToWrite){
-                time_us_now = time_us_64();
-                if (time_us_now - last_readable > SEC(5)){
-                    if(!spi_is_readable(SPI_PORT)){
+                time_us_now_check = time_us_64();
+                if (time_us_now_check - last_readable_check > SEC(5)){
+                    if(!spi_is_readable(SPI_PORT) || !spiLock){
                         multicore_reset_core1();
-                        FormatFlashConfig();
+                        Delay_Timer(SEC(2));
                         SaveFlashConfig(mobile->config_eeprom);
+                        Delay_Timer(SEC(2));
                         haveConfigToWrite = false;
-                        time_us_now = 0;
-                        last_readable = 0;                    
+                        time_us_now_check = 0;
+                        last_readable_check = 0;                    
                         multicore_launch_core1(core1_context);
                     }else{
-                        last_readable = time_us_now;
+                        last_readable_check = time_us_now_check;
                     }
                 }
             }
+
+            
         }
     }else{
         printf("Error during WiFi connection! =(\n");

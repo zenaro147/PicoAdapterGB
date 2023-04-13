@@ -4,6 +4,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "pico/time.h"
+
+volatile uint64_t time_us_now = 0;
+uint64_t last_readable = 0;
+
 bool needWrite = false;
 
 const uint8_t *flash_target_contents = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET);
@@ -35,6 +40,16 @@ void *memmem(const void *l, size_t l_len, const void *s, size_t s_len){
 	return NULL;
 }
 
+void Delay_Timer(int timeout){
+    volatile uint64_t timenow = 0;
+    volatile uint64_t last_read = 0;
+    timenow = time_us_64();
+    last_read = timenow;
+    while ((timenow - last_read) < timeout){
+        timenow = time_us_64();
+    }
+}
+
 //512 bytes for the Mobile Adapter GB + Adapter Configs and 256 bytes to WiFi Config and other stuffs
 void FormatFlashConfig(){
     printf("Erasing target region... ");
@@ -59,14 +74,15 @@ bool ReadConfigOption(uint8_t * buff, int offset, char *key, int datasize, char 
 //Read flash memory and set the configs
 bool ReadFlashConfig(uint8_t * buff, char * WiFiSSID, char * WiFiPASS){
     printf("Reading the target region... ");
+    memset(buff,0x00,FLASH_DATA_SIZE);
     memcpy(buff,flash_target_contents,FLASH_DATA_SIZE);
+    
     //Check if the Flash is already formated 
     if(memmem(buff+OFFSET_CONFIG,strlen(KEY_CONFIG),KEY_CONFIG,strlen(KEY_CONFIG)) == NULL){
         char tmp_config[16];
         memset(tmp_config,0x00,sizeof(tmp_config));
         sprintf(tmp_config,"%s",KEY_CONFIG);
         memcpy(buff+OFFSET_CONFIG,tmp_config,sizeof(tmp_config));
-        needWrite = true;
     }
     //Read the WiFi Config (32 bytes each with KEY)
     if(memmem(buff+OFFSET_SSID,strlen(KEY_SSID),KEY_SSID,strlen(KEY_SSID)) != NULL && memmem(buff+OFFSET_PASS,strlen(KEY_PASS),KEY_PASS,strlen(KEY_PASS)) != NULL){
@@ -88,13 +104,6 @@ bool ReadFlashConfig(uint8_t * buff, char * WiFiSSID, char * WiFiPASS){
         memset(tmp_pass,0x00,sizeof(tmp_pass));
         sprintf(tmp_pass,"%s%s",KEY_PASS,WiFiPASS);
         memcpy(buff+OFFSET_PASS,tmp_pass,sizeof(tmp_pass));
-        needWrite = true;
-    }
-
-    if(needWrite){
-        FormatFlashConfig();
-        flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);
-        needWrite = false;
     }
 
     printf("Done.\n");
@@ -102,6 +111,8 @@ bool ReadFlashConfig(uint8_t * buff, char * WiFiSSID, char * WiFiPASS){
 }
 
 void SaveFlashConfig(uint8_t * buff){
+    FormatFlashConfig();
+    Delay_Timer(SEC(2));
     printf("Programming target region... ");
     flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);
     printf("Done.\n");
@@ -116,7 +127,8 @@ void RefreshConfigBuff(uint8_t * buff, char * WiFiSSID, char * WiFiPASS){
     memset(tmp_pass,0x00,sizeof(tmp_pass));
     sprintf(tmp_pass,"%s%s",KEY_PASS,WiFiPASS);
     memcpy(buff+OFFSET_PASS,tmp_pass,sizeof(tmp_pass));
-    
+
     FormatFlashConfig();
+    Delay_Timer(SEC(2));
     flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);
 }

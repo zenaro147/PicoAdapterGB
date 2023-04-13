@@ -1,11 +1,12 @@
 #pragma once
 
 #include <mobile.h>
+#include <mobile_inet.h>
 
 struct socket_impl {
     uint8_t sock_addr;
     uint8_t sock_type;
-    unsigned char buffer[MOBILE_MAX_TRANSFER_SIZE];
+    uint8_t buffer[MOBILE_MAX_TRANSFER_SIZE];
     int buffer_len;
 	union{
 		struct tcp_pcb *tcp_pcb;

@@ -6,6 +6,8 @@
 struct socket_impl {
     uint8_t sock_addr;
     uint8_t sock_type;
+    char udp_remote_srv[46];
+    uint8_t udp_remote_port;
     uint8_t buffer[MOBILE_MAX_TRANSFER_SIZE];
     int buffer_len;
 	union{

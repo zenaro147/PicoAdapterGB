@@ -254,8 +254,6 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
         }     
     }
 
-    
-
     int recvd_buff = 0;
     printf("%d\n",state->buffer_len);
 
@@ -271,12 +269,12 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
                 case MOBILE_INET_PTON_IPV4:
                     addr4->type = MOBILE_ADDRTYPE_IPV4;
                     addr4->port = state->udp_remote_port;
-                    memcpy(addr4->host, state->udp_remote_srv, sizeof(addr4->host));
+                    memcpy(addr4->host, ip, sizeof(addr4->host));
                     break;
                 case MOBILE_INET_PTON_IPV6:
                     addr6->type = MOBILE_ADDRTYPE_IPV6;
                     addr6->port = state->udp_remote_port;
-                    memcpy(addr6->host, state->udp_remote_srv, sizeof(addr6->host));
+                    memcpy(addr6->host, ip, sizeof(addr6->host));
                     break;
                 default:
                     break;

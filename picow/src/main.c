@@ -22,8 +22,8 @@ bool speed_240_MHz = false;
 
 //#define DEBUG_SIGNAL_PINS
 
-//#define ERASE_EEPROM //Encomment this to ERASE ALL stored config (including Adapter config)
-//#define CONFIG_MODE //Uncomment this if you want to reconfigure something
+// #define ERASE_EEPROM //Encomment this to ERASE ALL stored config (including Adapter config)
+// #define CONFIG_MODE //Uncomment this if you want to reconfigure something
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -239,8 +239,8 @@ bool PicoW_Connect_WiFi(char *ssid, char *psk, uint32_t timeout){
     cyw43_arch_enable_sta_mode();
 
     printf("Connecting to Wi-Fi...\n");
-    //if (cyw43_arch_wifi_connect_timeout_ms(ssid, psk, CYW43_AUTH_WPA2_AES_PSK, timeout)) {
-    if (cyw43_arch_wifi_connect_timeout_ms("ZenWifi", "123indiozinhos", CYW43_AUTH_WPA2_AES_PSK, timeout)) {
+    if (cyw43_arch_wifi_connect_timeout_ms(ssid, psk, CYW43_AUTH_WPA2_AES_PSK, timeout)) {
+    //if (cyw43_arch_wifi_connect_timeout_ms("ZenWifi", "123indiozinhos", CYW43_AUTH_WPA2_AES_PSK, timeout)) {
         printf("failed to connect.\n");
         return false;
     } else {
@@ -334,7 +334,7 @@ void main(){
     mobile_config_load(mobile->adapter);
 
     #ifdef CONFIG_MODE
-        char newSSID[28] = "WiFi_SSID";
+		char newSSID[28] = "WiFi_SSID";
 		char newPASS[28] = "P@$$w0rd";
 
 		char MAGB_DNS1[60] = "0.0.0.0";

@@ -76,7 +76,7 @@ void socket_impl_close(struct socket_impl *state){
     }    
     state->sock_addr = -1;
     state->sock_type = -1;
-    state->buffer_len = -1;
+    state->buffer_len = 0;
     memset(state->buffer,0x00,sizeof(state->buffer));
 }
 
@@ -217,9 +217,7 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
 int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struct mobile_addr *addr){
     //If the socket is a TCP, check if it's disconnected to return an error
     if(state->sock_type == SOCK_TCP){
-        printf("teste1\n");
         if(!data){
-            printf("teste11\n");
             // CLOSED      = 0,
             // LISTEN      = 1,
             // SYN_SENT    = 2,
@@ -249,17 +247,14 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
             }
         }
         if(state->tcp_pcb->state == CLOSED || !state->tcp_pcb){
-            printf("teste12\n");
             return -2;
         }     
     }
 
     int recvd_buff = 0;
-    printf("%d\n",state->buffer_len);
 
     if(state->buffer_len > 0){
         if (addr && state->sock_type == SOCK_UDP){
-            printf("teste4\n");
             struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
             struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
             unsigned char ip[MOBILE_INET_PTON_MAXLEN];
@@ -281,19 +276,13 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
             }
         }
 
-        printf("teste2\n");
         recvd_buff = state->buffer_len;
         state->buffer_len = 0;
         memcpy(data,state->buffer,recvd_buff);
         if(state->sock_type == SOCK_TCP) tcp_recved(state->tcp_pcb,recvd_buff);
     }else if(state->buffer_len <= 0){
-        printf("teste3\n");
-        if(!data){
-          printf("teste33\n");  
-        }
         return 0;
     }
-    printf("teste4 - %d\n",recvd_buff);
     return recvd_buff;
 
 }

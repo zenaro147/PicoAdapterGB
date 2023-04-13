@@ -173,43 +173,45 @@ static bool impl_time_check_ms(void *user, unsigned timer, unsigned ms) {
 //Callbacks
 static bool impl_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_open\n");
+    // printf("mobile_impl_sock_open\n");
     return socket_impl_open(&mobile->socket[conn], socktype, addrtype, bindport);
 }
 
 static void impl_sock_close(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_close\n");
+    // printf("mobile_impl_sock_close\n");
     return socket_impl_close(&mobile->socket[conn]);
 }
 
 static int impl_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_connect\n"); 
+    // printf("mobile_impl_sock_connect\n"); 
     return socket_impl_connect(&mobile->socket[conn], addr);
 }
 
 static int impl_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_send\n");
+    // printf("mobile_impl_sock_send\n");
     return socket_impl_send(&mobile->socket[conn], data, size, addr);
 }
 
 static int impl_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_recv\n");
+    // printf("mobile_impl_sock_recv\n");
     return socket_impl_recv(&mobile->socket[conn], data, size, addr);
 }
 
+
+
 static bool impl_sock_listen(void *user, unsigned conn){ 
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_listen\n");
+    // printf("mobile_impl_sock_listen\n");
     return socket_impl_listen(&mobile->socket[conn]);
 }
 
 static bool impl_sock_accept(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_accept\n"); 
+    // printf("mobile_impl_sock_accept\n"); 
     return socket_impl_accept(&mobile->socket[conn]);
 }
 

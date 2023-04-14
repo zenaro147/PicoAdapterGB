@@ -3,13 +3,18 @@
 #include <mobile.h>
 #include <mobile_inet.h>
 
+#include "picow_socket.h"
+
 struct socket_impl {
     uint8_t sock_addr;
     uint8_t sock_type;
     char udp_remote_srv[46];
     uint8_t udp_remote_port;
-    uint8_t buffer[MOBILE_MAX_TRANSFER_SIZE];
-    int buffer_len;
+    bool client_status;
+    uint8_t buffer_tx[MOBILE_MAX_TRANSFER_SIZE];
+    uint8_t buffer_rx[BUFF_SIZE]; //Same as ESP-01
+    int buffer_rx_len;
+    int buffer_tx_len;
 	union{
 		struct tcp_pcb *tcp_pcb;
         struct udp_pcb *udp_pcb;

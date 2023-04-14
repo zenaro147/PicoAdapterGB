@@ -73,11 +73,18 @@ void socket_impl_close(struct socket_impl *state){
             break;
         default: 
             break;
-    }    
+    }        
+    state->tcp_pcb = NULL;
+    state->udp_pcb = NULL;
     state->sock_addr = -1;
     state->sock_type = -1;
-    state->buffer_len = 0;
-    memset(state->buffer,0x00,sizeof(state->buffer));
+    memset(state->udp_remote_srv,0x00,sizeof(state->udp_remote_srv));
+    state->udp_remote_port = 0;
+    state->client_status = false;
+    memset(state->buffer_rx,0x00,sizeof(state->buffer_rx));
+    memset(state->buffer_tx,0x00,sizeof(state->buffer_tx));
+    state->buffer_rx_len = 0;
+    state->buffer_tx_len = 0;
 }
 
 int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *addr){
@@ -166,7 +173,6 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
 
     err_t err = ERR_ARG;
     if(state->sock_type == SOCK_TCP){
-        
         cyw43_arch_lwip_begin();
         err = tcp_write(state->tcp_pcb,data,size,TCP_WRITE_FLAG_COPY);
         cyw43_arch_lwip_end();
@@ -210,13 +216,14 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
         printf("Send failed %d\n", err);
         return -1;
     } 
-    state->buffer_len = 0;
+    state->buffer_rx_len = 0;
+    state->buffer_tx_len = size;
     return size;
 }
 
 int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struct mobile_addr *addr){
-    //If the socket is a TCP, check if it's disconnected to return an error
-    if(state->sock_type == SOCK_TCP){
+    //If the socket is a TCP and don't have any buff, check if it's disconnected to return an error
+    if(state->sock_type == SOCK_TCP && state->buffer_rx_len <= 0){
         if(!data){
             // CLOSED      = 0,
             // LISTEN      = 1,
@@ -246,14 +253,13 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
                     break;
             }
         }
-        if(state->tcp_pcb->state == CLOSED || !state->tcp_pcb){
+        if((state->tcp_pcb->state == CLOSED || !state->tcp_pcb)){
             return -2;
         }     
     }
 
     int recvd_buff = 0;
-
-    if(state->buffer_len > 0){
+    if(state->buffer_rx_len > 0){
         if (addr && state->sock_type == SOCK_UDP){
             struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
             struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
@@ -276,11 +282,16 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
             }
         }
 
-        recvd_buff = state->buffer_len;
-        state->buffer_len = 0;
-        memcpy(data,state->buffer,recvd_buff);
-        if(state->sock_type == SOCK_TCP) tcp_recved(state->tcp_pcb,recvd_buff);
-    }else if(state->buffer_len <= 0){
+        if(state->buffer_rx_len > MOBILE_MAX_TRANSFER_SIZE){
+            state->buffer_rx_len = state->buffer_rx_len - MOBILE_MAX_TRANSFER_SIZE;
+            recvd_buff = MOBILE_MAX_TRANSFER_SIZE;
+        }else{
+            recvd_buff = state->buffer_rx_len;
+            state->buffer_rx_len = 0;
+        }
+        printf("copied %d bytes\n",recvd_buff);
+        memcpy(data,state->buffer_rx,recvd_buff);
+    }else if(state->buffer_rx_len <= 0){
         return 0;
     }
     return recvd_buff;
@@ -288,7 +299,31 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
 }
 
 bool socket_impl_listen(struct socket_impl *state){
+    err_t err = ERR_ABRT;
+    if(state->sock_type == SOCK_TCP){
+        if(state->tcp_pcb->state==CLOSED){
+            err = tcp_bind(state->tcp_pcb,&state->tcp_pcb->remote_ip,state->tcp_pcb->remote_port);
+            printf("Listening TCP socket - err: %d",err);
+            if(err == ERR_OK){
+                state->client_status=false;
+                tcp_accept(state->tcp_pcb, socket_accept_tcp);
+                return true;
+            } 
+        }
+    }
+    return false;
 }
 
 bool socket_impl_accept(struct socket_impl *state){
+    if(state->client_status && state->sock_type == SOCK_TCP && state->tcp_pcb){
+        switch(state->tcp_pcb->state){
+            case ESTABLISHED:
+                return true;
+                break;
+            default:
+                return false;
+                break;
+        }
+    }
+    return false;
 }

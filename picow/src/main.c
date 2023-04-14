@@ -402,8 +402,13 @@ void main(){
             mobile->socket[i].udp_pcb = NULL;
             mobile->socket[i].sock_addr = -1;
             mobile->socket[i].sock_type = -1;
-            mobile->socket[i].buffer_len = 0;
-            memset(mobile->socket[i].buffer,0x00,sizeof(mobile->socket[i].buffer));
+            memset(mobile->socket[i].udp_remote_srv,0x00,sizeof(mobile->socket[i].udp_remote_srv));
+            mobile->socket[i].udp_remote_port = 0;
+            mobile->socket[i].client_status = false;
+            memset(mobile->socket[i].buffer_rx,0x00,sizeof(mobile->socket[i].buffer_rx));
+            memset(mobile->socket[i].buffer_tx,0x00,sizeof(mobile->socket[i].buffer_tx));
+            mobile->socket[i].buffer_rx_len = 0;
+            mobile->socket[i].buffer_tx_len = 0;
         } 
 
         multicore_launch_core1(core1_context);

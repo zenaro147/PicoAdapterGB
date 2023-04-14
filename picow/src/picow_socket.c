@@ -20,8 +20,7 @@ void socket_recv_udp(void * arg, struct udp_pcb *pcb, struct pbuf *p, const ip_a
         port,
         p->len);
         // Receive the buffer
-        state->buffer_len = pbuf_copy_partial(p, &state->buffer, p->tot_len > MOBILE_MAX_TRANSFER_SIZE ? MOBILE_MAX_TRANSFER_SIZE : p->tot_len, 0);
-
+        state->buffer_rx_len = pbuf_copy_partial(p, &state->buffer_rx, p->tot_len > BUFF_SIZE ? BUFF_SIZE : p->tot_len, 0);
         memset(state->udp_remote_srv,0x00,sizeof(state->udp_remote_srv));
         sprintf(state->udp_remote_srv, "%d.%d.%d.%d", addr->addr&0xff, (addr->addr>>8)&0xff, (addr->addr>>16)&0xff, addr->addr>>24);
         state->udp_remote_port = port;
@@ -45,10 +44,36 @@ void socket_err_tcp(void *arg, err_t err){
 
 err_t socket_accept_tcp(void *arg, struct tcp_pcb *pcb, err_t err){
     struct socket_impl *state = (struct socket_impl*)arg;
+
+    if (err != ERR_OK || pcb == NULL) {
+        printf("Failure in accept\n");
+        return ERR_VAL;
+    }
+    printf("Client connected\n");
+
+    state->tcp_pcb = pcb;
+    tcp_arg(pcb, state);
+    //tcp_poll(state->tcp_pcb, NULL, 0);
+    tcp_accept(pcb, socket_accept_tcp);
+    tcp_sent(pcb, socket_sent_tcp);
+    tcp_recv(pcb, socket_recv_tcp);
+    tcp_err(pcb, socket_err_tcp);
+
+    state->client_status=true;
+
+    return ERR_OK;
 }
 
 err_t socket_sent_tcp(void *arg, struct tcp_pcb *pcb, u16_t len){
     struct socket_impl *state = (struct socket_impl*)arg;
+    if(state->buffer_tx_len != len){
+        printf("TCP sent %d bytes to IP: %s Port: %d. But should sent %d\n",len,ip4addr_ntoa(&pcb->remote_ip),pcb->remote_port,state->buffer_tx_len);
+        return ERR_BUF;
+    }else{
+        printf("TCP sent %d bytes to IP: %s Port: %d.\n",len,ip4addr_ntoa(&pcb->remote_ip),pcb->remote_port);
+        state->buffer_tx_len = 0;
+        return ERR_OK;
+    }
 }
 
 err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err){
@@ -60,18 +85,15 @@ err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
             printf("reading %d bytes tot\n", p->tot_len);
             printf("reading %d bytes\n", p->len);
             // Receive the buffer
-            state->buffer_len = pbuf_copy_partial(p, &state->buffer, p->tot_len > MOBILE_MAX_TRANSFER_SIZE ? MOBILE_MAX_TRANSFER_SIZE : p->tot_len, 0);
-            if (state->buffer_len > 0){
-                printf("received %d bytes\n", state->buffer_len);
+            state->buffer_rx_len = pbuf_copy_partial(p, &state->buffer_rx, p->tot_len > BUFF_SIZE ? BUFF_SIZE : p->tot_len, 0);
+            tcp_recved(pcb,state->buffer_rx_len);
+            if (state->buffer_rx_len > 0){
+                printf("received %d bytes\n", state->buffer_rx_len);
                 err = ERR_OK;
             }else{
-                err = ERR_ARG;
+                err = ERR_BUF;
             }
-            if(state->buffer_len != MOBILE_MAX_TRANSFER_SIZE)
-            {
-                printf("Free pbuf\n");
-                pbuf_free(p);
-            } 
+            pbuf_free(p);
         }
          
     }else{

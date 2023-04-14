@@ -8,6 +8,8 @@
 #define SOCK_TCP 1
 #define SOCK_UDP 2
 
+#define BUFF_SIZE 2048
+
 // UDP functions
 // void socket_listen_udp(void *arg);
 // void socket_close_udp(void *arg);

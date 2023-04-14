@@ -85,6 +85,7 @@ void socket_impl_close(struct socket_impl *state){
     memset(state->buffer_tx,0x00,sizeof(state->buffer_tx));
     state->buffer_rx_len = 0;
     state->buffer_tx_len = 0;
+    printf("Socket Closed.\n");
 }
 
 int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *addr){
@@ -168,17 +169,21 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
         (state->sock_type == SOCK_UDP && (!state->udp_pcb && !addr) ||
         (addr && (addr->type == MOBILE_ADDRTYPE_IPV4 && state->sock_addr == IPADDR_TYPE_V6) || 
         (addr->type == MOBILE_ADDRTYPE_IPV6 && state->sock_addr == IPADDR_TYPE_V4)))){
+        printf("teste1\n");
         return -1;
     }
-
+    printf("teste2\n");
     err_t err = ERR_ARG;
     if(state->sock_type == SOCK_TCP){
+        printf("teste3\n");
         cyw43_arch_lwip_begin();
         err = tcp_write(state->tcp_pcb,data,size,TCP_WRITE_FLAG_COPY);
         cyw43_arch_lwip_end();
     }else if(state->sock_type == SOCK_UDP) {
+        printf("teste4\n");
         //Set a new IP/Port if receive an addr parameter
         if(addr){
+            printf("teste5\n");
             char srv_ip[46];
             memset(srv_ip,0x00,sizeof(srv_ip));
             if (addr->type == MOBILE_ADDRTYPE_IPV4) {
@@ -210,6 +215,7 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
         cyw43_arch_lwip_end();
         pbuf_free(p);
     }else{
+        printf("teste6\n");
         return -1;
     }
     if(err != ERR_OK){
@@ -218,13 +224,16 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
     } 
     state->buffer_rx_len = 0;
     state->buffer_tx_len = size;
+    printf("teste - %d\n",size);
     return size;
 }
 
 int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struct mobile_addr *addr){
     //If the socket is a TCP and don't have any buff, check if it's disconnected to return an error
     if(state->sock_type == SOCK_TCP && state->buffer_rx_len <= 0){
+        printf("teste1\n");
         if(!data){
+            printf("teste2\n");
             // CLOSED      = 0,
             // LISTEN      = 1,
             // SYN_SENT    = 2,
@@ -254,13 +263,17 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
             }
         }
         if((state->tcp_pcb->state == CLOSED || !state->tcp_pcb)){
+            printf("teste3\n");
             return -2;
         }     
     }
 
+    printf("teste4\n");
     int recvd_buff = 0;
     if(state->buffer_rx_len > 0){
+        printf("teste5\n");
         if (addr && state->sock_type == SOCK_UDP){
+            printf("teste6\n");
             struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
             struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
             unsigned char ip[MOBILE_INET_PTON_MAXLEN];
@@ -283,17 +296,22 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
         }
 
         if(state->buffer_rx_len > MOBILE_MAX_TRANSFER_SIZE){
+            printf("teste7\n");
             state->buffer_rx_len = state->buffer_rx_len - MOBILE_MAX_TRANSFER_SIZE;
             recvd_buff = MOBILE_MAX_TRANSFER_SIZE;
         }else{
+            printf("teste8\n");
             recvd_buff = state->buffer_rx_len;
             state->buffer_rx_len = 0;
         }
+
         printf("copied %d bytes\n",recvd_buff);
         memcpy(data,state->buffer_rx,recvd_buff);
     }else if(state->buffer_rx_len <= 0){
+        printf("teste9\n");
         return 0;
     }
+    printf("teste10 - %d\n",recvd_buff);
     return recvd_buff;
 
 }
@@ -302,15 +320,18 @@ bool socket_impl_listen(struct socket_impl *state){
     err_t err = ERR_ABRT;
     if(state->sock_type == SOCK_TCP){
         if(state->tcp_pcb->state==CLOSED){
-            err = tcp_bind(state->tcp_pcb,&state->tcp_pcb->remote_ip,state->tcp_pcb->remote_port);
+            //err = tcp_bind(state->tcp_pcb,state->sock_addr == IPADDR_TYPE_V4 ? IP4_ADDR_ANY : IP6_ADDR_ANY,state->tcp_pcb->remote_port);
+            err = tcp_bind(state->tcp_pcb,IP4_ADDR_ANY,state->tcp_pcb->remote_port);
             printf("Listening TCP socket - err: %d",err);
             if(err == ERR_OK){
                 state->client_status=false;
                 tcp_accept(state->tcp_pcb, socket_accept_tcp);
+                printf("Client Listening!\n");
                 return true;
             } 
         }
     }
+    printf("Client Listen Failed!\n");
     return false;
 }
 
@@ -318,12 +339,13 @@ bool socket_impl_accept(struct socket_impl *state){
     if(state->client_status && state->sock_type == SOCK_TCP && state->tcp_pcb){
         switch(state->tcp_pcb->state){
             case ESTABLISHED:
+                printf("Client Accepted!\n");
                 return true;
                 break;
             default:
-                return false;
                 break;
         }
     }
+    printf("Client Waiting...!\n");
     return false;
 }

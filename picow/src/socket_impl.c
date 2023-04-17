@@ -5,6 +5,8 @@
 
 #include <string.h>
 
+uint16_t buffrx_lastpos = 0;
+
 bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
     switch (addrtype) {
         case MOBILE_ADDRTYPE_IPV4:
@@ -172,6 +174,7 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
         printf("teste1\n");
         return -1;
     }
+
     printf("teste2\n");
     err_t err = ERR_ARG;
     if(state->sock_type == SOCK_TCP){
@@ -223,7 +226,7 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
         return -1;
     } 
     state->buffer_rx_len = 0;
-    state->buffer_tx_len = size;
+    state->buffer_tx_len = state->buffer_tx_len + size;
     printf("teste - %d\n",size);
     return size;
 }
@@ -294,19 +297,23 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
                     break;
             }
         }
-
-        if(state->buffer_rx_len > MOBILE_MAX_TRANSFER_SIZE){
+        
+        uint16_t tmpsize = state->buffer_rx_len - buffrx_lastpos;
+        if(tmpsize > MOBILE_MAX_TRANSFER_SIZE){
             printf("teste7\n");
-            state->buffer_rx_len = state->buffer_rx_len - MOBILE_MAX_TRANSFER_SIZE;
             recvd_buff = MOBILE_MAX_TRANSFER_SIZE;
         }else{
             printf("teste8\n");
-            recvd_buff = state->buffer_rx_len;
-            state->buffer_rx_len = 0;
+            recvd_buff = tmpsize;
         }
 
         printf("copied %d bytes\n",recvd_buff);
-        memcpy(data,state->buffer_rx,recvd_buff);
+        memcpy(data,state->buffer_rx + buffrx_lastpos,recvd_buff);
+        buffrx_lastpos = buffrx_lastpos + recvd_buff;
+        if(buffrx_lastpos >= state->buffer_rx_len){
+            buffrx_lastpos = 0;
+            state->buffer_rx_len = 0;
+        } 
     }else if(state->buffer_rx_len <= 0){
         printf("teste9\n");
         return 0;

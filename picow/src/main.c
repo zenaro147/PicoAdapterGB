@@ -266,7 +266,7 @@ void core1_context() {
     }
 }
 
-void main(){
+ void main(){
     speed_240_MHz = set_sys_clock_khz(240000, false);
 
     stdio_init_all();

@@ -40,6 +40,7 @@ err_t socket_connected_tcp(void *arg, struct tcp_pcb *pcb, err_t err) {
 
 void socket_err_tcp(void *arg, err_t err){
     struct socket_impl *state = (struct socket_impl*)arg;
+    printf("TCP Generic Error %d\n", err);
 }
 
 err_t socket_accept_tcp(void *arg, struct tcp_pcb *pcb, err_t err){

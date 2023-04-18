@@ -73,6 +73,9 @@ err_t socket_sent_tcp(void *arg, struct tcp_pcb *pcb, u16_t len){
     }else{
         printf("TCP sent %d bytes to IP: %s:%d.\n",len,ip4addr_ntoa(&pcb->remote_ip),pcb->remote_port);
         state->buffer_tx_len = 0;
+        printf("reset buffTX size\n");
+        state->buffer_rx_len = 0;
+        printf("reset buffRX size\n");
         return ERR_OK;
     }
 }
@@ -94,8 +97,9 @@ err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
                 err = ERR_BUF;
             }
             pbuf_free(p);
+            // state->buffer_tx_len = 0;
+            // printf("reset buffTX size\n");
         }
-         
     }else{
         err = tcp_close(state->tcp_pcb);
         if (err != ERR_OK) {
@@ -110,6 +114,6 @@ err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
         tcp_err(state->tcp_pcb, NULL);
         state->tcp_pcb = NULL;
         err = ERR_ABRT;
-    }    
+    }
     return err;
 }

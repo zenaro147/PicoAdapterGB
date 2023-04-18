@@ -8,6 +8,7 @@ target_include_directories(${PROJECT_NAME}_PicoW PRIVATE /.. ${CMAKE_CURRENT_LIS
  
 # Pull in our pico_stdlib which pulls in commonly used features
 target_link_libraries(${PROJECT_NAME}_PicoW libmobile pico_stdlib pico_multicore hardware_spi hardware_flash pico_cyw43_arch_lwip_poll)
+#target_link_libraries(${PROJECT_NAME}_PicoW libmobile pico_stdlib pico_multicore hardware_spi hardware_flash pico_cyw43_arch_lwip_threadsafe_background)
 
 # disable usb output, enable uart output
 pico_enable_stdio_usb(${PROJECT_NAME}_PicoW 0)

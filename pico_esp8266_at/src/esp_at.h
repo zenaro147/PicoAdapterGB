@@ -10,15 +10,15 @@ bool use_uart0 = true;
 // Basics AT functions
 
 // Run a little timeout instead sleep (to prevent any block to the RX interrupt)
-void Delay_Timer(int timeout){
-    volatile uint64_t timenow = 0;
-    volatile uint64_t last_read = 0;
-    timenow = time_us_64();
-    last_read = timenow;
-    while ((timenow - last_read) < timeout){
-        timenow = time_us_64();
-    }
-}
+// void Delay_Timer(int timeout){
+//     volatile uint64_t timenow = 0;
+//     volatile uint64_t last_read = 0;
+//     timenow = time_us_64();
+//     last_read = timenow;
+//     while ((timenow - last_read) < timeout){
+//         timenow = time_us_64();
+//     }
+// }
 
 // RX interrupt handler
 void on_uart_rx(){

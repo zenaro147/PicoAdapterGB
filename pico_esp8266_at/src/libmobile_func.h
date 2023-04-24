@@ -146,35 +146,18 @@ static bool impl_config_write(void *user, const void *src, const uintptr_t offse
     return true;
 }
 
-static void impl_time_latch(A_UNUSED void *user, unsigned timer) {
-    millis_latch = time_us_64();
+static void impl_time_latch(void *user, unsigned timer) {
+    struct mobile_user *mobile = (struct mobile_user *)user;
+    mobile->esp_clock_latch[timer] = time_us_64();
 }
 
-static bool impl_time_check_ms(A_UNUSED void *user, unsigned timer, unsigned ms) {
-    unsigned long timeAgora = 0;
-    timeAgora = time_us_64(); 
-    unsigned long timeCheck = 0;
-    timeCheck = timeAgora - millis_latch;
-
-    // unsigned long teste = 0;
-    // teste = timeAgora - millis_latch;
-    // int validate;
-    // validate = 0;
-    
-    // printf("time: %i\n",timeAgora);
-    // printf("millis_latch: %i\n",millis_latch);
-    // printf("conta: %i\n",teste);
-    // printf("MS 1: %i\n",ms);
-    // printf("MS 2: %i\n",MS(ms));
-    // if ((timeAgora - millis_latch) > MS(ms)){
-    //     validate = 1;
-    // }
-    // printf("validate: %d\n",validate);
-    if (timeCheck >= MS(ms)){
-        printf("timeout1\n");
+static bool impl_time_check_ms(void *user, unsigned timer, unsigned ms) {
+    struct mobile_user *mobile = (struct mobile_user *)user;
+    unsigned long timeResult = time_us_64() - mobile->esp_clock_latch[timer];
+    if (timeResult >= MS(ms)){
+        printf("timeout\n");
         return true;
     }
-    // printf("timeout2\n");
     return false;
 }
 

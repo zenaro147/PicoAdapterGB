@@ -228,6 +228,7 @@ void main(){
         mobile->action = MOBILE_ACTION_NONE;
         mobile->number_user[0] = '\0';
         mobile->number_peer[0] = '\0';
+        for (int i = 0; i < MOBILE_MAX_TIMERS; i++) mobile->esp_clock_latch[i] = 0;
         for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
             mobile->esp_sockets[i].host_id = -1;
             mobile->esp_sockets[i].host_iptype = MOBILE_ADDRTYPE_NONE;
@@ -235,7 +236,7 @@ void main(){
             mobile->esp_sockets[i].local_port = -1;
             mobile->esp_sockets[i].sock_status = false;
             ESP_CloseSockConn(UART_ID,i);
-        } 
+        }
 
         multicore_launch_core1(core1_context);
         FlushATBuff();

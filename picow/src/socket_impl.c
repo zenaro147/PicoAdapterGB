@@ -87,6 +87,8 @@ void socket_impl_close(struct socket_impl *state){
     memset(state->buffer_tx,0x00,sizeof(state->buffer_tx));
     state->buffer_rx_len = 0;
     state->buffer_tx_len = 0;
+    state->checkDataSent = false;
+    state->checkDataRecv = false;
     printf("Socket Closed.\n");
 }
 
@@ -225,9 +227,23 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
         printf("Send failed %d\n", err);
         return -1;
     } 
-    state->buffer_rx_len = 0;
-    printf("reset buffRX size\n");
     state->buffer_tx_len = state->buffer_tx_len + size;
+
+    // volatile uint64_t timedelay = time_us_64();
+    // uint64_t timedelay_last = timedelay;
+    // while(1){
+    //     timedelay_last = time_us_64();
+    //     if(state->checkDataSent && !state->checkDataRecv){
+    //         state->checkDataSent = false;
+    //         printf("check1\n");
+    //         break;
+    //     }else if ((timedelay_last - timedelay) >= (10*1000*1000)){
+    //         state->buffer_tx_len = 0;
+    //         printf("check2\n");
+    //         return -1;
+    //     }
+    // }
+
     // printf("teste - %d\n",size);
     return size;
 }
@@ -270,6 +286,20 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
             // printf("teste3\n");
             return -2;
         }     
+    }
+
+    volatile uint64_t timedelay = time_us_64();
+    uint64_t timedelay_last = timedelay;
+    while(1){
+        timedelay_last = time_us_64();
+        if(state->buffer_rx_len > 0 || state->checkDataRecv){
+            state->checkDataRecv = false;
+            printf("check1\n");
+            break;
+        }else if ((timedelay_last - timedelay) >= (10*1000*1000)){
+            printf("check2\n");
+            return -1;
+        }
     }
 
     // printf("teste4\n");

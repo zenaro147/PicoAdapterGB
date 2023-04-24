@@ -77,6 +77,7 @@ struct esp_sock_config {
 struct mobile_user {
     struct mobile_adapter *adapter;
     enum mobile_action action;
+	unsigned long esp_clock_latch[MOBILE_MAX_TIMERS];
     uint8_t config_eeprom[FLASH_DATA_SIZE];
     struct esp_sock_config esp_sockets[MOBILE_MAX_CONNECTIONS];
     char number_user[MOBILE_MAX_NUMBER_SIZE + 1];

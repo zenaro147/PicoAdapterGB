@@ -28,13 +28,6 @@ static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
     hw_set_bits(&spi_get_hw(spi)->cr1, SPI_SSPCR1_SSE_BITS);
 }
 
-///////////////////////////////////////
-// Mobile Adapter GB Functions
-///////////////////////////////////////
-
-unsigned long millis_latch = 0;
-#define A_UNUSED __attribute__((unused))
-
 ////////////////////////
 // Auxiliar functions
 ////////////////////////
@@ -153,18 +146,13 @@ static void impl_time_latch(void *user, unsigned timer) {
 
 static bool impl_time_check_ms(void *user, unsigned timer, unsigned ms) {
     struct mobile_user *mobile = (struct mobile_user *)user;
-    unsigned long timeResult = time_us_64() - mobile->esp_clock_latch[timer];
-    if (timeResult >= MS(ms)){
-        printf("timeout\n");
-        return true;
-    }
-    return false;
+    return ((time_us_64() - mobile->esp_clock_latch[timer]) >= MS(ms));
 }
 
 static bool impl_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
     // Returns: true if socket was created successfully, false on error
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_open\n");
+    // printf("mobile_impl_sock_open\n");
     FlushATBuff();
 
     if(mobile->esp_sockets[conn].host_id != -1 && !mobile->esp_sockets[conn].sock_status){
@@ -212,7 +200,7 @@ static bool impl_sock_open(void *user, unsigned conn, enum mobile_socktype sockt
 
 static void impl_sock_close(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_close\n");
+    // printf("mobile_impl_sock_close\n");
     if(mobile->esp_sockets[conn].sock_status){
         if(ESP_GetSockStatus(UART_ID,conn,user)){
             ESP_CloseSockConn(UART_ID, conn);
@@ -222,7 +210,7 @@ static void impl_sock_close(void *user, unsigned conn){
         }
     }
     if(isServerOpened){
-        printf("mobile_impl_sock_close - Server\n");
+        // printf("mobile_impl_sock_close - Server\n");
         ESP_CloseServer(UART_ID);
         isServerOpened = false;
     }
@@ -231,7 +219,7 @@ static void impl_sock_close(void *user, unsigned conn){
 static int impl_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
     // Returns: 1 on success, 0 if connect is in progress, -1 on error
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_connect\n");
+    // printf("mobile_impl_sock_connect\n");
 
     if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status){
         return -1;
@@ -288,7 +276,7 @@ static bool impl_sock_listen(void *user, unsigned conn){
     // Returns: true if a connection was accepted,
     //          false if there's no incoming connections    
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_listen\n");
+    // printf("mobile_impl_sock_listen\n");
     bool sockP2Pcheck = false;
     if(!isServerOpened && mobile->esp_sockets[conn].host_type == 1){
         sockP2Pcheck = ESP_OpenServer(UART_ID,conn,mobile->esp_sockets[conn].local_port);
@@ -300,7 +288,7 @@ static bool impl_sock_accept(void *user, unsigned conn){
     // Returns: true if a connection was accepted,
     //          false if there's no incoming connections
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_accept\n");
+    // printf("mobile_impl_sock_accept\n");
     bool sockP2Pconn = false;
     if(isServerOpened){
         sockP2Pconn = ESP_CheckIncommingConn(UART_ID,conn);
@@ -314,7 +302,7 @@ static bool impl_sock_accept(void *user, unsigned conn){
 static int impl_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){    
     // Returns: non-negative amount of data sent on success, -1 on error
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_send\n");
+    // printf("mobile_impl_sock_send\n");
     
     if(mobile->esp_sockets[conn].host_id == -1 && !mobile->esp_sockets[conn].sock_status){
         return -1;
@@ -363,7 +351,7 @@ static int impl_sock_recv(void *user, unsigned conn, void *data, unsigned size, 
     // Returns: amount of data received on success,
     //          -1 on error,
     //          -2 on remote disconnect
-    printf("mobile_impl_sock_recv\n");
+    // printf("mobile_impl_sock_recv\n");
 
     struct mobile_user *mobile = (struct mobile_user *)user;
     struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
@@ -460,10 +448,8 @@ static int impl_sock_recv(void *user, unsigned conn, void *data, unsigned size, 
     FlushATBuff();
     if (!data){
         if(!ESP_GetSockStatus(UART_ID,conn,user)){
-            printf("retorna -2\n");
             return -2;
         }else{
-            printf("retorna 0\n");
             return 0;
         }
     }
@@ -490,7 +476,6 @@ static int impl_sock_recv(void *user, unsigned conn, void *data, unsigned size, 
             return len;
         }
     }
-    printf("retorna %d\n",len);
     return len;
 }
 

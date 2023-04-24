@@ -6,22 +6,32 @@
 #include <string.h>
 #include "hardware/uart.h"
 #include "hardware/irq.h"
-#include "libmobile/mobile.h"
-#include "libmobile/mobile_inet.h"
+#include <mobile.h>
+#include <mobile_inet.h>
 
 //Flash Config
 #define FLASH_DATA_SIZE (FLASH_PAGE_SIZE * 3)
 #define MOBILE_MAX_DATA_SIZE 0xFF
 
+// SPI pins
+#define SPI_PORT        spi0
+#define SPI_BAUDRATE_512    64 * 1024 * 8
+#define SPI_BAUDRATE_256    32 * 1024 * 8
+#define PIN_SPI_SIN     16
+#define PIN_SPI_SCK     18
+#define PIN_SPI_SOUT    19 
+volatile bool spiLock = false;
+uint8_t buff32[4];
+volatile int8_t buff32_pointer = 0;
+
+//UART pins
+#define UART_ID uart1
+#define BAUD_RATE 115200
+#define UART_TX_PIN 4
+#define UART_RX_PIN 5
+
 // Control the configs on Flash
-bool haveAdapterConfig = false;
 bool haveWifiConfig = false;
-bool haveDNS1Config = false;
-bool haveDNS2Config = false;
-bool haveDNSPConfig = false;
-bool haveP2PPConfig = false;
-bool haveP2PSConfig = false;
-bool haveUNMETConfig = false;
 
 //LED Config
 #define LED_PIN       		  	25
@@ -34,6 +44,14 @@ bool haveUNMETConfig = false;
 #define MKS(A)                  (A)
 #define MS(A)                   ((A) * 1000)
 #define SEC(A)                  ((A) * 1000 * 1000)
+volatile uint64_t time_us_now = 0;
+uint64_t last_readable = 0;
+
+//Control Bools
+bool isESPDetected = false;
+bool haveConfigToWrite = false;
+bool isServerOpened = false;
+bool is32bitsMode = false;
 
 //UART RX Buffer Config
 #define BUFF_AT_SIZE 2048 //2048 is the maximun you can receive from esp01
@@ -45,24 +63,8 @@ int ipdVal[5] = {0,0,0,0,0};
 
 //Wifi and Flash Configs Default
 bool isConnectedWiFi = false;
-char WiFiSSID[32] = "WiFi_Network";
-char WiFiPASS[32] = "P@$$w0rd";
-
-#define USE_CUSTOM_DNS1
-char MAGB_DNS1[64] = "0.0.0.0";
-#define USE_CUSTOM_DNS2
-char MAGB_DNS2[64] = "0.0.0.0";
-#define USE_CUSTOM_DNS_PORT
-char MAGB_DNSPORT[5] = "53";
-
-
-#define USE_RELAY_SERVER
-char P2P_SERVER[15] = "0.0.0.0";
-#define USE_CUSTOM_P2P_PORT
-char P2P_PORT[5] = "1027";
-
-#define USE_CUSTOM_DEVICE_UNMETERED
-char DEVICE_UNMETERED[1] = "0";
+char WiFiSSID[28] = "WiFi_Network";
+char WiFiPASS[28] = "P@$$w0rd";
 
 struct esp_sock_config {
     int host_id;
@@ -75,13 +77,13 @@ struct esp_sock_config {
 struct mobile_user {
     struct mobile_adapter *adapter;
     enum mobile_action action;
+	unsigned long esp_clock_latch[MOBILE_MAX_TIMERS];
     uint8_t config_eeprom[FLASH_DATA_SIZE];
     struct esp_sock_config esp_sockets[MOBILE_MAX_CONNECTIONS];
     char number_user[MOBILE_MAX_NUMBER_SIZE + 1];
     char number_peer[MOBILE_MAX_NUMBER_SIZE + 1];
 };
 struct mobile_user *mobile;
-
 
 // C Funciton to replace strcmp. Necessary to compare strings if the buffer have a 0x00 byte.
 void *memmem(const void *l, size_t l_len, const void *s, size_t s_len){

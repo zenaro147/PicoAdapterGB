@@ -191,13 +191,13 @@ static int impl_sock_connect(void *user, unsigned conn, const struct mobile_addr
 
 static int impl_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    // printf("mobile_impl_sock_send\n");
+    printf("mobile_impl_sock_send\n");
     return socket_impl_send(&mobile->socket[conn], data, size, addr);
 }
 
 static int impl_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;    
-    // printf("mobile_impl_sock_recv\n");
+    printf("mobile_impl_sock_recv\n");
     return socket_impl_recv(&mobile->socket[conn], data, size, addr);
 }
 
@@ -271,7 +271,7 @@ void core1_context() {
     printf("Booting...\n");
     cyw43_arch_init();
 
-    busy_wait_ms(SEC(5));
+    busy_wait_us(SEC(5));
 
     #ifdef DEBUG_SIGNAL_PINS
         gpio_init(9);
@@ -308,7 +308,7 @@ void core1_context() {
         FormatFlashConfig();
     #endif
 
-    busy_wait_ms(SEC(2));
+    busy_wait_us(SEC(2));
     
     memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
     ReadFlashConfig(mobile->config_eeprom, WiFiSSID, WiFiPASS); 
@@ -380,9 +380,9 @@ void core1_context() {
         }
 
         mobile_config_save(mobile->adapter);
-        busy_wait_ms(SEC(2));
+        busy_wait_us(SEC(2));
         RefreshConfigBuff(mobile->config_eeprom,WiFiSSID,WiFiPASS);
-        busy_wait_ms(SEC(2));
+        busy_wait_us(SEC(2));
 
         printf("New configuration defined! Please comment the \'#define CONFIG_MODE\' again to back the adapter to the normal operation.\n");
         while (1){
@@ -411,6 +411,9 @@ void core1_context() {
             memset(mobile->socket[i].buffer_tx,0x00,sizeof(mobile->socket[i].buffer_tx));
             mobile->socket[i].buffer_rx_len = 0;
             mobile->socket[i].buffer_tx_len = 0;
+            mobile->socket[i].checkDataSent = false;
+            mobile->socket[i].checkDataRecv = false;
+
         } 
 
         multicore_launch_core1(core1_context);
@@ -419,15 +422,12 @@ void core1_context() {
 
         LED_OFF;
         while (true) {
-            // if you are using pico_cyw43_arch_poll, then you must poll periodically from your
-            // main loop (not from a timer) to check for Wi-Fi driver or lwIP work that needs to be done.
-            cyw43_arch_poll();
-            // you can poll as often as you like, however if you have nothing else to do you can
-            // choose to sleep until either a specified time, or cyw43_arch_poll() has work to do:
-            //cyw43_arch_wait_for_work_until(make_timeout_time_ms(1000));
+            // cyw43_arch_poll();
 
             // Mobile Adapter Main Loop
             mobile_loop(mobile->adapter);
+
+            // busy_wait_us(MS(100));
 
             // Check if there is any new config to write on Flash
             if(haveConfigToWrite){
@@ -435,9 +435,9 @@ void core1_context() {
                 if (time_us_now_check - last_readable_check > SEC(5)){
                     if(!spi_is_readable(SPI_PORT) || !spiLock){
                         // multicore_reset_core1();
-                        // busy_wait_ms(SEC(2));
+                        // busy_wait_us(SEC(2));
                         // SaveFlashConfig(mobile->config_eeprom);
-                        // busy_wait_ms(SEC(2));
+                        // busy_wait_us(SEC(2));
                         haveConfigToWrite = false;
                         time_us_now_check = 0;
                         last_readable_check = 0;                    

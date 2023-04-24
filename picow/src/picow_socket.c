@@ -76,6 +76,7 @@ err_t socket_sent_tcp(void *arg, struct tcp_pcb *pcb, u16_t len){
         printf("reset buffTX size\n");
         state->buffer_rx_len = 0;
         printf("reset buffRX size\n");
+        // state->checkDataSent = true;
         return ERR_OK;
     }
 }
@@ -115,5 +116,6 @@ err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
         state->tcp_pcb = NULL;
         err = ERR_ABRT;
     }
+    if (err == ERR_OK && state->buffer_rx_len > 0) state->checkDataRecv = true;
     return err;
 }

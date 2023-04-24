@@ -15,6 +15,8 @@ struct socket_impl {
     uint8_t buffer_rx[BUFF_SIZE]; //Same as ESP-01
     int buffer_rx_len;
     int buffer_tx_len;
+    bool checkDataSent;
+    bool checkDataRecv;
 	union{
 		struct tcp_pcb *tcp_pcb;
         struct udp_pcb *udp_pcb;

@@ -52,7 +52,6 @@ Mkfile.old
 dkms.conf
 
 #Demos projects, etc.
-32bitsSample.sal
 **/build/*
 **/.vscode/*
 **/copy.bat

@@ -15,26 +15,3 @@ list (REMOVE_DUPLICATES LibMobile_INCLUDE_DIRS)
 
 add_library(libmobile ${LibMobile_SOURCES})
 target_include_directories(libmobile PUBLIC ${REON_LIBMOBILE})
-
-
-####################################
-# Add FreeRTOS files as a Library
-####################################
-# set(PICO_SDK_FREERTOS_SOURCE FreeRTOS-Kernel)
-
-# add_library(freertos
-#     ${PICO_SDK_FREERTOS_SOURCE}/event_groups.c
-#     ${PICO_SDK_FREERTOS_SOURCE}/list.c
-#     ${PICO_SDK_FREERTOS_SOURCE}/queue.c
-#     ${PICO_SDK_FREERTOS_SOURCE}/stream_buffer.c
-#     ${PICO_SDK_FREERTOS_SOURCE}/tasks.c
-#     ${PICO_SDK_FREERTOS_SOURCE}/timers.c
-#     ${PICO_SDK_FREERTOS_SOURCE}/portable/MemMang/heap_3.c
-#     ${PICO_SDK_FREERTOS_SOURCE}/portable/ThirdParty/GCC/RP2040/port.c
-# )
-
-# target_include_directories(freertos PUBLIC
-#     .
-#     ${PICO_SDK_FREERTOS_SOURCE}/include
-#     ${PICO_SDK_FREERTOS_SOURCE}/portable/ThirdParty/GCC/RP2040
-# )

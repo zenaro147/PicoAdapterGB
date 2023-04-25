@@ -83,8 +83,8 @@ err_t socket_sent_tcp(void *arg, struct tcp_pcb *pcb, u16_t len){
 err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err){
     struct socket_impl *state = (struct socket_impl*)arg;
     printf("TCP Receiving...\n");
-    state->buffer_rx_len = 0;
-    printf("reset buffRX size\n");
+    // if (state->buffer_rx_len <= 0);
+    // printf("reset buffRX size\n");
     // cyw43_arch_lwip_check();
     if(p){
         if (p->tot_len > 0) {

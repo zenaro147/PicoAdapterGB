@@ -191,13 +191,13 @@ static int impl_sock_connect(void *user, unsigned conn, const struct mobile_addr
 
 static int impl_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
-    printf("mobile_impl_sock_send\n");
+    // printf("mobile_impl_sock_send\n");
     return socket_impl_send(&mobile->socket[conn], data, size, addr);
 }
 
 static int impl_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;    
-    printf("mobile_impl_sock_recv\n");
+    // printf("mobile_impl_sock_recv\n");
     return socket_impl_recv(&mobile->socket[conn], data, size, addr);
 }
 
@@ -235,6 +235,7 @@ static void impl_update_number(void *user, enum mobile_number type, const char *
 // PICO W AUXILIAR FUNCTIONS //
 ///////////////////////////////
 bool PicoW_Connect_WiFi(char *ssid, char *psk, uint32_t timeout){
+
     cyw43_pm_value(CYW43_NO_POWERSAVE_MODE,200,1,1,10);
     cyw43_arch_enable_sta_mode();
 
@@ -270,7 +271,6 @@ void core1_context() {
     stdio_init_all();
     printf("Booting...\n");
     cyw43_arch_init();
-
     busy_wait_us(SEC(5));
 
     #ifdef DEBUG_SIGNAL_PINS
@@ -305,10 +305,9 @@ void core1_context() {
     mobile = malloc(sizeof(struct mobile_user));
 
     #ifdef ERASE_EEPROM
+        cyw43_arch_deinit();
         FormatFlashConfig();
     #endif
-
-    busy_wait_us(SEC(2));
     
     memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
     ReadFlashConfig(mobile->config_eeprom, WiFiSSID, WiFiPASS); 
@@ -380,10 +379,9 @@ void core1_context() {
         }
 
         mobile_config_save(mobile->adapter);
-        busy_wait_us(SEC(2));
         RefreshConfigBuff(mobile->config_eeprom,WiFiSSID,WiFiPASS);
-        busy_wait_us(SEC(2));
 
+        cyw43_arch_init();
         printf("New configuration defined! Please comment the \'#define CONFIG_MODE\' again to back the adapter to the normal operation.\n");
         while (1){
             LED_ON;
@@ -421,39 +419,43 @@ void core1_context() {
         mobile_start(mobile->adapter);
 
         LED_OFF;
+        cyw43_arch_poll();
         while (true) {
-            // cyw43_arch_poll();
-
             // Mobile Adapter Main Loop
             mobile_loop(mobile->adapter);
 
-            // busy_wait_us(MS(100));
-
             // Check if there is any new config to write on Flash
-            if(haveConfigToWrite){
-                time_us_now_check = time_us_64();
-                if (time_us_now_check - last_readable_check > SEC(5)){
-                    if(!spi_is_readable(SPI_PORT) || !spiLock){
-                        // multicore_reset_core1();
-                        // busy_wait_us(SEC(2));
-                        // SaveFlashConfig(mobile->config_eeprom);
-                        // busy_wait_us(SEC(2));
-                        haveConfigToWrite = false;
-                        time_us_now_check = 0;
-                        last_readable_check = 0;                    
-                        // multicore_launch_core1(core1_context);
-                    }else{
-                        last_readable_check = time_us_now_check;
+            if(haveConfigToWrite && mobile->action == MOBILE_ACTION_NONE){
+                bool checkSockStatus = false;
+                for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
+                    if(mobile->socket[i].tcp_pcb || mobile->socket[i].udp_pcb){
+                        checkSockStatus = true;
+                        break;
+                    } 
+                }
+                if(!checkSockStatus){
+                    time_us_now_check = time_us_64();
+                    if (time_us_now_check - last_readable_check > SEC(5)){
+                        if(!spi_is_readable(SPI_PORT) && !spiLock){
+                            multicore_reset_core1();
+                            SaveFlashConfig(mobile->config_eeprom);
+                            haveConfigToWrite = false;
+                            time_us_now_check = 0;
+                            last_readable_check = 0;
+                            multicore_launch_core1(core1_context);
+                        }else{
+                            last_readable_check = time_us_now_check;
+                        }
                     }
                 }
             }
-
-            
         }
     }else{
         printf("Error during WiFi connection! =(\n");
         while(true){
-            //do something
+            LED_ON;
+            sleep_ms(200);
+            LED_OFF;
         }
     }
 }

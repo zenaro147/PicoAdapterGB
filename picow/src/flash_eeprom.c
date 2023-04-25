@@ -40,16 +40,6 @@ void *memmem(const void *l, size_t l_len, const void *s, size_t s_len){
 	return NULL;
 }
 
-void Delay_Timer(int timeout){
-    volatile uint64_t timenow = 0;
-    volatile uint64_t last_read = 0;
-    timenow = time_us_64();
-    last_read = timenow;
-    while ((timenow - last_read) < timeout){
-        timenow = time_us_64();
-    }
-}
-
 //512 bytes for the Mobile Adapter GB + Adapter Configs and 256 bytes to WiFi Config and other stuffs
 void FormatFlashConfig(){
     printf("Erasing target region... ");
@@ -112,7 +102,6 @@ bool ReadFlashConfig(uint8_t * buff, char * WiFiSSID, char * WiFiPASS){
 
 void SaveFlashConfig(uint8_t * buff){
     FormatFlashConfig();
-    Delay_Timer(SEC(2));
     printf("Programming target region... ");
     flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);
     printf("Done.\n");
@@ -129,6 +118,7 @@ void RefreshConfigBuff(uint8_t * buff, char * WiFiSSID, char * WiFiPASS){
     memcpy(buff+OFFSET_PASS,tmp_pass,sizeof(tmp_pass));
 
     FormatFlashConfig();
-    Delay_Timer(SEC(2));
+    printf("Programming target region... ");
     flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);
+    printf("Done.\n");
 }

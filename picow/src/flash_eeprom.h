@@ -20,8 +20,6 @@
 #define MS(A)                   ((A) * 1000)
 #define SEC(A)                  ((A) * 1000 * 1000)
 
-void Delay_Timer(int timeout);
-
 void FormatFlashConfig();
 bool ReadConfigOption(uint8_t * buff, int offset, char *key, int datasize, char *varConfig);
 bool ReadFlashConfig(uint8_t * buff, char * WiFiSSID, char * WiFiPASS);

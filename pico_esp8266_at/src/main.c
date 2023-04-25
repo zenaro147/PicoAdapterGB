@@ -178,37 +178,58 @@ void main(){
         memcpy(WiFiSSID,newSSID,sizeof(newSSID));
         memcpy(WiFiPASS,newPASS,sizeof(newPASS));
 
-        main_parse_addr(&dns1, MAGB_DNS1);
-        main_parse_addr(&dns2, MAGB_DNS2);
-        main_set_port(&dns1, MAGB_DNSPORT);
-        main_set_port(&dns2, MAGB_DNSPORT);
-
-        main_parse_addr(&relay, RELAY_SERVER);
-        main_set_port(&relay, MOBILE_DEFAULT_RELAY_PORT);
-
         //Set the values to the Adapter config
         mobile_config_set_device(mobile->adapter, device, DEVICE_UNMETERED);
-        mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
-        mobile_config_set_relay(mobile->adapter, &relay);
-        mobile_config_set_p2p_port(mobile->adapter, P2P_PORT);
-
-        //ONLY UNCOMMENT THIS LINE IF YOU WANT TO SETUP A TOKEN MANUALLY
-        if (updateRelayToken) {
-            bool TokenOk = main_parse_hex(relay_token_buf, RELAY_TOKEN, sizeof(relay_token_buf));
-            if(!TokenOk){
-                printf("Invalid Relay Token\n");
+        
+        if(strcmp(MAGB_DNS1,"0.0.0.0") != 0){
+            main_parse_addr(&dns1, MAGB_DNS1);
+            main_set_port(&dns1, MAGB_DNSPORT);
+            if(strcmp(MAGB_DNS2,"0.0.0.0") != 0){
+                main_parse_addr(&dns2, MAGB_DNS2);
+                main_set_port(&dns2, MAGB_DNSPORT);
+                mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
             }else{
-                mobile_config_set_relay_token(mobile->adapter, relay_token_buf);
+                mobile_config_set_dns(mobile->adapter, &dns1, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
+            }
+        }else{
+            if(strcmp(MAGB_DNS2,"0.0.0.0") != 0){
+                main_parse_addr(&dns2, MAGB_DNS2);
+                main_set_port(&dns2, MAGB_DNSPORT);
+                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &dns2);
+            }else{
+                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
             }
         }
+        
+        if(strcmp(RELAY_SERVER,"0.0.0.0") != 0){
+            main_parse_addr(&relay, RELAY_SERVER);
+            main_set_port(&relay, MOBILE_DEFAULT_RELAY_PORT);
+            mobile_config_set_relay(mobile->adapter, &relay);
+        }else{
+            mobile_config_set_relay(adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
+        }
+        mobile_config_set_p2p_port(mobile->adapter, P2P_PORT);
 
+        if (updateRelayToken) {
+            if(strcmp(RELAY_TOKEN,"00000000000000000000000000000000"){
+                mobile_config_set_relay_token(mobile->adapter, NULL);
+            }else{
+                bool TokenOk = main_parse_hex(relay_token_buf, RELAY_TOKEN, sizeof(relay_token_buf));
+                if(!TokenOk){
+                    printf("Invalid Relay Token\n");
+                }else{
+                    mobile_config_set_relay_token(mobile->adapter, relay_token_buf);
+                }
+            }
+        }
         mobile_config_save(mobile->adapter);
-        RefreshConfigBuff(mobile->config_eeprom);
+        RefreshConfigBuff(mobile->config_eeprom,WiFiSSID,WiFiPASS);
 
+        cyw43_arch_init();
         printf("New configuration defined! Please comment the \'#define CONFIG_MODE\' again to back the adapter to the normal operation.\n");
         while (1){
             LED_ON;
-            busy_wait_us(MS(300));
+            sleep_ms(300);
             LED_OFF;
         }
     #endif

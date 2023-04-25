@@ -211,7 +211,7 @@ void main(){
         mobile_config_set_p2p_port(mobile->adapter, P2P_PORT);
 
         if (updateRelayToken) {
-            if(strcmp(RELAY_TOKEN,"00000000000000000000000000000000"){
+            if(strcmp(RELAY_TOKEN,"00000000000000000000000000000000") != 0){
                 mobile_config_set_relay_token(mobile->adapter, NULL);
             }else{
                 bool TokenOk = main_parse_hex(relay_token_buf, RELAY_TOKEN, sizeof(relay_token_buf));

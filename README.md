@@ -10,8 +10,5 @@ Refer to the implementation's README.md for more details.
 
 -----------------------
 ### What need to do:
-* Save the "unmetered" parameter on flash
-* Reuse the new Libmobile variables to store configs 
-* Some method to apply new configurations, such as new SSID, password and DNS.
 * Implement a native 32bits mode for GBA
 * Clean code

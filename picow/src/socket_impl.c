@@ -177,12 +177,17 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
         return -1;
     }
 
+    state->buffer_tx_len = 0;
+    printf("reset buffTX size\n");
+
     // printf("teste2\n");
     err_t err = ERR_ARG;
+    
     if(state->sock_type == SOCK_TCP){
         // printf("teste3\n");
         cyw43_arch_lwip_begin();
         err = tcp_write(state->tcp_pcb,data,size,TCP_WRITE_FLAG_COPY);
+        if (err == ERR_OK) state->buffer_tx_len = size;
         cyw43_arch_lwip_end();
     }else if(state->sock_type == SOCK_UDP) {
         // printf("teste4\n");
@@ -205,18 +210,14 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
                 return -1; 
             }
         }
-        printf("Sending %d\n",size);
-        // struct pbuf * p = pbuf_alloc(PBUF_TRANSPORT,size+1,PBUF_RAM);
-        // uint8_t *pt = (uint8_t *) p->payload;
-        // memcpy(pt,data,size);
-        // pt[size]='\0';
-
+        
         struct pbuf * p = pbuf_alloc(PBUF_TRANSPORT,size,PBUF_RAM);
         uint8_t *pt = (uint8_t *) p->payload;
         memcpy(pt,data,size);
         
         cyw43_arch_lwip_begin();
         err = udp_send(state->udp_pcb,p);
+        if (err == ERR_OK) state->buffer_tx_len = size;
         cyw43_arch_lwip_end();
         pbuf_free(p);
     }else{
@@ -227,25 +228,23 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
         printf("Send failed %d\n", err);
         return -1;
     } 
-    state->buffer_tx_len = state->buffer_tx_len + size;
 
-    // volatile uint64_t timedelay = time_us_64();
-    // uint64_t timedelay_last = timedelay;
-    // while(1){
-    //     timedelay_last = time_us_64();
-    //     if(state->checkDataSent && !state->checkDataRecv){
-    //         state->checkDataSent = false;
-    //         printf("check1\n");
-    //         break;
-    //     }else if ((timedelay_last - timedelay) >= (10*1000*1000)){
-    //         state->buffer_tx_len = 0;
-    //         printf("check2\n");
-    //         return -1;
-    //     }
-    // }
-
+    volatile uint64_t timedelay = time_us_64();
+    uint64_t timedelay_last = timedelay;
+    while(1){
+        timedelay_last = time_us_64();
+        if(state->checkDataSent){
+            state->checkDataSent = false;
+            printf("check1\n");
+            break;
+        }else if ((timedelay_last - timedelay) >= (10*1000*1000)){
+            state->buffer_tx_len = 0;
+            printf("check2\n");
+            return -1;
+        }
+    }
     // printf("teste - %d\n",size);
-    return size;
+    return state->buffer_tx_len;
 }
 
 int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struct mobile_addr *addr){

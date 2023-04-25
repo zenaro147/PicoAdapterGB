@@ -67,24 +67,25 @@ err_t socket_accept_tcp(void *arg, struct tcp_pcb *pcb, err_t err){
 
 err_t socket_sent_tcp(void *arg, struct tcp_pcb *pcb, u16_t len){
     struct socket_impl *state = (struct socket_impl*)arg;
+    err_t err = ERR_ABRT;
     if(state->buffer_tx_len != len){
         printf("TCP sent %d bytes to IP: %s:%d. But should sent %d\n",len,ip4addr_ntoa(&pcb->remote_ip),pcb->remote_port,state->buffer_tx_len);
-        return ERR_BUF;
+        state->buffer_tx_len = len;
+        err = ERR_BUF;
     }else{
         printf("TCP sent %d bytes to IP: %s:%d.\n",len,ip4addr_ntoa(&pcb->remote_ip),pcb->remote_port);
-        state->buffer_tx_len = 0;
-        printf("reset buffTX size\n");
-        state->buffer_rx_len = 0;
-        printf("reset buffRX size\n");
-        // state->checkDataSent = true;
-        return ERR_OK;
+        err = ERR_OK;
     }
+    state->checkDataSent = true;
+    return err;
 }
 
 err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err){
     struct socket_impl *state = (struct socket_impl*)arg;
     printf("TCP Receiving...\n");
-    cyw43_arch_lwip_check();
+    state->buffer_rx_len = 0;
+    printf("reset buffRX size\n");
+    // cyw43_arch_lwip_check();
     if(p){
         if (p->tot_len > 0) {
             printf("reading %d bytes\n", p->tot_len);

@@ -104,6 +104,7 @@ int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *add
 
     //Check if is open
     if(state->sock_type == SOCK_TCP && state->tcp_pcb->state != CLOSED){
+        cyw43_arch_poll();
         switch (state->tcp_pcb->state){
             case ESTABLISHED:
                 return 1;
@@ -229,20 +230,19 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
         return -1;
     } 
 
-    volatile uint64_t timedelay = time_us_64();
-    uint64_t timedelay_last = timedelay;
-    while(1){
-        timedelay_last = time_us_64();
-        if(state->checkDataSent){
-            state->checkDataSent = false;
-            printf("check1\n");
-            break;
-        }else if ((timedelay_last - timedelay) >= (10*1000*1000)){
-            state->buffer_tx_len = 0;
-            printf("check2\n");
-            return -1;
-        }
-    }
+    // volatile uint64_t timedelay = time_us_64();
+    // uint64_t timedelay_last = timedelay;
+    // while(1){
+        cyw43_arch_poll();
+    //     timedelay_last = time_us_64();
+    //     if(state->checkDataSent){
+    //         state->checkDataSent = false;
+    //         break;
+    //     }else if ((timedelay_last - timedelay) >= (10*1000*1000)){
+    //         state->buffer_tx_len = 0;
+    //         return -1;
+    //     }
+    // }
     // printf("teste - %d\n",size);
     return state->buffer_tx_len;
 }
@@ -287,19 +287,18 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
         }     
     }
 
-    volatile uint64_t timedelay = time_us_64();
-    uint64_t timedelay_last = timedelay;
-    while(1){
-        timedelay_last = time_us_64();
-        if(state->buffer_rx_len > 0 || state->checkDataRecv){
-            state->checkDataRecv = false;
-            printf("check1\n");
-            break;
-        }else if ((timedelay_last - timedelay) >= (10*1000*1000)){
-            printf("check2\n");
-            return -1;
-        }
-    }
+    // volatile uint64_t timedelay = time_us_64();
+    // uint64_t timedelay_last = timedelay;
+    // while(1){
+        cyw43_arch_poll();
+    //     timedelay_last = time_us_64();
+    //     if(state->buffer_rx_len > 0 || state->checkDataRecv){
+    //         state->checkDataRecv = false;
+    //         break;
+    //     }else if ((timedelay_last - timedelay) >= (10*1000*1000)){
+    //         return -1;
+    //     }
+    // }
 
     // printf("teste4\n");
     int recvd_buff = 0;
@@ -376,6 +375,7 @@ bool socket_impl_listen(struct socket_impl *state){
 }
 
 bool socket_impl_accept(struct socket_impl *state){
+    cyw43_arch_poll();
     if(state->client_status && state->sock_type == SOCK_TCP && state->tcp_pcb){
         switch(state->tcp_pcb->state){
             case ESTABLISHED:

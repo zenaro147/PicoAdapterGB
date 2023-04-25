@@ -28,8 +28,8 @@ bool speed_240_MHz = false;
 //#define DEBUG_SIGNAL_PINS
 //#define MOBILE_ENABLE_NO32BIT
 
-//#define ERASE_EEPROM //Encomment this to ERASE ALL stored config (including Adapter config)
-//#define CONFIG_MODE //Uncomment this if you want to reconfigure something
+// #define ERASE_EEPROM //Encomment this to ERASE ALL stored config (including Adapter config)
+// #define CONFIG_MODE //Uncomment this if you want to reconfigure something
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -206,7 +206,7 @@ void main(){
             main_set_port(&relay, MOBILE_DEFAULT_RELAY_PORT);
             mobile_config_set_relay(mobile->adapter, &relay);
         }else{
-            mobile_config_set_relay(adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
+            mobile_config_set_relay(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
         }
         mobile_config_set_p2p_port(mobile->adapter, P2P_PORT);
 
@@ -225,7 +225,6 @@ void main(){
         mobile_config_save(mobile->adapter);
         RefreshConfigBuff(mobile->config_eeprom,WiFiSSID,WiFiPASS);
 
-        cyw43_arch_init();
         printf("New configuration defined! Please comment the \'#define CONFIG_MODE\' again to back the adapter to the normal operation.\n");
         while (1){
             LED_ON;

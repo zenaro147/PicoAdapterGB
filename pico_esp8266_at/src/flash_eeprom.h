@@ -92,17 +92,19 @@ void SaveFlashConfig(uint8_t * buff){
     printf("Done.\n");
 }
 
-void RefreshConfigBuff(uint8_t * buff){    
+void RefreshConfigBuff(uint8_t * buff, char * WiFiSSID2, char * WiFiPASS2){    
     char tmp_ssid[32];
     memset(tmp_ssid,0x00,sizeof(tmp_ssid));
-    sprintf(tmp_ssid,"%s%s",KEY_SSID,WiFiSSID);
+    sprintf(tmp_ssid,"%s%s",KEY_SSID,WiFiSSID2);
     memcpy(buff+OFFSET_SSID,tmp_ssid,sizeof(tmp_ssid));
     char tmp_pass[32];
     memset(tmp_pass,0x00,sizeof(tmp_pass));
-    sprintf(tmp_pass,"%s%s",KEY_PASS,WiFiPASS);
+    sprintf(tmp_pass,"%s%s",KEY_PASS,WiFiPASS2);
     memcpy(buff+OFFSET_PASS,tmp_pass,sizeof(tmp_pass));
-    
+
     FormatFlashConfig();
+    printf("Programming target region... ");
     flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);
+    printf("Done.\n");
 }
 #endif

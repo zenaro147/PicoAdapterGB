@@ -22,8 +22,8 @@ bool speed_240_MHz = false;
 
 //#define DEBUG_SIGNAL_PINS
 
-// #define ERASE_EEPROM //Encomment this to ERASE ALL stored config (including Adapter config)
-// #define CONFIG_MODE //Uncomment this if you want to reconfigure something
+#define ERASE_EEPROM //Encomment this to ERASE ALL stored config (including Adapter config)
+#define CONFIG_MODE //Uncomment this if you want to reconfigure something
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -380,7 +380,7 @@ void core1_context() {
             main_set_port(&relay, MOBILE_DEFAULT_RELAY_PORT);
             mobile_config_set_relay(mobile->adapter, &relay);
         }else{
-            mobile_config_set_relay(adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
+            mobile_config_set_relay(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
         }
         mobile_config_set_p2p_port(mobile->adapter, P2P_PORT);
 

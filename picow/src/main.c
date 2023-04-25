@@ -22,8 +22,8 @@ bool speed_240_MHz = false;
 
 //#define DEBUG_SIGNAL_PINS
 
-#define ERASE_EEPROM //Encomment this to ERASE ALL stored config (including Adapter config)
-#define CONFIG_MODE //Uncomment this if you want to reconfigure something
+// #define ERASE_EEPROM //Encomment this to ERASE ALL stored config (including Adapter config)
+// #define CONFIG_MODE //Uncomment this if you want to reconfigure something
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 

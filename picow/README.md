@@ -21,7 +21,7 @@
 **⚠If this doesn't work, try to flip around Pin2(Serial Out) and Pin3(Serial In), as the pinout markings of your link cable breakout might be the other way around.⚠**
 
 
-### Configuring the device
+# Configuring the device
 To configure your WiFi network and some other parameters, you need to put the device in "Config Mode". To do that, connect the device to a PC and, using a Serial Monitor, send any character when the text `Press any key to enter in Setup Mode...` shows.
 
 When the message `Enter a command:` appears, you can enter the following commands below to set a value. To clear/reset the parameter, just enter the command without any value next, like this `WIFISSID=`.

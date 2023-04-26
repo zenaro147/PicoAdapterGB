@@ -12,6 +12,7 @@
 #include <mobile.h>
 #include <mobile_inet.h>
 
+#include "config_menu.h"
 #include "gblink.h"
 #include "flash_eeprom.h"
 #include "picow_socket.h"
@@ -21,10 +22,6 @@
 bool speed_240_MHz = false;
 
 //#define DEBUG_SIGNAL_PINS
-
-// #define ERASE_EEPROM //Encomment this to ERASE ALL stored config (including Adapter config)
-// #define CONFIG_MODE //Uncomment this if you want to reconfigure something
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 //Wi-Fi Controllers
@@ -47,76 +44,9 @@ volatile bool spiLock = false;
 volatile uint64_t time_us_now_check = 0;
 uint64_t last_readable_check = 0;
 
-////////////////////////
-// AUXILIAR FUNCTIONS //
-////////////////////////
-void main_parse_addr(struct mobile_addr *dest, char *argv){
-    unsigned char ip[MOBILE_INET_PTON_MAXLEN];
-    int rc = mobile_inet_pton(MOBILE_INET_PTON_ANY, argv, ip);
-
-    struct mobile_addr4 *dest4 = (struct mobile_addr4 *)dest;
-    struct mobile_addr6 *dest6 = (struct mobile_addr6 *)dest;
-    switch (rc) {
-        case MOBILE_INET_PTON_IPV4:
-            dest4->type = MOBILE_ADDRTYPE_IPV4;
-            memcpy(dest4->host, ip, sizeof(dest4->host));
-            break;
-        case MOBILE_INET_PTON_IPV6:
-            dest6->type = MOBILE_ADDRTYPE_IPV6;
-            memcpy(dest6->host, ip, sizeof(dest6->host));
-            break;
-        default:
-            break;
-    }
-}
-
-static bool main_parse_hex(unsigned char *buf, char *str, unsigned size){
-    unsigned char x = 0;
-    for (unsigned i = 0; i < size * 2; i++) {
-        char c = str[i];
-        if (c >= '0' && c <= '9') c -= '0';
-        else if (c >= 'A' && c <= 'F') c -= 'A' - 10;
-        else if (c >= 'a' && c <= 'f') c -= 'a' - 10;
-        else return false;
-
-        x <<= 4;
-        x |= c;
-
-        if (i % 2 == 1) {
-            buf[i / 2] = x;
-            x = 0;
-        }
-    }
-    return true;
-}
-
-void main_set_port(struct mobile_addr *dest, unsigned port){
-    struct mobile_addr4 *dest4 = (struct mobile_addr4 *)dest;
-    struct mobile_addr6 *dest6 = (struct mobile_addr6 *)dest;
-    switch (dest->type) {
-    case MOBILE_ADDRTYPE_IPV4:
-        dest4->port = port;
-        break;
-    case MOBILE_ADDRTYPE_IPV6:
-        dest6->port = port;
-        break;
-    default:
-        break;
-    }
-}
-
 /////////////////////////////////
 // MOBILE ADAPTER GB FUNCTIONS //
 /////////////////////////////////
-struct mobile_user {
-    struct mobile_adapter *adapter;
-    enum mobile_action action;
-    unsigned long picow_clock_latch[MOBILE_MAX_TIMERS];
-    uint8_t config_eeprom[FLASH_DATA_SIZE];
-    struct socket_impl socket[MOBILE_MAX_CONNECTIONS];
-    char number_user[MOBILE_MAX_NUMBER_SIZE + 1];
-    char number_peer[MOBILE_MAX_NUMBER_SIZE + 1];
-};
 struct mobile_user *mobile;
 
 static void impl_debug_log(void *user, const char *line){
@@ -270,7 +200,6 @@ void core1_context() {
 
     stdio_init_all();
     printf("Booting...\n");
-    cyw43_arch_init();
     busy_wait_us(SEC(5));
 
     #ifdef DEBUG_SIGNAL_PINS
@@ -283,32 +212,14 @@ void core1_context() {
         gpio_put(10, false);
     #endif
 
-    // For toggle_led
-    LED_ON;
-
     // Initialize SPI pins
     gpio_set_function(PIN_SPI_SCK, GPIO_FUNC_SPI), gpio_pull_up(PIN_SPI_SCK);
     gpio_set_function(PIN_SPI_SIN, GPIO_FUNC_SPI);
     gpio_set_function(PIN_SPI_SOUT, GPIO_FUNC_SPI);
-
+    
     //Libmobile Variables
-    enum mobile_adapter_device device = MOBILE_ADAPTER_BLUE;
-    bool device_unmetered = false;
-    struct mobile_addr dns1 = {0};
-    struct mobile_addr dns2 = {0};
-    unsigned dns_port = MOBILE_DNS_PORT;
-    unsigned p2p_port = MOBILE_DEFAULT_P2P_PORT;
-    struct mobile_addr relay = {0};
-    bool relay_token_update = false;
-    unsigned char *relay_token = NULL;
-    unsigned char relay_token_buf[MOBILE_RELAY_TOKEN_SIZE];
     mobile = malloc(sizeof(struct mobile_user));
 
-    #ifdef ERASE_EEPROM
-        cyw43_arch_deinit();
-        FormatFlashConfig();
-    #endif
-    
     memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
     ReadFlashConfig(mobile->config_eeprom, WiFiSSID, WiFiPASS); 
 
@@ -332,81 +243,12 @@ void core1_context() {
 
     mobile_config_load(mobile->adapter);
 
-    #ifdef CONFIG_MODE
-		char newSSID[28] = "WiFi_SSID";
-		char newPASS[28] = "P@$$w0rd";
+    BootMenuConfig(mobile,WiFiSSID,WiFiPASS);
 
-		char MAGB_DNS1[60] = "0.0.0.0";
-		char MAGB_DNS2[60] = "0.0.0.0";
-		unsigned MAGB_DNSPORT = 53;
-
-		char RELAY_SERVER[60] = "0.0.0.0";
-		unsigned P2P_PORT = 1027;
-
-		char RELAY_TOKEN[32] = "00000000000000000000000000000000";
-		bool updateRelayToken = false;
-
-		bool DEVICE_UNMETERED = false;
-
-        //Set the new values
-        memcpy(WiFiSSID,newSSID,sizeof(newSSID));
-        memcpy(WiFiPASS,newPASS,sizeof(newPASS));
-
-        //Set the values to the Adapter config
-        mobile_config_set_device(mobile->adapter, device, DEVICE_UNMETERED);
-        
-        if(strcmp(MAGB_DNS1,"0.0.0.0") != 0){
-            main_parse_addr(&dns1, MAGB_DNS1);
-            main_set_port(&dns1, MAGB_DNSPORT);
-            if(strcmp(MAGB_DNS2,"0.0.0.0") != 0){
-                main_parse_addr(&dns2, MAGB_DNS2);
-                main_set_port(&dns2, MAGB_DNSPORT);
-                mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
-            }else{
-                mobile_config_set_dns(mobile->adapter, &dns1, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
-            }
-        }else{
-            if(strcmp(MAGB_DNS2,"0.0.0.0") != 0){
-                main_parse_addr(&dns2, MAGB_DNS2);
-                main_set_port(&dns2, MAGB_DNSPORT);
-                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &dns2);
-            }else{
-                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
-            }
-        }
-        
-        if(strcmp(RELAY_SERVER,"0.0.0.0") != 0){
-            main_parse_addr(&relay, RELAY_SERVER);
-            main_set_port(&relay, MOBILE_DEFAULT_RELAY_PORT);
-            mobile_config_set_relay(mobile->adapter, &relay);
-        }else{
-            mobile_config_set_relay(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
-        }
-        mobile_config_set_p2p_port(mobile->adapter, P2P_PORT);
-
-        if (updateRelayToken) {
-            if(strcmp(RELAY_TOKEN,"00000000000000000000000000000000") != 0){
-                mobile_config_set_relay_token(mobile->adapter, NULL);
-            }else{
-                bool TokenOk = main_parse_hex(relay_token_buf, RELAY_TOKEN, sizeof(relay_token_buf));
-                if(!TokenOk){
-                    printf("Invalid Relay Token\n");
-                }else{
-                    mobile_config_set_relay_token(mobile->adapter, relay_token_buf);
-                }
-            }
-        }
-        mobile_config_save(mobile->adapter);
-        RefreshConfigBuff(mobile->config_eeprom,WiFiSSID,WiFiPASS);
-
-        cyw43_arch_init();
-        printf("New configuration defined! Please comment the \'#define CONFIG_MODE\' again to back the adapter to the normal operation.\n");
-        while (1){
-            LED_ON;
-            sleep_ms(300);
-            LED_OFF;
-        }
-    #endif
+    busy_wait_us(SEC(1));
+    cyw43_arch_init();
+    LED_ON;
+    busy_wait_us(SEC(2));
 
     isConnectedWiFi = PicoW_Connect_WiFi(WiFiSSID, WiFiPASS, MS(10));
     
@@ -429,7 +271,6 @@ void core1_context() {
             mobile->socket[i].buffer_tx_len = 0;
             mobile->socket[i].checkDataSent = false;
             mobile->socket[i].checkDataRecv = false;
-
         } 
 
         multicore_launch_core1(core1_context);
@@ -469,11 +310,11 @@ void core1_context() {
             }
         }
     }else{
-        printf("Error during WiFi connection! =(\n");
+        printf("Error during WiFi connection!\n");
         while(true){
-            LED_ON;
-            sleep_ms(200);
-            LED_OFF;
+            LED_TOGGLE;
+            busy_wait_us(MS(500));
+            LED_TOGGLE;
         }
     }
 }

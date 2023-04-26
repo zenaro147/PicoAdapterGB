@@ -11,4 +11,5 @@ Refer to the implementation's README.md for more details.
 -----------------------
 ### What need to do:
 * Implement a native 32bits mode for GBA
+* Better method to apply new configurations
 * Clean code

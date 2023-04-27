@@ -113,4 +113,12 @@ void *memmem(const void *l, size_t l_len, const void *s, size_t s_len){
 	return NULL;
 }
 
+// Find a string into a buffer
+bool FindCommand(char * buf, char * target){
+    if(strstr(buf, target) != NULL){
+        return true;
+    }
+    return false;
+} 
+
 #endif

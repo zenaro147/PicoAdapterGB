@@ -14,14 +14,18 @@
 #define ADDR_IPV4 1
 #define ADDR_IPV6 2
 
+extern int gval;
+
 struct esp_sock_config {
     int host_id;
     uint8_t host_type; //0=NONE, 1=TCP or 2=UDP
     uint8_t host_iptype; //IPV4, IPV6 or NONE
+    char host_addr[60];
     int local_port;
+    int remote_port;
     bool sock_status;
     bool isServerOpened;
-    int idpVal;
+    int ipdVal;
 };
 
 void socket_impl_init(struct esp_sock_config *state);

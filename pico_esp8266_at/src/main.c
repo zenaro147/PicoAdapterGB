@@ -32,6 +32,10 @@ bool speed_240_MHz = false;
 //#define DEBUG_SIGNAL_PINS
 //#define MOBILE_ENABLE_NO32BIT
 
+uint8_t buffATrx[BUFF_AT_SIZE+64]; // + extra bytes to hold the AT command answer echo
+int buffATrx_pointer;
+uint8_t buffRecData[BUFF_AT_SIZE];
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //LED Config
 #define LED_PIN       		  	25
@@ -271,12 +275,14 @@ void main(){
         for (int i = 0; i < MOBILE_MAX_TIMERS; i++) mobile->esp_clock_latch[i] = 0;
         for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
             mobile->esp_sockets[i].host_id = -1;
-            mobile->esp_sockets[i].host_iptype = MOBILE_ADDRTYPE_NONE;
-            mobile->esp_sockets[i].host_type = 0;
+            mobile->esp_sockets[i].host_iptype = ADDR_NONE;
+            mobile->esp_sockets[i].host_type = TYPE_NONE;
+            memset(mobile->esp_sockets[i].host_addr,0x00,sizeof(mobile->esp_sockets[i].host_addr));
             mobile->esp_sockets[i].local_port = -1;
+            mobile->esp_sockets[i].remote_port = -1;
             mobile->esp_sockets[i].sock_status = false;
             mobile->esp_sockets[i].isServerOpened = false;
-            mobile->esp_sockets[i].idpVal = 0;
+            mobile->esp_sockets[i].ipdVal = 0;
             ESP_CloseSockConn(UART_ID,i);
         }
 

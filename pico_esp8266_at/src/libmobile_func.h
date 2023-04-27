@@ -32,7 +32,7 @@ static inline void trigger_spi(spi_inst_t *spi, uint baudrate) {
 // Auxiliar functions
 ////////////////////////
 
-void main_parse_addr(struct mobile_addr *dest, char *argv){
+int main_parse_addr(struct mobile_addr *dest, char *argv){
     unsigned char ip[MOBILE_INET_PTON_MAXLEN];
     int rc = mobile_inet_pton(MOBILE_INET_PTON_ANY, argv, ip);
 
@@ -42,12 +42,16 @@ void main_parse_addr(struct mobile_addr *dest, char *argv){
         case MOBILE_INET_PTON_IPV4:
             dest4->type = MOBILE_ADDRTYPE_IPV4;
             memcpy(dest4->host, ip, sizeof(dest4->host));
+            return 1;
             break;
         case MOBILE_INET_PTON_IPV6:
             dest6->type = MOBILE_ADDRTYPE_IPV6;
             memcpy(dest6->host, ip, sizeof(dest6->host));
+            return 1;
             break;
         default:
+            printf("Invalid IP address\n");
+            return 0;
             break;
     }
 }
@@ -83,6 +87,7 @@ void main_set_port(struct mobile_addr *dest, unsigned port){
         dest6->port = port;
         break;
     default:
+        printf("Invalid Port\n");
         break;
     }
 }

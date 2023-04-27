@@ -16,6 +16,7 @@
 #include "hardware/spi.h"
 #include "hardware/resets.h"
 #include "hardware/flash.h"
+#include "hardware/watchdog.h"
 
 #include "common.h"
 #include "esp_at.h"
@@ -27,9 +28,6 @@ bool speed_240_MHz = false;
 
 //#define DEBUG_SIGNAL_PINS
 //#define MOBILE_ENABLE_NO32BIT
-
-// #define ERASE_EEPROM //Encomment this to ERASE ALL stored config (including Adapter config)
-// #define CONFIG_MODE //Uncomment this if you want to reconfigure something
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -123,7 +121,7 @@ void main(){
     bool device_unmetered = false;
     struct mobile_addr dns1 = {0};
     struct mobile_addr dns2 = {0};
-    unsigned dns_port = MOBILE_DNS_PORT;
+    unsigned dns_port = -1;
     unsigned p2p_port = MOBILE_DEFAULT_P2P_PORT;
     struct mobile_addr relay = {0};
     bool relay_token_update = false;
@@ -158,80 +156,278 @@ void main(){
     mobile_def_update_number(mobile->adapter, impl_update_number);
 
     mobile_config_load(mobile->adapter);
-    #ifdef CONFIG_MODE
-        char newSSID[28] = "WiFi_SSID";
-        char newPASS[28] = "P@$$w0rd";
+   
+    //CONFIG MODE
+    int UserInput;
+    printf("Press any key to enter in Setup Mode...\n");
+    UserInput = getchar_timeout_us(SEC(5));
+    if(UserInput != PICO_ERROR_TIMEOUT){
+        char UserCMD[512] = {0};
+        bool needSave = false;
+        int haveDNS1 = 0;
+        int haveDNS2 = 0;
+        int haveRelaySrv = 0;
 
-        char MAGB_DNS1[60] = "0.0.0.0";
-        char MAGB_DNS2[60] = "0.0.0.0";
-        unsigned MAGB_DNSPORT = 53;
+        while(1){
+            printf("Enter a command: \n");
+            scanf("%512s",UserCMD);
 
-        char RELAY_SERVER[60] = "0.0.0.0";
-        unsigned P2P_PORT = 1027;
-
-        char RELAY_TOKEN[32] = "00000000000000000000000000000000";
-        bool updateRelayToken = false;
-
-        bool DEVICE_UNMETERED = false;
-
-        //Set the new values
-        memcpy(WiFiSSID,newSSID,sizeof(newSSID));
-        memcpy(WiFiPASS,newPASS,sizeof(newPASS));
-
-        //Set the values to the Adapter config
-        mobile_config_set_device(mobile->adapter, device, DEVICE_UNMETERED);
-        
-        if(strcmp(MAGB_DNS1,"0.0.0.0") != 0){
-            main_parse_addr(&dns1, MAGB_DNS1);
-            main_set_port(&dns1, MAGB_DNSPORT);
-            if(strcmp(MAGB_DNS2,"0.0.0.0") != 0){
-                main_parse_addr(&dns2, MAGB_DNS2);
-                main_set_port(&dns2, MAGB_DNSPORT);
-                mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
-            }else{
-                mobile_config_set_dns(mobile->adapter, &dns1, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
-            }
-        }else{
-            if(strcmp(MAGB_DNS2,"0.0.0.0") != 0){
-                main_parse_addr(&dns2, MAGB_DNS2);
-                main_set_port(&dns2, MAGB_DNSPORT);
-                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &dns2);
-            }else{
-                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
-            }
-        }
-        
-        if(strcmp(RELAY_SERVER,"0.0.0.0") != 0){
-            main_parse_addr(&relay, RELAY_SERVER);
-            main_set_port(&relay, MOBILE_DEFAULT_RELAY_PORT);
-            mobile_config_set_relay(mobile->adapter, &relay);
-        }else{
-            mobile_config_set_relay(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
-        }
-        mobile_config_set_p2p_port(mobile->adapter, P2P_PORT);
-
-        if (updateRelayToken) {
-            if(strcmp(RELAY_TOKEN,"00000000000000000000000000000000") != 0){
-                mobile_config_set_relay_token(mobile->adapter, NULL);
-            }else{
-                bool TokenOk = main_parse_hex(relay_token_buf, RELAY_TOKEN, sizeof(relay_token_buf));
-                if(!TokenOk){
-                    printf("Invalid Relay Token\n");
+            //Set the new WiFi SSID
+            if(FindCommand(UserCMD,"WIFISSID=")){
+                if(strlen(UserCMD)-9 > 0){
+                    memset(WiFiSSID,0x00,sizeof(WiFiSSID));
+                    memcpy(WiFiSSID,UserCMD+9,strlen(UserCMD)-9);
+                    printf("New WiFi SSID defined.\n");
+                    needSave=true;  
+                }else if(strlen(UserCMD)-9 == 0){
+                    memcpy(WiFiSSID,"WiFi_Network",12);
+                    printf("Default WiFi SSID defined.\n");
+                    needSave=true;  
                 }else{
-                    mobile_config_set_relay_token(mobile->adapter, relay_token_buf);
+                    printf("Invalid parameter.\n");
+                }
+
+            //Set the new WiFi Password
+            }else if(FindCommand(UserCMD,"WIFIPASS=")){
+                if(strlen(UserCMD)-9 > 0){
+                    memset(WiFiPASS,0x00,sizeof(WiFiPASS));
+                    memcpy(WiFiPASS,UserCMD+9,strlen(UserCMD)-9);
+                    printf("New WiFi Password defined.\n");
+                    needSave=true;
+                }else if(strlen(UserCMD)-9 == 0){
+                    memcpy(WiFiPASS,"P@$$w0rd",8);
+                    printf("Default WiFi Password defined.\n");
+                    needSave=true;
+                }else{
+                    printf("Invalid parameter.\n");
+                }
+            
+            //Set the new DNS1 for Libmobile
+            }else if(FindCommand(UserCMD,"DNS1=")){
+                if(strlen(UserCMD)-5 > 0){
+                    char MAGB_DNS[60] = {0};
+                    memcpy(MAGB_DNS,UserCMD+5,strlen(UserCMD)-5);
+                    haveDNS1 = main_parse_addr(&dns1, MAGB_DNS);
+                    if(haveDNS1 == 1){
+                        printf("New DNS Server 1 defined.\n");
+                        needSave=true;
+                    } 
+                }else if(strlen(UserCMD)-5 == 0){
+                      haveDNS1 = -1;
+                      printf("Default DNS Server 1 defined.\n");
+                      needSave=true;
+                }else{
+                    printf("Invalid parameter.\n");
+                }
+
+            //Set the new DNS2 for Libmobile
+            }else if(FindCommand(UserCMD,"DNS2=")){
+                if(strlen(UserCMD)-5 > 0){
+                    char MAGB_DNS[60] = {0};
+                    memcpy(MAGB_DNS,UserCMD+5,strlen(UserCMD)-5);
+                    haveDNS2 = main_parse_addr(&dns2, MAGB_DNS);
+                    if(haveDNS2 == 1){
+                        printf("New DNS Server 2 defined.\n");
+                        needSave=true;
+                    } 
+                }else if(strlen(UserCMD)-5 == 0){
+                      haveDNS2 = -1;
+                      printf("Default DNS Server 2 defined.\n");
+                      needSave=true;
+                }else{
+                    printf("Invalid parameter.\n");
+                } 
+            
+            //Set the new DNS Port for Libmobile
+            }else if(FindCommand(UserCMD,"DNSPORT=")){
+                if(strlen(UserCMD)-8 > 0){
+                    char dnsportstr[6] = {0};
+                    memcpy(dnsportstr,UserCMD+8,strlen(UserCMD)-8);
+                    if(atoi(dnsportstr) > 0){
+                        dns_port = atoi(dnsportstr);
+                        printf("New DNS Server port defined.\n");
+                    }else{
+                        printf("Invalid parameter.\n");
+                    }
+                    needSave=true;
+                }else if(strlen(UserCMD)-8 == 0){
+                    dns_port = MOBILE_DNS_PORT;
+                    printf("Default DNS Server port defined.\n");
+                    needSave=true;
+                }else{
+                    printf("Invalid parameter.\n");
+                } 
+            
+            //Set the new Relay Server IP for Libmobile               
+            }else if(FindCommand(UserCMD,"RELAYSERVER=")){
+                if(strlen(UserCMD)-12 > 0){
+                    char RELAY_SERVER[60] = {0};
+                    memcpy(RELAY_SERVER,UserCMD+12,strlen(UserCMD)-12);
+                    haveRelaySrv = main_parse_addr(&relay, RELAY_SERVER);
+                    if(haveRelaySrv == 1){
+                        main_set_port(&relay, MOBILE_DEFAULT_RELAY_PORT);
+                        mobile_config_set_relay(mobile->adapter, &relay);
+                        printf("New Relay Server Address defined.\n");
+                        needSave=true;
+                    } 
+                }else if(strlen(UserCMD)-12 == 0){
+                    mobile_config_set_relay(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
+                    printf("Relay Server Address removed.\n");
+                    needSave=true;
+                }else{
+                    printf("Invalid parameter.\n");
+                } 
+
+            //Set the new Relay Token for Libmobile                    
+            }else if(FindCommand(UserCMD,"RELAYTOKEN=")){
+                if(strlen(UserCMD)-11 > 0){
+                    char RELAY_TOKEN[32] = {0};
+                    memcpy(RELAY_TOKEN,UserCMD+5,32);
+                    bool TokenOk = main_parse_hex(relay_token_buf, RELAY_TOKEN, sizeof(relay_token_buf));
+                    if(!TokenOk){
+                        printf("Invalid parameter.\n");
+                    }else{
+                        mobile_config_set_relay_token(mobile->adapter, relay_token_buf);
+                        printf("New Relay Token defined.\n");
+                        needSave=true;
+                    }
+                }else if(strlen(UserCMD)-11 == 0){
+                    mobile_config_set_relay_token(mobile->adapter, NULL);
+                    printf("Relay Token removed.\n");
+                    needSave=true;
+                }else{
+                    printf("Invalid parameter.\n");
+                } 
+
+            //Set the new P2P Port for Libmobile 
+            }else if(FindCommand(UserCMD,"P2PPORT=")){
+                if(strlen(UserCMD)-8 > 0){
+                    char p2pportstr[6] = {0};                    
+                    memcpy(p2pportstr,UserCMD+8,strlen(UserCMD)-8);
+                    if(atoi(p2pportstr) > 0){
+                        mobile_config_set_p2p_port(mobile->adapter, atoi(p2pportstr));
+                        printf("New P2P Port defined.\n");
+                    }else{
+                        printf("Invalid parameter.\n");
+                    }
+                    needSave=true;
+                }else if(strlen(UserCMD)-8 == 0){
+                    mobile_config_set_p2p_port(mobile->adapter, MOBILE_DEFAULT_P2P_PORT);
+                    printf("Default P2P Port defined.\n");
+                    needSave=true;
+                }else{
+                    printf("Invalid parameter.\n");
+                } 
+            
+            //Set the new Unmetered setting for Libmobile 
+            }else if(FindCommand(UserCMD,"UNMETERED=")){
+                if(strlen(UserCMD)-10 == 1){
+                    bool unmeteredcheck=false;
+                    switch (UserCMD[10]){
+                        case '0':
+                            unmeteredcheck=false;
+                            break;
+                        case '1':
+                            unmeteredcheck=true;
+                            break;
+                        default:
+                            printf("Invalid parameter. Applying default value.\n");
+                            break;
+                    }
+                    mobile_config_set_device(mobile->adapter, device, unmeteredcheck);
+                    printf("New Unmetered value defined.\n");
+                    needSave=true;
+                }else if(strlen(UserCMD)-10 == 0){
+                    mobile_config_set_device(mobile->adapter, device, false);
+                    printf("Default Unmetered value defined.\n");
+                    needSave=true;
+                }else{
+                    printf("Invalid parameter.\n");
+                } 
+            
+            //Format the entire EEPROM, if necessary
+            }else if(FindCommand(UserCMD,"FORMAT_EEPROM")){
+                FormatFlashConfig();
+            //Exit from Menu
+            }else if(FindCommand(UserCMD,"EXIT")){
+                break;
+            }else if(FindCommand(UserCMD,"HELP")){
+                printf("Command Sintax: <COMMAND>=<VALUE>\n");
+                printf("To reset/clear a parameter, leave the <VALUE> blank, for example: WIFISSID=\n");
+                printf("All commands are Case-Sensitive\n\n");
+                printf("Command List:\n");
+                printf("WIFISSID    | Set the SSID to use to connect.\n");
+                printf("WIFIPASS    | Set the password from the WiFi network to use to connect.\n");
+                printf("DNS1        | Set primary DNS that the adapter will use to parse the nameservers.\n");
+                printf("DNS2        | Set secondary DNS that the adapter will use to parse the nameservers.\n");
+                printf("DNSPORT     | Set a custom DNS port to use with the DNS servers.\n");
+                printf("RELAYSERVER | Set a Relay Server that will be use during P2P communications.\n");
+                printf("RELAYTOKEN  | Set a Relay Token that will be used on Relay Server to receive a valid number to use during P2P communications.\n");
+                printf("P2PPORT     | Set a custom P2P port to use during P2P communications (Local Network only).\n");
+                printf("UNMETERED   | Set if the device will be Unmetered (useful for Pokemon Crystal).\n");
+                printf("EXIT        | Quit from Config Mode and Save the new values. If you change some value, the device will reboot.\n\n");
+                
+            //Generic error return
+            }else{
+                printf("Invalid command.\n");
+            }
+        }
+
+        if(needSave){
+            printf("Saving new configs...\n");
+
+            //Parsing new DNS Server
+            if (haveDNS1 == 1 && haveDNS2 == 1){
+                if(dns_port > 0){
+                    main_set_port(&dns1, dns_port);
+                    main_set_port(&dns2, dns_port);
+                }
+                mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
+            }else if (haveDNS1 == -1 && haveDNS2 == -1){
+                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
+            }else if (haveDNS1 == 1 && haveDNS2 == -1){
+                if(dns_port > 0){
+                    main_set_port(&dns1, dns_port);
+                }
+                mobile_config_set_dns(mobile->adapter, &dns1, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
+            }else if (haveDNS1 == -1 && haveDNS2 == 1){
+                if(dns_port > 0){
+                    main_set_port(&dns2, dns_port);
+                }
+                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &dns2);
+            }else if (haveDNS1 == 0 || haveDNS2 == 0){
+                mobile_config_get_dns(mobile->adapter, &dns1, &dns2);
+                if (haveDNS1 == 0 && haveDNS2 == -1){
+                    if(dns_port > 0){
+                        main_set_port(&dns1, dns_port);
+                    }
+                    mobile_config_set_dns(mobile->adapter, &dns1, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
+                }else if (haveDNS1 == -1 && haveDNS2 == 0){
+                    if(dns_port > 0){
+                        main_set_port(&dns2, dns_port);
+                    }
+                    mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &dns2);
+                }else{
+                    if(dns_port > 0){
+                        main_set_port(&dns1, dns_port);
+                        main_set_port(&dns2, dns_port);
+                    }
+                    mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
                 }
             }
-        }
-        mobile_config_save(mobile->adapter);
-        RefreshConfigBuff(mobile->config_eeprom,WiFiSSID,WiFiPASS);
 
-        printf("New configuration defined! Please comment the \'#define CONFIG_MODE\' again to back the adapter to the normal operation.\n");
-        while (1){
-            LED_ON;
-            sleep_ms(300);
-            LED_OFF;
+            //Save new Configs
+            mobile_config_save(mobile->adapter);
+            RefreshConfigBuff(mobile->config_eeprom,WiFiSSID,WiFiPASS);
+
+            printf("Rebooting device...\n");
+
+            watchdog_enable(100, 1);
+            watchdog_update();
+            while(1);
         }
-    #endif
+    }
+    printf("Continuing initialization...\n");
 
     //////////////////////
     // CONFIGURE THE ESP

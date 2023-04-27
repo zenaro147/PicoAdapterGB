@@ -1,10 +1,5 @@
-add_executable(${PROJECT_NAME}_PicoESP01    src/main.c
-                                            src/libmobile_func.c
-                                            src/gblink.c
-                                            src/esp_at.c
-                                            src/flash_eeprom.c
-                                            src/config_menu.c)
-                                            
+add_executable(${PROJECT_NAME}_PicoESP01 src/main.c)
+ 
 # Pull in our pico_stdlib which pulls in commonly used features
 target_link_libraries(${PROJECT_NAME}_PicoESP01 libmobile pico_stdlib pico_multicore hardware_spi hardware_uart hardware_flash)
 

@@ -9,22 +9,18 @@
 // ---- https://docs.espressif.com/projects/esp-at/en/release-v2.2.0.0_esp8266/AT_Command_Set/index.html
 ////////////////////////////////////
 
-#include <stdio.h>
-#include <stdlib.h>
-
-#include "hardware/irq.h"
-
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/timer.h"
 #include "hardware/gpio.h"
+#include "hardware/spi.h"
+#include "hardware/resets.h"
+#include "hardware/flash.h"
 
-
-#include "gblink.h"
+#include "common.h"
 #include "esp_at.h"
 #include "flash_eeprom.h"
 #include "libmobile_func.h"
-#include "config_menu.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool speed_240_MHz = false;
@@ -32,146 +28,10 @@ bool speed_240_MHz = false;
 //#define DEBUG_SIGNAL_PINS
 //#define MOBILE_ENABLE_NO32BIT
 
+// #define ERASE_EEPROM //Encomment this to ERASE ALL stored config (including Adapter config)
+// #define CONFIG_MODE //Uncomment this if you want to reconfigure something
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-//LED Config
-#define LED_PIN       		  	25
-#define LED_SET(A)    		  	(gpio_put(LED_PIN, (A)))
-#define LED_ON        		  	LED_SET(true)
-#define LED_OFF       		  	LED_SET(false)
-#define LED_TOGGLE    		  	(gpio_put(LED_PIN, !gpio_get(LED_PIN)))
-
-volatile uint64_t time_us_now = 0;
-uint64_t last_readable = 0;
-
-//Wi-Fi Controllers
-bool isConnectedWiFi = false;
-char WiFiSSID[28] = "WiFi_Network";
-char WiFiPASS[28] = "P@$$w0rd";
-
-//Control Bools
-bool isESPDetected = false;
-bool haveConfigToWrite = false;
-
-volatile bool spiLock = false;
-
-/////////////////////////////////
-// MOBILE ADAPTER GB FUNCTIONS //
-/////////////////////////////////
-struct mobile_user *mobile;
-
-static void impl_debug_log(void *user, const char *line){
-    (void)user;
-    fprintf(stderr, "%s\n", line);
-}
-
-static void impl_serial_disable(void *user) {
-    #ifdef DEBUG_SIGNAL_PINS
-        gpio_put(10, true);
-    #endif
-    struct mobile_user *mobile = (struct mobile_user *)user;
-    while(spiLock);
-    spi_deinit(SPI_PORT);    
-}
-
-static void impl_serial_enable(void *user, bool mode_32bit) {
-    (void)mode_32bit;
-    struct mobile_user *mobile = (struct mobile_user *)user;
-    trigger_spi(SPI_PORT,SPI_BAUDRATE_256);
-    #ifdef DEBUG_SIGNAL_PINS
-        gpio_put(10, false);
-    #endif
-}
-
-static bool impl_config_read(void *user, void *dest, const uintptr_t offset, const size_t size) {
-    struct mobile_user *mobile = (struct mobile_user *)user;
-    for(int i = 0; i < size; i++){
-        ((char *)dest)[i] = (char)mobile->config_eeprom[OFFSET_MAGB + offset + i];
-    }
-    return true;
-}
-
-static bool impl_config_write(void *user, const void *src, const uintptr_t offset, const size_t size) {
-    struct mobile_user *mobile = (struct mobile_user *)user;
-    for(int i = 0; i < size; i++){
-        mobile->config_eeprom[OFFSET_MAGB + offset + i] = ((uint8_t *)src)[i];
-    }
-    haveConfigToWrite = true;
-    last_readable = time_us_64();
-    return true;
-}
-
-static void impl_time_latch(void *user, unsigned timer) {
-    struct mobile_user *mobile = (struct mobile_user *)user;
-    mobile->esp_clock_latch[timer] = time_us_64();
-}
-
-static bool impl_time_check_ms(void *user, unsigned timer, unsigned ms) {
-    struct mobile_user *mobile = (struct mobile_user *)user;
-    return ((time_us_64() - mobile->esp_clock_latch[timer]) >= MS(ms));
-}
-
-//Callbacks
-static bool impl_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
-    struct mobile_user *mobile = (struct mobile_user *)user;
-    // printf("mobile_impl_sock_open\n");
-    return socket_impl_open(&mobile->esp_sockets[conn], conn, socktype, addrtype, bindport);
-}
-
-static void impl_sock_close(void *user, unsigned conn){
-    struct mobile_user *mobile = (struct mobile_user *)user;
-    // printf("mobile_impl_sock_close\n");
-    return socket_impl_close(&mobile->esp_sockets[conn]);
-}
-
-static int impl_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
-    struct mobile_user *mobile = (struct mobile_user *)user;
-    // printf("mobile_impl_sock_connect\n"); 
-    return socket_impl_connect(&mobile->esp_sockets[conn], addr);
-}
-
-static int impl_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){
-    struct mobile_user *mobile = (struct mobile_user *)user;
-    // printf("mobile_impl_sock_send\n");
-    return socket_impl_send(&mobile->esp_sockets[conn], data, size, addr);
-}
-
-static int impl_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
-    struct mobile_user *mobile = (struct mobile_user *)user;    
-    // printf("mobile_impl_sock_recv\n");
-    return socket_impl_recv(&mobile->esp_sockets[conn], data, size, addr);
-}
-
-static bool impl_sock_listen(void *user, unsigned conn){ 
-    struct mobile_user *mobile = (struct mobile_user *)user;
-    // printf("mobile_impl_sock_listen\n");
-    return socket_impl_listen(&mobile->esp_sockets[conn]);
-}
-
-static bool impl_sock_accept(void *user, unsigned conn){
-    struct mobile_user *mobile = (struct mobile_user *)user;
-    // printf("mobile_impl_sock_accept\n"); 
-    return socket_impl_accept(&mobile->esp_sockets[conn]);
-}
-
-static void impl_update_number(void *user, enum mobile_number type, const char *number){
-    struct mobile_user *mobile = (struct mobile_user *)user;
-    char *dest = NULL;
-
-    switch (type) {
-        case MOBILE_NUMBER_USER: dest = mobile->number_user; break;
-        case MOBILE_NUMBER_PEER: dest = mobile->number_peer; break;
-        default: assert(false); return;
-    }
-
-    if (number) {
-        strncpy(dest, number, MOBILE_MAX_NUMBER_SIZE);
-        dest[MOBILE_MAX_NUMBER_SIZE] = '\0';
-    } else {
-        dest[0] = '\0';
-    }
-}
-
-
 
 ///////////////////////////////////////
 // Main Functions and Core 1 Loop
@@ -183,7 +43,51 @@ void core1_context() {
     while (true) {
         if(spi_is_readable(SPI_PORT)){
             spiLock = true;
-            spi_get_hw(SPI_PORT)->dr = mobile_transfer(mobile->adapter, spi_get_hw(SPI_PORT)->dr);
+            //spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, spi_get_hw(SPI_PORT)->dr);
+            if(!is32bitsMode){
+               spi_get_hw(SPI_PORT)->dr = mobile_transfer(mobile->adapter, spi_get_hw(SPI_PORT)->dr);
+            }else{
+                // Mario Kart Data Sample
+                // 0x99661900  0xD2D2D2D2  // Start signal, command 0x19 (read eeprom)
+                // 0x00020080  0xD2D2D2D2  // Packet size 2, data = [0x00, 0x80] (read from offset 0, 0x80 bytes)
+                // 0x0000009B  0xD2D2D2D2  // Padding, 2-byte checksum (0x009B)
+                // 0x81000000  0x88990000  // Device ID (0x81 = GBA, 0x88 = Blue adapter), acknowledgement (0x19 ^ 0x80) = 0x99 for current command
+
+                buff32[buff32_pointer++] = spi_get_hw(SPI_PORT)->dr;
+                if(buff32_pointer >= 4){
+                    #ifdef DEBUG_SIGNAL_PINS
+                    gpio_put(9, true);
+                    #endif
+                    uint8_t tmpbuff[4];
+                    //for(int x = 0 ; x < 4 ; x++){                   
+                    //    spi_get_hw(SPI_PORT)->dr = mobile_transfer(&mobile->adapter, buff32[x]);  
+                    //}
+
+                    //for(int x = 0 ; x < 4 ; x++){                   
+                    //    tmpbuff[x] = mobile_transfer(&mobile->adapter, buff32[3-x]);
+                    //}
+                    //for(int x = 0 ; x < 4 ; x++){                   
+                    //    spi_get_hw(SPI_PORT)->dr = tmpbuff[3-x];
+                    //}
+
+                    //buff32[0] = spi_get_hw(SPI_PORT)->dr;
+                    //buff32[1] = spi_get_hw(SPI_PORT)->dr;
+                    //buff32[2] = spi_get_hw(SPI_PORT)->dr;
+                    //buff32[3] = spi_get_hw(SPI_PORT)->dr;
+                    tmpbuff[0] = mobile_transfer(mobile->adapter, buff32[0]);
+                    tmpbuff[1] = mobile_transfer(mobile->adapter, buff32[1]);
+                    tmpbuff[2] = mobile_transfer(mobile->adapter, buff32[2]);
+                    tmpbuff[3] = mobile_transfer(mobile->adapter, buff32[3]);
+                    spi_get_hw(SPI_PORT)->dr = tmpbuff[0];
+                    spi_get_hw(SPI_PORT)->dr = tmpbuff[1];
+                    spi_get_hw(SPI_PORT)->dr = tmpbuff[2];
+                    spi_get_hw(SPI_PORT)->dr = tmpbuff[3];
+                    buff32_pointer -= 4;
+                    #ifdef DEBUG_SIGNAL_PINS
+                    gpio_put(9, false);
+                    #endif
+                }
+            }
             spiLock = false;
         }
     }
@@ -228,8 +132,12 @@ void main(){
 
     mobile = malloc(sizeof(struct mobile_user));
 
+    #ifdef ERASE_EEPROM
+    FormatFlashConfig();
+    #endif
+
     memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
-    ReadFlashConfig(mobile->config_eeprom,WiFiSSID,WiFiPASS); 
+    ReadFlashConfig(mobile->config_eeprom); 
 
     // Initialize mobile library
     mobile->adapter = mobile_new(mobile);
@@ -250,8 +158,80 @@ void main(){
     mobile_def_update_number(mobile->adapter, impl_update_number);
 
     mobile_config_load(mobile->adapter);
-    
-    BootMenuConfig(mobile,WiFiSSID,WiFiPASS);
+    #ifdef CONFIG_MODE
+        char newSSID[28] = "WiFi_SSID";
+        char newPASS[28] = "P@$$w0rd";
+
+        char MAGB_DNS1[60] = "0.0.0.0";
+        char MAGB_DNS2[60] = "0.0.0.0";
+        unsigned MAGB_DNSPORT = 53;
+
+        char RELAY_SERVER[60] = "0.0.0.0";
+        unsigned P2P_PORT = 1027;
+
+        char RELAY_TOKEN[32] = "00000000000000000000000000000000";
+        bool updateRelayToken = false;
+
+        bool DEVICE_UNMETERED = false;
+
+        //Set the new values
+        memcpy(WiFiSSID,newSSID,sizeof(newSSID));
+        memcpy(WiFiPASS,newPASS,sizeof(newPASS));
+
+        //Set the values to the Adapter config
+        mobile_config_set_device(mobile->adapter, device, DEVICE_UNMETERED);
+        
+        if(strcmp(MAGB_DNS1,"0.0.0.0") != 0){
+            main_parse_addr(&dns1, MAGB_DNS1);
+            main_set_port(&dns1, MAGB_DNSPORT);
+            if(strcmp(MAGB_DNS2,"0.0.0.0") != 0){
+                main_parse_addr(&dns2, MAGB_DNS2);
+                main_set_port(&dns2, MAGB_DNSPORT);
+                mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
+            }else{
+                mobile_config_set_dns(mobile->adapter, &dns1, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
+            }
+        }else{
+            if(strcmp(MAGB_DNS2,"0.0.0.0") != 0){
+                main_parse_addr(&dns2, MAGB_DNS2);
+                main_set_port(&dns2, MAGB_DNSPORT);
+                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &dns2);
+            }else{
+                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
+            }
+        }
+        
+        if(strcmp(RELAY_SERVER,"0.0.0.0") != 0){
+            main_parse_addr(&relay, RELAY_SERVER);
+            main_set_port(&relay, MOBILE_DEFAULT_RELAY_PORT);
+            mobile_config_set_relay(mobile->adapter, &relay);
+        }else{
+            mobile_config_set_relay(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
+        }
+        mobile_config_set_p2p_port(mobile->adapter, P2P_PORT);
+
+        if (updateRelayToken) {
+            if(strcmp(RELAY_TOKEN,"00000000000000000000000000000000") != 0){
+                mobile_config_set_relay_token(mobile->adapter, NULL);
+            }else{
+                bool TokenOk = main_parse_hex(relay_token_buf, RELAY_TOKEN, sizeof(relay_token_buf));
+                if(!TokenOk){
+                    printf("Invalid Relay Token\n");
+                }else{
+                    mobile_config_set_relay_token(mobile->adapter, relay_token_buf);
+                }
+            }
+        }
+        mobile_config_save(mobile->adapter);
+        RefreshConfigBuff(mobile->config_eeprom,WiFiSSID,WiFiPASS);
+
+        printf("New configuration defined! Please comment the \'#define CONFIG_MODE\' again to back the adapter to the normal operation.\n");
+        while (1){
+            LED_ON;
+            sleep_ms(300);
+            LED_OFF;
+        }
+    #endif
 
     //////////////////////
     // CONFIGURE THE ESP
@@ -275,8 +255,6 @@ void main(){
             mobile->esp_sockets[i].host_type = 0;
             mobile->esp_sockets[i].local_port = -1;
             mobile->esp_sockets[i].sock_status = false;
-            mobile->esp_sockets[i].isServerOpened = false;
-            mobile->esp_sockets[i].idpVal = 0;
             ESP_CloseSockConn(UART_ID,i);
         }
 

@@ -55,31 +55,34 @@ void socket_impl_close(struct socket_impl *state){
     err_t err = ERR_ARG;
     switch (state->sock_type) {
         case SOCK_TCP:
-            err = tcp_close(state->tcp_pcb);
-            if (err != ERR_OK) {
-                printf("close failed %d, calling abort\n", err);
-                tcp_abort(state->tcp_pcb);
+            if(state->tcp_pcb){
+                err = tcp_close(state->tcp_pcb);
+                if (err != ERR_OK) {
+                    // printf("close failed %d, calling abort\n", err);
+                    tcp_abort(state->tcp_pcb);
+                }
+                tcp_arg(state->tcp_pcb, NULL);
+                //tcp_poll(state->tcp_pcb, NULL, 0);
+                tcp_accept(state->tcp_pcb, NULL);
+                tcp_sent(state->tcp_pcb, NULL);
+                tcp_recv(state->tcp_pcb, NULL);
+                tcp_err(state->tcp_pcb, NULL);
+                state->tcp_pcb = 0x0;
+                state->tcp_pcb = NULL;
             }
-            tcp_arg(state->tcp_pcb, NULL);
-            //tcp_poll(state->tcp_pcb, NULL, 0);
-            tcp_accept(state->tcp_pcb, NULL);
-            tcp_sent(state->tcp_pcb, NULL);
-            tcp_recv(state->tcp_pcb, NULL);
-            tcp_err(state->tcp_pcb, NULL);
-            state->tcp_pcb = NULL;
             break;
         case SOCK_UDP:             
             udp_disconnect(state->udp_pcb);
-            state->udp_pcb = NULL;
+            udp_remove(state->udp_pcb);
             udp_recv(state->udp_pcb, NULL, NULL);
+            state->udp_pcb = 0x0;
+            state->udp_pcb = NULL;
             break;
         default: 
             break;
-    }        
-    state->tcp_pcb = NULL;
-    state->udp_pcb = NULL;
+    }
     state->sock_addr = -1;
-    state->sock_type = -1;
+    state->sock_type = SOCK_NONE;
     memset(state->udp_remote_srv,0x00,sizeof(state->udp_remote_srv));
     state->udp_remote_port = 0;
     state->client_status = false;
@@ -87,9 +90,7 @@ void socket_impl_close(struct socket_impl *state){
     memset(state->buffer_tx,0x00,sizeof(state->buffer_tx));
     state->buffer_rx_len = 0;
     state->buffer_tx_len = 0;
-    state->checkDataSent = false;
-    state->checkDataRecv = false;
-    printf("Socket Closed.\n");
+    // printf("Socket Closed.\n");
 }
 
 int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *addr){
@@ -130,7 +131,7 @@ int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *add
             err = tcp_connect(state->tcp_pcb, &state->tcp_pcb->remote_ip, state->tcp_pcb->remote_port, socket_connected_tcp);
             cyw43_arch_lwip_end();
             if(err != ERR_OK){
-                printf("Connect TCP failed %d\n", err);
+                // printf("Connect TCP failed %d\n", err);
                 return -1;
             } 
         }else if (state->sock_type == SOCK_UDP){
@@ -152,7 +153,7 @@ int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *add
             err = tcp_connect(state->tcp_pcb, &state->tcp_pcb->remote_ip, state->tcp_pcb->remote_port, socket_connected_tcp);
             cyw43_arch_lwip_end();
             if(err != ERR_OK){
-                printf("Connect TCP failed %d\n", err);
+                // printf("Connect TCP failed %d\n", err);
                 return -1;
             } 
         }else if (state->sock_type == SOCK_UDP){
@@ -174,27 +175,22 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
         (state->sock_type == SOCK_UDP && (!state->udp_pcb && !addr) ||
         (addr && (addr->type == MOBILE_ADDRTYPE_IPV4 && state->sock_addr == IPADDR_TYPE_V6) || 
         (addr->type == MOBILE_ADDRTYPE_IPV6 && state->sock_addr == IPADDR_TYPE_V4)))){
-        // printf("teste1\n");
         return -1;
     }
 
     state->buffer_tx_len = 0;
-    printf("reset buffTX size\n");
+    // printf("reset buffTX size\n");
 
-    // printf("teste2\n");
     err_t err = ERR_ARG;
     
     if(state->sock_type == SOCK_TCP){
-        // printf("teste3\n");
         cyw43_arch_lwip_begin();
         err = tcp_write(state->tcp_pcb,data,size,TCP_WRITE_FLAG_COPY);
         if (err == ERR_OK) state->buffer_tx_len = size;
         cyw43_arch_lwip_end();
     }else if(state->sock_type == SOCK_UDP) {
-        // printf("teste4\n");
         //Set a new IP/Port if receive an addr parameter
         if(addr){
-            // printf("teste5\n");
             char srv_ip[46];
             memset(srv_ip,0x00,sizeof(srv_ip));
             if (addr->type == MOBILE_ADDRTYPE_IPV4) {
@@ -222,18 +218,26 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
         cyw43_arch_lwip_end();
         pbuf_free(p);
     }else{
-        // printf("teste6\n");
         return -1;
     }
     if(err != ERR_OK){
-        printf("Send failed %d\n", err);
+        // printf("Send failed %d\n", err);
         return -1;
     } 
 
-    // volatile uint64_t timedelay = time_us_64();
-    // uint64_t timedelay_last = timedelay;
-    // while(1){
         cyw43_arch_poll();
+        cyw43_arch_poll();
+    //     timedelay_last = time_us_64();
+    //     if(state->checkDataSent){
+    //         state->checkDataSent = false;
+    //         break;
+    //     }else if ((timedelay_last - timedelay) >= (10*1000*1000)){
+    //         state->buffer_tx_len = 0;
+    //         return -1;
+    //     }
+    // }
+    // printf("teste - %d\n",size);
+    cyw43_arch_poll();
     //     timedelay_last = time_us_64();
     //     if(state->checkDataSent){
     //         state->checkDataSent = false;
@@ -250,9 +254,7 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
 int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struct mobile_addr *addr){
     //If the socket is a TCP and don't have any buff, check if it's disconnected to return an error
     if(state->sock_type == SOCK_TCP && state->buffer_rx_len <= 0){
-        // printf("teste1\n");
         if(!data){
-            // printf("teste2\n");
             // CLOSED      = 0,
             // LISTEN      = 1,
             // SYN_SENT    = 2,
@@ -282,14 +284,11 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
             }
         }
         if((state->tcp_pcb->state == CLOSED || !state->tcp_pcb)){
-            // printf("teste3\n");
             return -2;
         }     
     }
 
-    // volatile uint64_t timedelay = time_us_64();
-    // uint64_t timedelay_last = timedelay;
-    // while(1){
+        cyw43_arch_poll();
         cyw43_arch_poll();
     //     timedelay_last = time_us_64();
     //     if(state->buffer_rx_len > 0 || state->checkDataRecv){
@@ -299,13 +298,19 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
     //         return -1;
     //     }
     // }
+    cyw43_arch_poll();
+    //     timedelay_last = time_us_64();
+    //     if(state->buffer_rx_len > 0 || state->checkDataRecv){
+    //         state->checkDataRecv = false;
+    //         break;
+    //     }else if ((timedelay_last - timedelay) >= (10*1000*1000)){
+    //         return -1;
+    //     }
+    // }
 
-    // printf("teste4\n");
     int recvd_buff = 0;
     if(state->buffer_rx_len > 0){
-        // printf("teste5\n");
         if (addr && state->sock_type == SOCK_UDP){
-            // printf("teste6\n");
             struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
             struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
             unsigned char ip[MOBILE_INET_PTON_MAXLEN];
@@ -329,26 +334,23 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
         
         uint16_t tmpsize = state->buffer_rx_len - buffrx_lastpos;
         if(tmpsize > MOBILE_MAX_TRANSFER_SIZE){
-            // printf("teste7\n");
             recvd_buff = MOBILE_MAX_TRANSFER_SIZE;
         }else{
-            // printf("teste8\n");
             recvd_buff = tmpsize;
         }        
         if (recvd_buff > size) recvd_buff = size;
 
-        printf("copied %d bytes\n",recvd_buff);
+        // printf("copied %d bytes\n",recvd_buff);
         memcpy(data,state->buffer_rx + buffrx_lastpos,recvd_buff);
         buffrx_lastpos = buffrx_lastpos + recvd_buff;
         if(buffrx_lastpos >= state->buffer_rx_len){
             buffrx_lastpos = 0;
             state->buffer_rx_len = 0;
-            printf("reset buffRX size\n");
+            // printf("reset buffRX size\n");
         } 
     }else if(state->buffer_rx_len <= 0){
-        // printf("teste9\n");
         return 0;
-    }
+    }  
     // printf("teste10 - %d\n",recvd_buff);    
     if (recvd_buff > size) return -1;
     return recvd_buff;
@@ -361,16 +363,16 @@ bool socket_impl_listen(struct socket_impl *state){
         if(state->tcp_pcb->state==CLOSED){
             //err = tcp_bind(state->tcp_pcb,state->sock_addr == IPADDR_TYPE_V4 ? IP4_ADDR_ANY : IP6_ADDR_ANY,state->tcp_pcb->remote_port);
             err = tcp_bind(state->tcp_pcb,IP4_ADDR_ANY,state->tcp_pcb->remote_port);
-            printf("Listening TCP socket - err: %d\n",err);
+            // printf("Listening TCP socket - err: %d\n",err);
             if(err == ERR_OK){
                 state->client_status=false;
                 tcp_accept(state->tcp_pcb, socket_accept_tcp);
-                printf("Client Listening!\n");
+                // printf("Client Listening!\n");
                 return true;
             } 
         }
     }
-    printf("Client Listen Failed!\n");
+    // printf("Client Listen Failed!\n");
     return false;
 }
 
@@ -379,13 +381,13 @@ bool socket_impl_accept(struct socket_impl *state){
     if(state->client_status && state->sock_type == SOCK_TCP && state->tcp_pcb){
         switch(state->tcp_pcb->state){
             case ESTABLISHED:
-                printf("Client Accepted!\n");
+                // printf("Client Accepted!\n");
                 return true;
                 break;
             default:
                 break;
         }
     }
-    printf("Client Waiting...!\n");
+    // printf("Client Waiting...!\n");
     return false;
 }

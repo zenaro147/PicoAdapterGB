@@ -3,8 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "hardware/watchdog.h"
-
+#include "pico/cyw43_arch.h"
 
 int main_parse_addr(struct mobile_addr *dest, char *argv){
     unsigned char ip[MOBILE_INET_PTON_MAXLEN];
@@ -312,42 +311,29 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
         if(needSave){
             printf("Saving new configs...\n");
 
+            mobile_config_get_dns(mobile->adapter, &dns1, &dns2);
+            if(dns_port > 0){
+                main_set_port(&dns1, dns_port);
+                main_set_port(&dns2, dns_port);
+            }else{
+                main_set_port(&dns1, MOBILE_DNS_PORT);
+                main_set_port(&dns2, MOBILE_DNS_PORT);
+            }
             //Parsing new DNS Server
             if (haveDNS1 == 1 && haveDNS2 == 1){
-                if(dns_port > 0){
-                    main_set_port(&dns1, dns_port);
-                    main_set_port(&dns2, dns_port);
-                }
                 mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
             }else if (haveDNS1 == -1 && haveDNS2 == -1){
                 mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
             }else if (haveDNS1 == 1 && haveDNS2 == -1){
-                if(dns_port > 0){
-                    main_set_port(&dns1, dns_port);
-                }
                 mobile_config_set_dns(mobile->adapter, &dns1, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
             }else if (haveDNS1 == -1 && haveDNS2 == 1){
-                if(dns_port > 0){
-                    main_set_port(&dns2, dns_port);
-                }
                 mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &dns2);
             }else if (haveDNS1 == 0 || haveDNS2 == 0){
-                mobile_config_get_dns(mobile->adapter, &dns1, &dns2);
                 if (haveDNS1 == 0 && haveDNS2 == -1){
-                    if(dns_port > 0){
-                        main_set_port(&dns1, dns_port);
-                    }
                     mobile_config_set_dns(mobile->adapter, &dns1, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
                 }else if (haveDNS1 == -1 && haveDNS2 == 0){
-                    if(dns_port > 0){
-                        main_set_port(&dns2, dns_port);
-                    }
                     mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &dns2);
                 }else{
-                    if(dns_port > 0){
-                        main_set_port(&dns1, dns_port);
-                        main_set_port(&dns2, dns_port);
-                    }
                     mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
                 }
             }
@@ -356,11 +342,16 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
             mobile_config_save(mobile->adapter);
             RefreshConfigBuff(mobile->config_eeprom,newSSID,newPASS);
 
-            printf("Rebooting device...\n");
+            busy_wait_ms(1*1000);
 
-            watchdog_enable(100, 1);
-            watchdog_update();
-            while(1);
+            printf("Please reboot the device...\n");
+            cyw43_arch_init();
+            while(true){
+                cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true);
+                busy_wait_us(MS(300));
+                cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
+                busy_wait_us(MS(300));
+            }
         }
     }
     printf("Continuing initialization...\n");

@@ -39,17 +39,22 @@ All commands are Case-Sensitive.
 
 |   Command   | Effect |
 |-------------|-------------|
-| WIFISSID    | Set the SSID to use to connect. |
-| WIFIPASS    | Set the password from the WiFi network to use to connect. |
-| DNS1        | Set primary DNS that the adapter will use to parse the nameservers. |
-| DNS2        | Set secondary DNS that the adapter will use to parse the nameservers. | 
-| DNSPORT     | Set a custom DNS port to use with the DNS servers. |
-| RELAYSERVER | Set a Relay Server that will be use during P2P communications. |
-| RELAYTOKEN  | Set a Relay Token that will be used on Relay Server to receive a valid number to use during P2P communications. |
-| P2PPORT     | Set a custom P2P port to use during P2P communications (Local Network only). |
-| UNMETERED   | Set if the device will be Unmetered (useful for Pokemon Crystal). |
-| EXIT        | Quit from Config Mode and Save the new values. If you change some value, the device will reboot. |
-| HELP        | Show this command list on screen. |
+| WIFISSID      | Set the SSID to use to connect. |
+| WIFIPASS      | Set the password from the WiFi network to use to connect. |
+| DNS1          | Set primary DNS that the adapter will use to parse the nameservers. |
+| DNS2          | Set secondary DNS that the adapter will use to parse the nameservers. | 
+| DNSPORT       | Set a custom DNS port to use with the DNS servers. |
+| RELAYSERVER   | Set a Relay Server that will be use during P2P communications. |
+| RELAYTOKEN    | Set a Relay Token that will be used on Relay Server to receive a valid number to use during P2P communications. |
+| P2PPORT       | Set a custom P2P port to use during P2P communications (Local Network only). |
+| UNMETERED     | Set if the device will be Unmetered (useful for Pokemon Crystal). |
+
+Special commands (just enter the command, without =<VALUE>):
+|    Command    | Effect |
+|---------------|-------------|
+| FORMAT_EEPROM | Format the eeprom, if necessary. |
+| EXIT          | Quit from Config Mode and Save the new values. If you change some value, the device will reboot. |
+| HELP          | Show this command list on screen. |
 
 -----------------------
 ### What need to do:

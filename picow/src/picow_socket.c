@@ -10,15 +10,15 @@
 //UDP Callbacks
 void socket_recv_udp(void * arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t*addr, u16_t port){
     struct socket_impl *state = (struct socket_impl*)arg;
-    printf("UDP Receiving...\n");
+    // printf("UDP Receiving...\n");
     if (p->tot_len > 0) {
-        printf("received UDP from IP: %d.%d.%d.%d port: %d  length: %d\n",
-		addr->addr&0xff,
-		(addr->addr>>8)&0xff,
-		(addr->addr>>16)&0xff,
-		addr->addr>>24,
-        port,
-        p->len);
+        // printf("received UDP from IP: %d.%d.%d.%d port: %d  length: %d\n",
+		// addr->addr&0xff,
+		// (addr->addr>>8)&0xff,
+		// (addr->addr>>16)&0xff,
+		// addr->addr>>24,
+        // port,
+        // p->len);
         // Receive the buffer
         state->buffer_rx_len = pbuf_copy_partial(p, &state->buffer_rx, p->tot_len > BUFF_SIZE ? BUFF_SIZE : p->tot_len, 0);
         memset(state->udp_remote_srv,0x00,sizeof(state->udp_remote_srv));
@@ -31,9 +31,9 @@ void socket_recv_udp(void * arg, struct udp_pcb *pcb, struct pbuf *p, const ip_a
 //TCP Callbacks
 err_t socket_connected_tcp(void *arg, struct tcp_pcb *pcb, err_t err) {
     if (err != ERR_OK) {
-        printf("connect failed %d\n", err);
+        // printf("connect failed %d\n", err);
     }else{
-         printf("TCP connected!\n");
+        //  printf("TCP connected!\n");
     }
     return err;
 }
@@ -47,10 +47,10 @@ err_t socket_accept_tcp(void *arg, struct tcp_pcb *pcb, err_t err){
     struct socket_impl *state = (struct socket_impl*)arg;
 
     if (err != ERR_OK || pcb == NULL) {
-        printf("Failure in accept\n");
+        // printf("Failure in accept\n");
         return ERR_VAL;
     }
-    printf("Client connected\n");
+    // printf("Client connected\n");
 
     state->tcp_pcb = pcb;
     tcp_arg(pcb, state);
@@ -69,31 +69,30 @@ err_t socket_sent_tcp(void *arg, struct tcp_pcb *pcb, u16_t len){
     struct socket_impl *state = (struct socket_impl*)arg;
     err_t err = ERR_ABRT;
     if(state->buffer_tx_len != len){
-        printf("TCP sent %d bytes to IP: %s:%d. But should sent %d\n",len,ip4addr_ntoa(&pcb->remote_ip),pcb->remote_port,state->buffer_tx_len);
+        // printf("TCP sent %d bytes to IP: %s:%d. But should sent %d\n",len,ip4addr_ntoa(&pcb->remote_ip),pcb->remote_port,state->buffer_tx_len);
         state->buffer_tx_len = len;
         err = ERR_BUF;
     }else{
-        printf("TCP sent %d bytes to IP: %s:%d.\n",len,ip4addr_ntoa(&pcb->remote_ip),pcb->remote_port);
+        // printf("TCP sent %d bytes to IP: %s:%d.\n",len,ip4addr_ntoa(&pcb->remote_ip),pcb->remote_port);
         err = ERR_OK;
     }
-    state->checkDataSent = true;
     return err;
 }
 
 err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err){
     struct socket_impl *state = (struct socket_impl*)arg;
-    printf("TCP Receiving...\n");
+    // printf("TCP Receiving...\n");
     // if (state->buffer_rx_len <= 0);
     // printf("reset buffRX size\n");
     // cyw43_arch_lwip_check();
     if(p){
         if (p->tot_len > 0) {
-            printf("reading %d bytes\n", p->tot_len);
+            // printf("reading %d bytes\n", p->tot_len);
             // Receive the buffer
             state->buffer_rx_len = pbuf_copy_partial(p, &state->buffer_rx, p->tot_len > BUFF_SIZE ? BUFF_SIZE : p->tot_len, 0);
             tcp_recved(pcb,state->buffer_rx_len);
             if (state->buffer_rx_len > 0){
-                printf("received %d bytes\n", state->buffer_rx_len);
+                // printf("received %d bytes\n", state->buffer_rx_len);
                 err = ERR_OK;
             }else{
                 err = ERR_BUF;
@@ -105,8 +104,9 @@ err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
     }else{
         err = tcp_close(state->tcp_pcb);
         if (err != ERR_OK) {
-            printf("close failed %d, calling abort\n", err);
+            // printf("close failed %d, calling abort\n", err);
             tcp_abort(state->tcp_pcb);
+            err = ERR_ABRT;
         }
         tcp_arg(state->tcp_pcb, NULL);
         //tcp_poll(state->tcp_pcb, NULL, 0);
@@ -114,9 +114,8 @@ err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
         tcp_sent(state->tcp_pcb, NULL);
         tcp_recv(state->tcp_pcb, NULL);
         tcp_err(state->tcp_pcb, NULL);
+        state->tcp_pcb = 0x0;
         state->tcp_pcb = NULL;
-        err = ERR_ABRT;
     }
-    if (err == ERR_OK && state->buffer_rx_len > 0) state->checkDataRecv = true;
     return err;
 }

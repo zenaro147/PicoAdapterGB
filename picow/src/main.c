@@ -195,7 +195,7 @@ void core1_context() {
     }
 }
 
- void main(){
+void main(){
     speed_240_MHz = set_sys_clock_khz(240000, false);
 
     stdio_init_all();
@@ -261,7 +261,7 @@ void core1_context() {
             mobile->socket[i].tcp_pcb = NULL;
             mobile->socket[i].udp_pcb = NULL;
             mobile->socket[i].sock_addr = -1;
-            mobile->socket[i].sock_type = -1;
+            mobile->socket[i].sock_type = SOCK_NONE;
             memset(mobile->socket[i].udp_remote_srv,0x00,sizeof(mobile->socket[i].udp_remote_srv));
             mobile->socket[i].udp_remote_port = 0;
             mobile->socket[i].client_status = false;
@@ -269,8 +269,6 @@ void core1_context() {
             memset(mobile->socket[i].buffer_tx,0x00,sizeof(mobile->socket[i].buffer_tx));
             mobile->socket[i].buffer_rx_len = 0;
             mobile->socket[i].buffer_tx_len = 0;
-            mobile->socket[i].checkDataSent = false;
-            mobile->socket[i].checkDataRecv = false;
         } 
 
         multicore_launch_core1(core1_context);
@@ -312,9 +310,10 @@ void core1_context() {
     }else{
         printf("Error during WiFi connection!\n");
         while(true){
-            LED_TOGGLE;
-            busy_wait_us(MS(500));
-            LED_TOGGLE;
+            LED_ON;
+            busy_wait_us(MS(300));
+            LED_OFF;
+            busy_wait_us(MS(300));
         }
     }
 }

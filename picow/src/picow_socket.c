@@ -19,6 +19,7 @@ void socket_recv_udp(void * arg, struct udp_pcb *pcb, struct pbuf *p, const ip_a
 		// addr->addr>>24,
         // port,
         // p->len);
+
         // Receive the buffer
         state->buffer_rx_len = pbuf_copy_partial(p, &state->buffer_rx, p->tot_len > BUFF_SIZE ? BUFF_SIZE : p->tot_len, 0);
         memset(state->udp_remote_srv,0x00,sizeof(state->udp_remote_srv));
@@ -82,9 +83,6 @@ err_t socket_sent_tcp(void *arg, struct tcp_pcb *pcb, u16_t len){
 err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err){
     struct socket_impl *state = (struct socket_impl*)arg;
     // printf("TCP Receiving...\n");
-    // if (state->buffer_rx_len <= 0);
-    // printf("reset buffRX size\n");
-    // cyw43_arch_lwip_check();
     if(p){
         if (p->tot_len > 0) {
             // printf("reading %d bytes\n", p->tot_len);
@@ -98,8 +96,6 @@ err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
                 err = ERR_BUF;
             }
             pbuf_free(p);
-            // state->buffer_tx_len = 0;
-            // printf("reset buffTX size\n");
         }
     }else{
         err = tcp_close(state->tcp_pcb);

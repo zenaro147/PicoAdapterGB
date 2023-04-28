@@ -355,16 +355,18 @@ void main(){
                 printf("To reset/clear a parameter, leave the <VALUE> blank, for example: WIFISSID=\n");
                 printf("All commands are Case-Sensitive\n\n");
                 printf("Command List:\n");
-                printf("WIFISSID    | Set the SSID to use to connect.\n");
-                printf("WIFIPASS    | Set the password from the WiFi network to use to connect.\n");
-                printf("DNS1        | Set primary DNS that the adapter will use to parse the nameservers.\n");
-                printf("DNS2        | Set secondary DNS that the adapter will use to parse the nameservers.\n");
-                printf("DNSPORT     | Set a custom DNS port to use with the DNS servers.\n");
-                printf("RELAYSERVER | Set a Relay Server that will be use during P2P communications.\n");
-                printf("RELAYTOKEN  | Set a Relay Token that will be used on Relay Server to receive a valid number to use during P2P communications.\n");
-                printf("P2PPORT     | Set a custom P2P port to use during P2P communications (Local Network only).\n");
-                printf("UNMETERED   | Set if the device will be Unmetered (useful for Pokemon Crystal).\n");
-                printf("EXIT        | Quit from Config Mode and Save the new values. If you change some value, the device will reboot.\n\n");
+                printf("WIFISSID      | Set the SSID to use to connect.\n");
+                printf("WIFIPASS      | Set the password from the WiFi network to use to connect.\n");
+                printf("DNS1          | Set primary DNS that the adapter will use to parse the nameservers.\n");
+                printf("DNS2          | Set secondary DNS that the adapter will use to parse the nameservers.\n");
+                printf("DNSPORT       | Set a custom DNS port to use with the DNS servers.\n");
+                printf("RELAYSERVER   | Set a Relay Server that will be use during P2P communications.\n");
+                printf("RELAYTOKEN    | Set a Relay Token that will be used on Relay Server to receive a valid number to use during P2P communications.\n");
+                printf("P2PPORT       | Set a custom P2P port to use during P2P communications (Local Network only).\n");
+                printf("UNMETERED     | Set if the device will be Unmetered (useful for Pokemon Crystal).\n");
+                printf("Special commands (just enter the command, without =<VALUE>):\n");
+                printf("FORMAT_EEPROM | Format the eeprom, if necessary.\n\n");
+                printf("EXIT          | Quit from Config Mode and Save the new values. If you change some value, the device will reboot.\n\n");
                 
             //Generic error return
             }else{
@@ -375,29 +377,56 @@ void main(){
         if(needSave){
             printf("Saving new configs...\n");
 
-            mobile_config_get_dns(mobile->adapter, &dns1, &dns2);
-            if(dns_port > 0){
-                main_set_port(&dns1, dns_port);
-                main_set_port(&dns2, dns_port);
-            }else{
-                main_set_port(&dns1, MOBILE_DNS_PORT);
-                main_set_port(&dns2, MOBILE_DNS_PORT);
-            }
             //Parsing new DNS Server
             if (haveDNS1 == 1 && haveDNS2 == 1){
+                if(dns_port > 0){
+                    main_set_port(&dns1, dns_port);
+                    main_set_port(&dns2, dns_port);
+                }else{
+                    main_set_port(&dns1, MOBILE_DNS_PORT);
+                    main_set_port(&dns2, MOBILE_DNS_PORT);
+                }
                 mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
             }else if (haveDNS1 == -1 && haveDNS2 == -1){
                 mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
             }else if (haveDNS1 == 1 && haveDNS2 == -1){
+                if(dns_port > 0){
+                    main_set_port(&dns1, dns_port);
+                }else{
+                    main_set_port(&dns1, MOBILE_DNS_PORT);
+                }
                 mobile_config_set_dns(mobile->adapter, &dns1, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
             }else if (haveDNS1 == -1 && haveDNS2 == 1){
+                if(dns_port > 0){
+                    main_set_port(&dns2, dns_port);
+                }else{
+                    main_set_port(&dns2, MOBILE_DNS_PORT);
+                }
                 mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &dns2);
             }else if (haveDNS1 == 0 || haveDNS2 == 0){
+                mobile_config_get_dns(mobile->adapter, &dns1, &dns2);
                 if (haveDNS1 == 0 && haveDNS2 == -1){
+                    if(dns_port > 0){
+                        main_set_port(&dns1, dns_port);
+                    }else{
+                        main_set_port(&dns1, MOBILE_DNS_PORT);
+                    }
                     mobile_config_set_dns(mobile->adapter, &dns1, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
                 }else if (haveDNS1 == -1 && haveDNS2 == 0){
+                    if(dns_port > 0){
+                        main_set_port(&dns2, dns_port);
+                    }else{
+                        main_set_port(&dns2, MOBILE_DNS_PORT);
+                    }
                     mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &dns2);
                 }else{
+                    if(dns_port > 0){
+                        main_set_port(&dns1, dns_port);
+                        main_set_port(&dns2, dns_port);
+                    }else{
+                        main_set_port(&dns1, MOBILE_DNS_PORT);
+                        main_set_port(&dns2, MOBILE_DNS_PORT);
+                    }
                     mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
                 }
             }

@@ -46,7 +46,7 @@ bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, 
         default: 
             return false;
     }
-
+    // printf("Socket Open.\n");
     return true;
 }
 
@@ -179,10 +179,8 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
     }
 
     state->buffer_tx_len = 0;
-    // printf("reset buffTX size\n");
 
     err_t err = ERR_ARG;
-    
     if(state->sock_type == SOCK_TCP){
         cyw43_arch_lwip_begin();
         err = tcp_write(state->tcp_pcb,data,size,TCP_WRITE_FLAG_COPY);
@@ -225,29 +223,8 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
         return -1;
     } 
 
-        cyw43_arch_poll();
-        cyw43_arch_poll();
-    //     timedelay_last = time_us_64();
-    //     if(state->checkDataSent){
-    //         state->checkDataSent = false;
-    //         break;
-    //     }else if ((timedelay_last - timedelay) >= (10*1000*1000)){
-    //         state->buffer_tx_len = 0;
-    //         return -1;
-    //     }
-    // }
-    // printf("teste - %d\n",size);
     cyw43_arch_poll();
-    //     timedelay_last = time_us_64();
-    //     if(state->checkDataSent){
-    //         state->checkDataSent = false;
-    //         break;
-    //     }else if ((timedelay_last - timedelay) >= (10*1000*1000)){
-    //         state->buffer_tx_len = 0;
-    //         return -1;
-    //     }
-    // }
-    // printf("teste - %d\n",size);
+
     return state->buffer_tx_len;
 }
 
@@ -288,25 +265,7 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
         }     
     }
 
-        cyw43_arch_poll();
-        cyw43_arch_poll();
-    //     timedelay_last = time_us_64();
-    //     if(state->buffer_rx_len > 0 || state->checkDataRecv){
-    //         state->checkDataRecv = false;
-    //         break;
-    //     }else if ((timedelay_last - timedelay) >= (10*1000*1000)){
-    //         return -1;
-    //     }
-    // }
     cyw43_arch_poll();
-    //     timedelay_last = time_us_64();
-    //     if(state->buffer_rx_len > 0 || state->checkDataRecv){
-    //         state->checkDataRecv = false;
-    //         break;
-    //     }else if ((timedelay_last - timedelay) >= (10*1000*1000)){
-    //         return -1;
-    //     }
-    // }
 
     int recvd_buff = 0;
     if(state->buffer_rx_len > 0){
@@ -346,12 +305,10 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
         if(buffrx_lastpos >= state->buffer_rx_len){
             buffrx_lastpos = 0;
             state->buffer_rx_len = 0;
-            // printf("reset buffRX size\n");
         } 
     }else if(state->buffer_rx_len <= 0){
         return 0;
     }  
-    // printf("teste10 - %d\n",recvd_buff);    
     if (recvd_buff > size) return -1;
     return recvd_buff;
 

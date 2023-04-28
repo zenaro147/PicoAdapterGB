@@ -43,7 +43,9 @@ void *memmem(const void *l, size_t l_len, const void *s, size_t s_len){
 //512 bytes for the Mobile Adapter GB + Adapter Configs and 256 bytes to WiFi Config and other stuffs
 void FormatFlashConfig(){
     printf("Erasing target region... ");
+    busy_wait_ms(1*1000);
     flash_range_erase(FLASH_TARGET_OFFSET, FLASH_DATA_SIZE);
+    busy_wait_ms(1*1000);
     printf("Done.\n");
 }
 
@@ -103,7 +105,9 @@ bool ReadFlashConfig(uint8_t * buff, char * WiFiSSID, char * WiFiPASS){
 void SaveFlashConfig(uint8_t * buff){
     FormatFlashConfig();
     printf("Programming target region... ");
+    busy_wait_ms(1*1000);
     flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);
+    busy_wait_ms(1*1000);
     printf("Done.\n");
 }
 
@@ -119,6 +123,8 @@ void RefreshConfigBuff(uint8_t * buff, char * WiFiSSID, char * WiFiPASS){
 
     FormatFlashConfig();
     printf("Programming target region... ");
+    busy_wait_ms(1*1000);
     flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);
+    busy_wait_ms(1*1000);
     printf("Done.\n");
 }

@@ -171,7 +171,6 @@ bool PicoW_Connect_WiFi(char *ssid, char *psk, uint32_t timeout){
 
     printf("Connecting to Wi-Fi...\n");
     if (cyw43_arch_wifi_connect_timeout_ms(ssid, psk, CYW43_AUTH_WPA2_AES_PSK, timeout)) {
-    //if (cyw43_arch_wifi_connect_timeout_ms("ZenWifi", "123indiozinhos", CYW43_AUTH_WPA2_AES_PSK, timeout)) {
         printf("failed to connect.\n");
         return false;
     } else {
@@ -276,13 +275,13 @@ void main(){
         mobile_start(mobile->adapter);
 
         LED_OFF;
-        cyw43_arch_poll();
         while (true) {
             // Mobile Adapter Main Loop
             mobile_loop(mobile->adapter);
 
             // Check if there is any new config to write on Flash
             if(haveConfigToWrite && mobile->action == MOBILE_ACTION_NONE){
+                LED_ON;
                 bool checkSockStatus = false;
                 for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
                     if(mobile->socket[i].tcp_pcb || mobile->socket[i].udp_pcb){
@@ -300,6 +299,7 @@ void main(){
                             time_us_now_check = 0;
                             last_readable_check = 0;
                             multicore_launch_core1(core1_context);
+                            LED_OFF;
                         }else{
                             last_readable_check = time_us_now_check;
                         }

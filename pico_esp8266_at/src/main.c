@@ -365,8 +365,9 @@ void main(){
                 printf("P2PPORT       | Set a custom P2P port to use during P2P communications (Local Network only).\n");
                 printf("UNMETERED     | Set if the device will be Unmetered (useful for Pokemon Crystal).\n");
                 printf("Special commands (just enter the command, without =<VALUE>):\n");
-                printf("FORMAT_EEPROM | Format the eeprom, if necessary.\n\n");
-                printf("EXIT          | Quit from Config Mode and Save the new values. If you change some value, the device will reboot.\n\n");
+                printf("FORMAT_EEPROM | Format the eeprom, if necessary.\n");
+                printf("EXIT          | Quit from Config Mode and Save the new values. If you change some value, the device will reboot.\n");
+                printf("HELP          | Show this command list on screen.\n\n");
                 
             //Generic error return
             }else{

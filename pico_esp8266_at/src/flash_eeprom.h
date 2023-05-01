@@ -50,6 +50,8 @@ bool ReadFlashConfig(uint8_t * buff){
     //Check if the Flash is already formated 
     if(memmem(buff+OFFSET_CONFIG,strlen(KEY_CONFIG),KEY_CONFIG,strlen(KEY_CONFIG)) == NULL){
         char tmp_config[16];
+        printf("The flash memory is not formatted. Formatting now...");
+        FormatFlashConfig();
         memset(tmp_config,0x00,sizeof(tmp_config));
         sprintf(tmp_config,"%s",KEY_CONFIG);
         memcpy(buff+OFFSET_CONFIG,tmp_config,sizeof(tmp_config));
@@ -92,7 +94,12 @@ void SaveFlashConfig(uint8_t * buff){
     printf("Done.\n");
 }
 
-void RefreshConfigBuff(uint8_t * buff, char * WiFiSSID2, char * WiFiPASS2){    
+void RefreshConfigBuff(uint8_t * buff, char * WiFiSSID2, char * WiFiPASS2){   
+    char tmp_config[16];
+    memset(tmp_config,0x00,sizeof(tmp_config));
+    sprintf(tmp_config,"%s",KEY_CONFIG);
+    memcpy(buff+OFFSET_CONFIG,tmp_config,sizeof(tmp_config));
+ 
     char tmp_ssid[32];
     memset(tmp_ssid,0x00,sizeof(tmp_ssid));
     sprintf(tmp_ssid,"%s%s",KEY_SSID,WiFiSSID2);

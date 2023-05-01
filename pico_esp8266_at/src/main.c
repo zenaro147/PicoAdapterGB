@@ -167,6 +167,8 @@ void main(){
         int haveDNS2 = 0;
         int haveRelaySrv = 0;
 
+        mobile_config_get_dns(mobile->adapter, &dns1, &dns2);
+
         while(1){
             printf("Enter a command: \n");
             scanf("%512s",UserCMD);
@@ -346,7 +348,22 @@ void main(){
             
             //Format the entire EEPROM, if necessary
             }else if(FindCommand(UserCMD,"FORMAT_EEPROM")){
-                FormatFlashConfig();
+                printf("Formatting...\n");
+                memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
+
+                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
+                mobile_config_set_relay(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
+                mobile_config_set_relay_token(mobile->adapter, NULL);
+                mobile_config_set_p2p_port(mobile->adapter, MOBILE_DEFAULT_P2P_PORT);
+                mobile_config_set_device(mobile->adapter, device, false);
+                
+                mobile_config_save(mobile->adapter);
+                busy_wait_ms(2*1000);
+                RefreshConfigBuff(mobile->config_eeprom,"WiFi_Network","P@$$w0rd");
+
+                printf("Device formatted!\n");
+                needSave=true;
+
             //Exit from Menu
             }else if(FindCommand(UserCMD,"EXIT")){
                 break;
@@ -377,7 +394,6 @@ void main(){
 
         if(needSave){
             printf("Saving new configs...\n");
-
             //Parsing new DNS Server
             if (haveDNS1 == 1 && haveDNS2 == 1){
                 if(dns_port > 0){
@@ -405,7 +421,6 @@ void main(){
                 }
                 mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &dns2);
             }else if (haveDNS1 == 0 || haveDNS2 == 0){
-                mobile_config_get_dns(mobile->adapter, &dns1, &dns2);
                 if (haveDNS1 == 0 && haveDNS2 == -1){
                     if(dns_port > 0){
                         main_set_port(&dns1, dns_port);

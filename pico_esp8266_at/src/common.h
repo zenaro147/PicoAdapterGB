@@ -55,7 +55,7 @@ bool is32bitsMode = false;
 
 //UART RX Buffer Config
 #define BUFF_AT_SIZE 2048 //2048 is the maximun you can receive from esp01
-uint8_t buffATrx[BUFF_AT_SIZE+64] = {0}; // + extra bytes to hold the AT command answer echo
+uint8_t buffATrx[BUFF_AT_SIZE+1024+64] = {0}; // + extra bytes to hold the AT command answer echo
 int buffATrx_pointer = 0;
 uint8_t buffRecData[BUFF_AT_SIZE] = {0};
 int buffRecData_pointer = 0;
@@ -112,5 +112,13 @@ void *memmem(const void *l, size_t l_len, const void *s, size_t s_len){
 
 	return NULL;
 }
+
+// Find a string into a buffer
+bool FindCommand(char * buf, char * target){
+    if(strstr(buf, target) != NULL){
+        return true;
+    }
+    return false;
+} 
 
 #endif

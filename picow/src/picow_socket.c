@@ -70,7 +70,7 @@ err_t socket_sent_tcp(void *arg, struct tcp_pcb *pcb, u16_t len){
     struct socket_impl *state = (struct socket_impl*)arg;
     err_t err = ERR_ABRT;
     if(state->buffer_tx_len != len){
-        // printf("TCP sent %d bytes to IP: %s:%d. But should sent %d\n",len,ip4addr_ntoa(&pcb->remote_ip),pcb->remote_port,state->buffer_tx_len);
+        // printf("TCP sent %d bytes to: %s:%d. But should sent %d\n",len,ip4addr_ntoa(&pcb->remote_ip),pcb->remote_port,state->buffer_tx_len);
         state->buffer_tx_len = len;
         err = ERR_BUF;
     }else{
@@ -85,12 +85,16 @@ err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
     // printf("TCP Receiving...\n");
     if(p){
         if (p->tot_len > 0) {
+            int recvsize = 0;
+            uint8_t tmpbuff[BUFF_SIZE] ={0};
             // printf("reading %d bytes\n", p->tot_len);
             // Receive the buffer
-            state->buffer_rx_len = pbuf_copy_partial(p, &state->buffer_rx, p->tot_len > BUFF_SIZE ? BUFF_SIZE : p->tot_len, 0);
-            tcp_recved(pcb,state->buffer_rx_len);
-            if (state->buffer_rx_len > 0){
-                // printf("received %d bytes\n", state->buffer_rx_len);
+            recvsize = pbuf_copy_partial(p, &tmpbuff, p->tot_len, 0);
+            tcp_recved(pcb,recvsize);
+            memcpy(state->buffer_rx + state->buffer_rx_len,tmpbuff,recvsize);
+            state->buffer_rx_len = state->buffer_rx_len + recvsize;
+            if (recvsize > 0){
+                // printf("received %d bytes\n", recvsize);
                 err = ERR_OK;
             }else{
                 err = ERR_BUF;

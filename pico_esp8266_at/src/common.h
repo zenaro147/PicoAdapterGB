@@ -55,7 +55,7 @@ bool is32bitsMode = false;
 
 //UART RX Buffer Config
 #define BUFF_AT_SIZE 2048 //2048 is the maximun you can receive from esp01
-uint8_t buffATrx[BUFF_AT_SIZE+64] = {0}; // + extra bytes to hold the AT command answer echo
+uint8_t buffATrx[BUFF_AT_SIZE+1024+64] = {0}; // + extra bytes to hold the AT command answer echo
 int buffATrx_pointer = 0;
 uint8_t buffRecData[BUFF_AT_SIZE] = {0};
 int buffRecData_pointer = 0;

@@ -64,5 +64,5 @@ Special commands (just enter the command, without =<VALUE>):
 | HELP          | Show this command list on screen. |
 
 -----------------------
-### What need to do:
+### Next steps:
 * Implement a native 32bits mode for GBA

@@ -121,4 +121,35 @@ bool FindCommand(char * buf, char * target){
     return false;
 } 
 
+
+
+void parse_addr_string(struct mobile_addr *src, char *dest){
+    struct mobile_addr4 *addr4 = (struct mobile_addr4 *)src;
+    struct mobile_addr6 *addr6 = (struct mobile_addr6 *)src;
+
+    char tmpaddr[60] = {0};
+
+    switch (src->type) {
+        case MOBILE_ADDRTYPE_IPV4:            
+            sprintf(tmpaddr,"%i.%i.%i.%i:%i\0", addr4->host[0], addr4->host[1], addr4->host[2], addr4->host[3], addr4->port);
+            break;
+        case MOBILE_ADDRTYPE_IPV6:
+            sprintf(tmpaddr,"[%02hhx%02hhx:%02hhx%02hhx:%02hhx%02hhx:%02hhx%02hhx:%02hhx%02hhx:%02hhx%02hhx:%02hhx%02hhx:%02hhx%02hhx]:%i\0",
+                    addr6->host[0],addr6->host[1], 
+                    addr6->host[2],addr6->host[3], 
+                    addr6->host[4],addr6->host[5], 
+                    addr6->host[6],addr6->host[7], 
+                    addr6->host[8],addr6->host[9], 
+                    addr6->host[10],addr6->host[11], 
+                    addr6->host[12],addr6->host[13], 
+                    addr6->host[14],addr6->host[15], 
+                    addr6->port);
+            break;
+        default:
+            sprintf(tmpaddr,"No server defined.");
+            break;
+    }
+    memcpy(dest,tmpaddr,sizeof(tmpaddr));
+}
+
 #endif

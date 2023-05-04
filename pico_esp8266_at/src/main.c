@@ -168,6 +168,7 @@ void main(){
         int haveRelaySrv = 0;
 
         mobile_config_get_dns(mobile->adapter, &dns1, &dns2);
+        mobile_config_get_relay(mobile->adapter, &relay);
 
         while(1){
             printf("Enter a command: \n");
@@ -367,6 +368,40 @@ void main(){
             //Exit from Menu
             }else if(FindCommand(UserCMD,"EXIT")){
                 break;
+
+            // Shows the actual device configuration
+            }else if(FindCommand(UserCMD,"SHOW_CONFIG")){
+                printf("NETWORK SETTINGS\n");
+                printf("WiFi SSID: %s\n",WiFiSSID);
+                printf("WiFi Password: %s\n",WiFiPASS);
+                printf("\n");
+                printf("ADAPTER SETTINGS\n");
+
+                char tmpSrv[60] = {0};
+                parse_addr_string(&dns1,tmpSrv);
+                printf("DNS Server 1: %s\n", tmpSrv);
+                parse_addr_string(&dns2,tmpSrv);
+                printf("DNS Server 2: %s\n", tmpSrv);
+                parse_addr_string(&relay,tmpSrv);
+                printf("Relay Server: %s\n", tmpSrv);
+
+                char tmpToken[16] = {0};
+                mobile_config_get_relay_token(mobile->adapter,tmpToken);
+                printf("Relay Token: ");
+                for (int i = 0; i < sizeof(tmpToken); i++){
+                    printf("%02hhX", tmpToken[i]);
+                }
+                printf("\n");
+
+                unsigned tmpPort = 0;
+                mobile_config_get_p2p_port(mobile->adapter,&tmpPort);
+                printf("P2P Port: %i\n", tmpPort);
+
+                bool tmpUnmet = false;
+                mobile_config_get_device(mobile->adapter,NULL,&tmpUnmet);
+                printf("Is Unmetered: %s\n", tmpUnmet == true ? "Yes":"No");
+                printf("\n");
+
             }else if(FindCommand(UserCMD,"HELP")){
                 printf("Command Sintax: <COMMAND>=<VALUE>\n");
                 printf("To reset/clear a parameter, leave the <VALUE> blank, for example: WIFISSID=\n");
@@ -380,9 +415,11 @@ void main(){
                 printf("RELAYSERVER   | Set a Relay Server that will be use during P2P communications.\n");
                 printf("RELAYTOKEN    | Set a Relay Token that will be used on Relay Server to receive a valid number to use during P2P communications.\n");
                 printf("P2PPORT       | Set a custom P2P port to use during P2P communications (Local Network only).\n");
-                printf("UNMETERED     | Set if the device will be Unmetered (useful for Pokemon Crystal).\n");
+                printf("UNMETERED     | Set if the device will be Unmetered (useful for Pokemon Crystal). Only accept 1 (true) or 0 (false).\n\n");
+
                 printf("Special commands (just enter the command, without =<VALUE>):\n");
                 printf("FORMAT_EEPROM | Format the eeprom, if necessary.\n");
+                printf("SHOW_CONFIG   | Show the actual device configuration.\n");
                 printf("EXIT          | Quit from Config Mode and Save the new values. If you change some value, the device will reboot.\n");
                 printf("HELP          | Show this command list on screen.\n\n");
                 

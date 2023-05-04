@@ -65,6 +65,35 @@ static bool main_parse_hex(unsigned char *buf, char *str, unsigned size){
     return true;
 }
 
+void parse_addr_string(struct mobile_addr *src, char *dest){
+    struct mobile_addr4 *addr4 = (struct mobile_addr4 *)src;
+    struct mobile_addr6 *addr6 = (struct mobile_addr6 *)src;
+
+    char tmpaddr[60] = {0};
+
+    switch (src->type) {
+        case MOBILE_ADDRTYPE_IPV4:            
+            sprintf(tmpaddr,"%i.%i.%i.%i:%i\0", addr4->host[0], addr4->host[1], addr4->host[2], addr4->host[3], addr4->port);
+            break;
+        case MOBILE_ADDRTYPE_IPV6:
+            sprintf(tmpaddr,"[%02hhx%02hhx:%02hhx%02hhx:%02hhx%02hhx:%02hhx%02hhx:%02hhx%02hhx:%02hhx%02hhx:%02hhx%02hhx:%02hhx%02hhx]:%i\0",
+                    addr6->host[0],addr6->host[1], 
+                    addr6->host[2],addr6->host[3], 
+                    addr6->host[4],addr6->host[5], 
+                    addr6->host[6],addr6->host[7], 
+                    addr6->host[8],addr6->host[9], 
+                    addr6->host[10],addr6->host[11], 
+                    addr6->host[12],addr6->host[13], 
+                    addr6->host[14],addr6->host[15], 
+                    addr6->port);
+            break;
+        default:
+            sprintf(tmpaddr,"No server defined.");
+            break;
+    }
+    memcpy(dest,tmpaddr,sizeof(tmpaddr));
+}
+
 // Find a string into a buffer
 bool FindCommand(char * buf, char * target){
     if(strstr(buf, target) != NULL){
@@ -104,6 +133,7 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
         unsigned char relay_token_buf[MOBILE_RELAY_TOKEN_SIZE];
 
         mobile_config_get_dns(mobile->adapter, &dns1, &dns2);
+        mobile_config_get_relay(mobile->adapter, &relay);
 
         while(1){
             printf("Enter a command: \n");
@@ -303,6 +333,40 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
             //Exit from Menu
             }else if(FindCommand(UserCMD,"EXIT")){
                 break;
+
+            // Shows the actual device configuration
+            }else if(FindCommand(UserCMD,"SHOW_CONFIG")){
+                printf("NETWORK SETTINGS\n");
+                printf("WiFi SSID: %s\n",newSSID);
+                printf("WiFi Password: %s\n",newPASS);
+                printf("\n");
+                printf("ADAPTER SETTINGS\n");
+
+                char tmpSrv[60] = {0};
+                parse_addr_string(&dns1,tmpSrv);
+                printf("DNS Server 1: %s\n", tmpSrv);
+                parse_addr_string(&dns2,tmpSrv);
+                printf("DNS Server 2: %s\n", tmpSrv);
+                parse_addr_string(&relay,tmpSrv);
+                printf("Relay Server: %s\n", tmpSrv);
+
+                char tmpToken[16] = {0};
+                mobile_config_get_relay_token(mobile->adapter,tmpToken);
+                printf("Relay Token: ");
+                for (int i = 0; i < sizeof(tmpToken); i++){
+                    printf("%02hhX", tmpToken[i]);
+                }
+                printf("\n");
+
+                unsigned tmpPort = 0;
+                mobile_config_get_p2p_port(mobile->adapter,&tmpPort);
+                printf("P2P Port: %i\n", tmpPort);
+
+                bool tmpUnmet = false;
+                mobile_config_get_device(mobile->adapter,NULL,&tmpUnmet);
+                printf("Is Unmetered: %s\n", tmpUnmet == true ? "Yes":"No");
+                printf("\n");
+
             }else if(FindCommand(UserCMD,"HELP")){
                 printf("Command Sintax: <COMMAND>=<VALUE>\n");
                 printf("To reset/clear a parameter, leave the <VALUE> blank, for example: WIFISSID=\n");
@@ -316,9 +380,11 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
                 printf("RELAYSERVER   | Set a Relay Server that will be use during P2P communications.\n");
                 printf("RELAYTOKEN    | Set a Relay Token that will be used on Relay Server to receive a valid number to use during P2P communications.\n");
                 printf("P2PPORT       | Set a custom P2P port to use during P2P communications (Local Network only).\n");
-                printf("UNMETERED     | Set if the device will be Unmetered (useful for Pokemon Crystal).\n");
+                printf("UNMETERED     | Set if the device will be Unmetered (useful for Pokemon Crystal). Only accept 1 (true) or 0 (false).\n\n");
+
                 printf("Special commands (just enter the command, without =<VALUE>):\n");
                 printf("FORMAT_EEPROM | Format the eeprom, if necessary.\n");
+                printf("SHOW_CONFIG   | Show the actual device configuration.\n");
                 printf("EXIT          | Quit from Config Mode and Save the new values. If you change some value, the device will reboot.\n");
                 printf("HELP          | Show this command list on screen.\n\n");
                 
@@ -388,10 +454,7 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
             busy_wait_ms(2*1000);
             RefreshConfigBuff(mobile->config_eeprom,newSSID,newPASS);
 
-            busy_wait_ms(1*1000);
-
             printf("Please reboot the device...\n");
-            cyw43_arch_init();
             while(true){
                 cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true);
                 busy_wait_ms(300);

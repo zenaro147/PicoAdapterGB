@@ -199,6 +199,8 @@ void main(){
 
     stdio_init_all();
     printf("Booting...\n");
+    cyw43_arch_init();
+    LED_ON;
     busy_wait_us(SEC(5));
 
     #ifdef DEBUG_SIGNAL_PINS
@@ -243,10 +245,7 @@ void main(){
     mobile_config_load(mobile->adapter);
 
     BootMenuConfig(mobile,WiFiSSID,WiFiPASS);
-
-    busy_wait_us(SEC(1));
-    cyw43_arch_init();
-    LED_ON;
+    
     busy_wait_us(SEC(2));
 
     isConnectedWiFi = PicoW_Connect_WiFi(WiFiSSID, WiFiPASS, MS(10));
@@ -265,7 +264,7 @@ void main(){
             mobile->socket[i].udp_remote_port = 0;
             mobile->socket[i].client_status = false;
             memset(mobile->socket[i].buffer_rx,0x00,sizeof(mobile->socket[i].buffer_rx));
-            memset(mobile->socket[i].buffer_tx,0x00,sizeof(mobile->socket[i].buffer_tx));
+            //memset(mobile->socket[i].buffer_tx,0x00,sizeof(mobile->socket[i].buffer_tx));
             mobile->socket[i].buffer_rx_len = 0;
             mobile->socket[i].buffer_tx_len = 0;
         } 

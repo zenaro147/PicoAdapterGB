@@ -58,12 +58,13 @@ All commands are Case-Sensitive.
 | RELAYSERVER   | Set a Relay Server that will be use during P2P communications. |
 | RELAYTOKEN    | Set a Relay Token that will be used on Relay Server to receive a valid number to use during P2P communications. |
 | P2PPORT       | Set a custom P2P port to use during P2P communications (Local Network only). |
-| UNMETERED     | Set if the device will be Unmetered (useful for Pokemon Crystal). |
+| UNMETERED     | Set if the device will be Unmetered (useful for Pokemon Crystal). Only accept 1 (true) or 0 (false). |
 
 Special commands (just enter the command, without =<VALUE>):
 |    Command    | Effect |
 |---------------|-------------|
 | FORMAT_EEPROM | Format the eeprom, if necessary. |
+| SHOW_CONFIG   | Show the actual device configuration. |
 | EXIT          | Quit from Config Mode and Save the new values. If you change some value, the device will reboot. |
 | HELP          | Show this command list on screen. |
 

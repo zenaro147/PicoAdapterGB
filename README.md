@@ -71,3 +71,4 @@ Special commands (just enter the command, without =<VALUE>):
 -----------------------
 ### Next steps:
 * Implement a native 32bits mode for GBA
+* Better/dynamic buffer to handle TCP data

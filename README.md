@@ -1,14 +1,25 @@
 # PicoAdapterGB - A Mobile Adapter GB hardware emulator based on RaspberryPi Pico
 
-Based on: [Libmobile](https://github.com/REONTeam/libmobile) by [REON Team](https://github.com/REONTeam)
+<a href="https://www.buymeacoffee.com/zenaro147" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 
-### Current implementations
+This is the first standalone implementation of [Mobile Adapter GB](https://bulbapedia.bulbagarden.net/wiki/Mobile_Game_Boy_Adapter)!
+<br>It's based on [Libmobile](https://github.com/REONTeam/libmobile) by [REON Team](https://github.com/REONTeam) and it's totally free from any kind of sofware. You just need to power the adapter with any power source that's provide 5v (like a power bank, a phone using an OTG, add a battery circuit, etc), and make the first configuration (using any Serial Monitor on PC/Smartphone, even the Serial Monitor from Arduino or VS Code).
+
+It's possible to connect to any [REON project](https://github.com/REONTeam/reon) custom server as soon it releases.
+
+## Development Status
+Latest Stable Release  [![Release Version](https://img.shields.io/github/v/release/zenaro147/PicoAdapterGB?style=plastic)](https://github.com/zenaro147/PicoAdapterGB/releases/latest/)  [![Release Date](https://img.shields.io/github/release-date/zenaro147/PicoAdapterGB?style=plastic)](https://github.com/zenaro147/PicoAdapterGB/releases/latest/)
+<br>Latest Development Release  [![Release Version](https://img.shields.io/github/release/zenaro147/PicoAdapterGB/all.svg?style=plastic)](https://github.com/zenaro147/PicoAdapterGB/releases/) [![Release Date](https://img.shields.io/github/release-date-pre/zenaro147/PicoAdapterGB.svg?style=plastic)](https://github.com/zenaro147/PicoAdapterGB/releases/) 
+
+If you still have questions, ask us here or in the **REON Team Discord** [![Discord Group](https://img.shields.io/badge/chat-on%20Discord-738ADB)](https://discord.gg/mKT4pTfUqC)
+
+# Current implementations
 - `pico_esp8266_at`: A Raspberry Pi Pico implementation using an ESP8266 ESP-01 to provide WiFi connectivity. 
 - `picow`: A Raspberry Pi Pico W implementation using the internal WiFi connectivity. (recommended)
 
 Refer to the implementation's README.md for more specific details.
 
-# Link Cable Setup
+## Link Cable Setup
 ```
  ___________
 |  6  4  2  |
@@ -47,15 +58,18 @@ All commands are Case-Sensitive.
 | RELAYSERVER   | Set a Relay Server that will be use during P2P communications. |
 | RELAYTOKEN    | Set a Relay Token that will be used on Relay Server to receive a valid number to use during P2P communications. |
 | P2PPORT       | Set a custom P2P port to use during P2P communications (Local Network only). |
-| UNMETERED     | Set if the device will be Unmetered (useful for Pokemon Crystal). |
+| UNMETERED     | Set if the device will be Unmetered (useful for Pokemon Crystal). Only accept 1 (true) or 0 (false). |
 
 Special commands (just enter the command, without =<VALUE>):
 |    Command    | Effect |
 |---------------|-------------|
 | FORMAT_EEPROM | Format the eeprom, if necessary. |
+| SHOW_CONFIG   | Show the actual device configuration. |
 | EXIT          | Quit from Config Mode and Save the new values. If you change some value, the device will reboot. |
 | HELP          | Show this command list on screen. |
 
 -----------------------
-### What need to do:
+### Next steps:
 * Implement a native 32bits mode for GBA
+* Better/dynamic buffer to handle TCP data
+

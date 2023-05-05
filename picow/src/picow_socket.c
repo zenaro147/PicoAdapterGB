@@ -21,7 +21,7 @@ void socket_recv_udp(void * arg, struct udp_pcb *pcb, struct pbuf *p, const ip_a
         // p->len);
 
         // Receive the buffer
-        state->buffer_rx_len = pbuf_copy_partial(p, &state->buffer_rx, p->tot_len > BUFF_SIZE ? BUFF_SIZE : p->tot_len, 0);
+        state->buffer_rx_len = pbuf_copy_partial(p, &state->buffer_rx, p->tot_len, 0);
         memset(state->udp_remote_srv,0x00,sizeof(state->udp_remote_srv));
         sprintf(state->udp_remote_srv, "%d.%d.%d.%d", addr->addr&0xff, (addr->addr>>8)&0xff, (addr->addr>>16)&0xff, addr->addr>>24);
         state->udp_remote_port = port;
@@ -86,12 +86,13 @@ err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
     if(p){
         if (p->tot_len > 0) {
             int recvsize = 0;
-            uint8_t tmpbuff[BUFF_SIZE] ={0};
+            // uint8_t tmpbuff[BUFF_SIZE] ={0};
             // printf("reading %d bytes\n", p->tot_len);
             // Receive the buffer
-            recvsize = pbuf_copy_partial(p, &tmpbuff, p->tot_len, 0);
+            recvsize = pbuf_copy_partial(p, state->buffer_rx + state->buffer_rx_len, p->tot_len, 0);
+
             tcp_recved(pcb,recvsize);
-            memcpy(state->buffer_rx + state->buffer_rx_len,tmpbuff,recvsize);
+            // memcpy(state->buffer_rx + state->buffer_rx_len,tmpbuff,recvsize);
             state->buffer_rx_len = state->buffer_rx_len + recvsize;
             if (recvsize > 0){
                 // printf("received %d bytes\n", recvsize);

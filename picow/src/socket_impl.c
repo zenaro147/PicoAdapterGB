@@ -87,7 +87,7 @@ void socket_impl_close(struct socket_impl *state){
     state->udp_remote_port = 0;
     state->client_status = false;
     memset(state->buffer_rx,0x00,sizeof(state->buffer_rx));
-    memset(state->buffer_tx,0x00,sizeof(state->buffer_tx));
+    //memset(state->buffer_tx,0x00,sizeof(state->buffer_tx));
     state->buffer_rx_len = 0;
     state->buffer_tx_len = 0;
     // printf("Socket Closed.\n");

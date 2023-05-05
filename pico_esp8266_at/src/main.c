@@ -402,6 +402,7 @@ void main(){
                 printf("Is Unmetered: %s\n", tmpUnmet == true ? "Yes":"No");
                 printf("\n");
 
+
             }else if(FindCommand(UserCMD,"HELP")){
                 printf("Command Sintax: <COMMAND>=<VALUE>\n");
                 printf("To reset/clear a parameter, leave the <VALUE> blank, for example: WIFISSID=\n");

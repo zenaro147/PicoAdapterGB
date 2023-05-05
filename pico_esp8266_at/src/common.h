@@ -121,8 +121,6 @@ bool FindCommand(char * buf, char * target){
     return false;
 } 
 
-
-
 void parse_addr_string(struct mobile_addr *src, char *dest){
     struct mobile_addr4 *addr4 = (struct mobile_addr4 *)src;
     struct mobile_addr6 *addr6 = (struct mobile_addr6 *)src;

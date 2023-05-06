@@ -14,4 +14,5 @@ endforeach()
 list (REMOVE_DUPLICATES LibMobile_INCLUDE_DIRS)
 
 add_library(libmobile ${LibMobile_SOURCES})
+target_compile_definitions(libmobile PRIVATE MOBILE_ENABLE_NO32BIT)
 target_include_directories(libmobile PUBLIC ${REON_LIBMOBILE})

@@ -35,7 +35,7 @@ Refer to the implementation's README.md for more specific details.
 | Pin 5      |  HV3<->LV3  |   GPIO 18   | Clock Out |
 | Pin 6      |  GND<->GND  |   GND   | GND |
 |            |      LV     |  +3.3V  | +3.3 volts from Pico (3v3 Out) |
-|            |      HV     |   +5V   | +5 volts from Pico (VBUS) or Pin1 from Gameboy|
+|            |      HV     |   N/A   | I recommend to let this pin unconnected. Also, it's possible to use P1 from Link Cable, but **DO AT YOUR OWN RISK** (some aftermarket cables have P1 and P4 connected each other. If this is your case, use P4 instead) |
 
 **⚠If this doesn't work, try to flip around Pin2(Serial Out) and Pin3(Serial In), as the pinout markings of your link cable breakout might be the other way around.⚠**
 

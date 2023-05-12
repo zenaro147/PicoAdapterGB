@@ -6,17 +6,21 @@
 #include <string.h>
 
 #include "pico/stdlib.h"
-#include "pico/multicore.h"
+// #include "pico/multicore.h"
+#include "hardware/pio.h"
 #include "pico/cyw43_arch.h"
 
 #include <mobile.h>
 #include <mobile_inet.h>
+
+#include "globals.h"
 
 #include "config_menu.h"
 #include "gblink.h"
 #include "flash_eeprom.h"
 #include "picow_socket.h"
 #include "socket_impl.h"
+#include "pio/linkcable.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool speed_240_MHz = false;
@@ -34,19 +38,13 @@ bool haveConfigToWrite = false;
 
 volatile bool spiLock = false;
 
-//LED Config
-#define LED_PIN       		  	CYW43_WL_GPIO_LED_PIN
-#define LED_SET(A)    		  	(cyw43_arch_gpio_put(LED_PIN, (A)))
-#define LED_ON        		  	LED_SET(true)
-#define LED_OFF       		  	LED_SET(false)
-#define LED_TOGGLE    		  	(cyw43_arch_gpio_put(LED_PIN, !cyw43_arch_gpio_get(LED_PIN)))
-
 volatile uint64_t time_us_now_check = 0;
 uint64_t last_readable_check = 0;
 
 /////////////////////////////////
 // MOBILE ADAPTER GB FUNCTIONS //
 /////////////////////////////////
+
 struct mobile_user *mobile;
 
 static void impl_debug_log(void *user, const char *line){
@@ -60,13 +58,19 @@ static void impl_serial_disable(void *user) {
     #endif
     struct mobile_user *mobile = (struct mobile_user *)user;
     while(spiLock);
-    spi_deinit(SPI_PORT);    
+    // spi_deinit(SPI_PORT);    
 }
 
 static void impl_serial_enable(void *user, bool mode_32bit) {
-    (void)mode_32bit;
+    //(void)mode_32bit;
     struct mobile_user *mobile = (struct mobile_user *)user;
-    trigger_spi(SPI_PORT,SPI_BAUDRATE_256);
+    
+    if(!mode_32bit){
+        trigger_spi(SPI_PORT,SPI_BAUDRATE_256,8);
+    }else{
+        trigger_spi(SPI_PORT,SPI_BAUDRATE_256,32);
+    }
+    
     #ifdef DEBUG_SIGNAL_PINS
         gpio_put(10, false);
     #endif
@@ -161,6 +165,24 @@ static void impl_update_number(void *user, enum mobile_number type, const char *
     }
 }
 
+//////////////////////////
+// LINK CABLE FUNCTIONS //
+//////////////////////////
+bool link_cable_data_received = false;
+void link_cable_ISR(void) {
+    // linkcable_send(protocol_data_process(linkcable_receive()));
+    linkcable_send(mobile_transfer(mobile->adapter, linkcable_receive()));
+    link_cable_data_received = true;
+}
+
+int64_t link_cable_watchdog(alarm_id_t id, void *user_data) {
+    if (!link_cable_data_received) {
+        linkcable_reset();
+        // protocol_reset();
+    } else link_cable_data_received = false;
+    return MS(300);
+}
+
 ///////////////////////////////
 // PICO W AUXILIAR FUNCTIONS //
 ///////////////////////////////
@@ -182,17 +204,16 @@ bool PicoW_Connect_WiFi(char *ssid, char *psk, uint32_t timeout){
 /////////////////////////
 // Main and Core1 Loop //
 /////////////////////////
-void core1_context() {
-    irq_set_mask_enabled(0xffffffff, false);
-
-    while (true) {
-        if(spi_is_readable(SPI_PORT)){
-            spiLock = true;
-            spi_get_hw(SPI_PORT)->dr = mobile_transfer(mobile->adapter, spi_get_hw(SPI_PORT)->dr);
-            spiLock = false;
-        }
-    }
-}
+// void core1_context() {
+//     irq_set_mask_enabled(0xffffffff, false);
+//     while (true) {
+//         if(spi_is_readable(SPI_PORT)){
+//             spiLock = true;
+//             spi_get_hw(SPI_PORT)->dr = mobile_transfer(mobile->adapter, spi_get_hw(SPI_PORT)->dr);
+//             spiLock = false;
+//         }
+//     }
+// }
 
 void main(){
     speed_240_MHz = set_sys_clock_khz(240000, false);
@@ -269,10 +290,13 @@ void main(){
             mobile->socket[i].buffer_tx_len = 0;
         } 
 
-        multicore_launch_core1(core1_context);
+        // multicore_launch_core1(core1_context);
+
+        linkcable_init(link_cable_ISR);
+        add_alarm_in_us(MS(300), link_cable_watchdog, NULL, true);
 
         mobile_start(mobile->adapter);
-
+        
         LED_OFF;
         while (true) {
             // Mobile Adapter Main Loop
@@ -291,13 +315,13 @@ void main(){
                 if(!checkSockStatus){
                     time_us_now_check = time_us_64();
                     if (time_us_now_check - last_readable_check > SEC(5)){
-                        if(!spi_is_readable(SPI_PORT) && !spiLock){
-                            multicore_reset_core1();
+                        if(/*!spi_is_readable(SPI_PORT) && */!spiLock){
+                            // multicore_reset_core1();
                             SaveFlashConfig(mobile->config_eeprom);
                             haveConfigToWrite = false;
                             time_us_now_check = 0;
                             last_readable_check = 0;
-                            multicore_launch_core1(core1_context);
+                            // multicore_launch_core1(core1_context);
                             LED_OFF;
                         }else{
                             last_readable_check = time_us_now_check;

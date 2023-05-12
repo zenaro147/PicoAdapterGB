@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "globals.h"
+#include "gblink.h"
+
 #include "pico/cyw43_arch.h"
 
 int main_parse_addr(struct mobile_addr *dest, char *argv){

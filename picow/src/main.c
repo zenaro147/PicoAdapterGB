@@ -35,11 +35,8 @@ char WiFiPASS[28] = "P@$$w0rd";
 
 //Control Flash Write
 bool haveConfigToWrite = false;
-
-volatile bool spiLock = false;
-
-volatile uint64_t time_us_now_check = 0;
-uint64_t last_readable_check = 0;
+bool startWriteConfig = false;
+uint8_t currentTicks = 0;
 
 /////////////////////////////////
 // MOBILE ADAPTER GB FUNCTIONS //
@@ -57,7 +54,14 @@ static void impl_serial_disable(void *user) {
         gpio_put(10, true);
     #endif
     struct mobile_user *mobile = (struct mobile_user *)user;
-    while(spiLock);
+
+    if(haveConfigToWrite && !startWriteConfig){
+        if(currentTicks >= TICKSWAIT){
+            startWriteConfig = true;
+        }else{
+            currentTicks++;
+        }
+    }
     // spi_deinit(SPI_PORT);    
 }
 
@@ -90,7 +94,7 @@ static bool impl_config_write(void *user, const void *src, const uintptr_t offse
         mobile->config_eeprom[OFFSET_MAGB + offset + i] = ((uint8_t *)src)[i];
     }
     haveConfigToWrite = true;
-    last_readable_check = time_us_64();
+    LED_ON;
     return true;
 }
 
@@ -303,8 +307,7 @@ void main(){
             mobile_loop(mobile->adapter);
 
             // Check if there is any new config to write on Flash
-            if(haveConfigToWrite && mobile->action == MOBILE_ACTION_NONE){
-                LED_ON;
+            if(haveConfigToWrite){
                 bool checkSockStatus = false;
                 for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
                     if(mobile->socket[i].tcp_pcb || mobile->socket[i].udp_pcb){
@@ -312,21 +315,12 @@ void main(){
                         break;
                     } 
                 }
-                if(!checkSockStatus){
-                    time_us_now_check = time_us_64();
-                    if (time_us_now_check - last_readable_check > SEC(5)){
-                        if(/*!spi_is_readable(SPI_PORT) && */!spiLock){
-                            // multicore_reset_core1();
-                            SaveFlashConfig(mobile->config_eeprom);
-                            haveConfigToWrite = false;
-                            time_us_now_check = 0;
-                            last_readable_check = 0;
-                            // multicore_launch_core1(core1_context);
-                            LED_OFF;
-                        }else{
-                            last_readable_check = time_us_now_check;
-                        }
-                    }
+                if(!checkSockStatus && startWriteConfig){
+                    SaveFlashConfig(mobile->config_eeprom);
+                    haveConfigToWrite = false;
+                    startWriteConfig = false;
+                    currentTicks = 0;
+                    LED_OFF;
                 }
             }
         }

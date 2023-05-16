@@ -1,9 +1,7 @@
 #pragma once
 
 #include "pico/stdlib.h"
-
 #include <mobile.h>
-
 
 int main_parse_addr(struct mobile_addr *dest, char *argv);
 void main_set_port(struct mobile_addr *dest, unsigned port);

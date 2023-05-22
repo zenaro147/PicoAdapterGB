@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <mobile.h>
+#include "globals.h"
+
 #include "pico/time.h"
 
 volatile uint64_t time_us_now = 0;

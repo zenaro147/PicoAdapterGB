@@ -5,6 +5,9 @@
 
 #include "pico/cyw43_arch.h"
 
+#include "globals.h"
+#include "gblink.h"
+
 int main_parse_addr(struct mobile_addr *dest, char *argv){
     unsigned char ip[MOBILE_INET_PTON_MAXLEN];
     int rc = mobile_inet_pton(MOBILE_INET_PTON_ANY, argv, ip);
@@ -248,8 +251,8 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
             //Set the new Relay Token for Libmobile                    
             }else if(FindCommand(UserCMD,"RELAYTOKEN=")){
                 if(strlen(UserCMD)-11 > 0){
-                    char RELAY_TOKEN[32] = {0};
-                    memcpy(RELAY_TOKEN,UserCMD+5,32);
+                    char RELAY_TOKEN[33] = {0};
+                    memcpy(RELAY_TOKEN,UserCMD+11,32);
                     bool TokenOk = main_parse_hex(relay_token_buf, RELAY_TOKEN, sizeof(relay_token_buf));
                     if(!TokenOk){
                         printf("Invalid parameter.\n");

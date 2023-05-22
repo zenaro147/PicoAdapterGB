@@ -15,6 +15,16 @@ static void linkcable_isr(void) {
     if (pio_interrupt_get(LINKCABLE_PIO, 0)) pio_interrupt_clear(LINKCABLE_PIO, 0);
 }
 
+void linkcable_changeBits(void) {
+    pio_sm_set_enabled(LINKCABLE_PIO, LINKCABLE_SM, false);
+    pio_sm_clear_fifos(LINKCABLE_PIO, LINKCABLE_SM);
+    pio_sm_restart(LINKCABLE_PIO, LINKCABLE_SM);
+    pio_sm_clkdiv_restart(LINKCABLE_PIO, LINKCABLE_SM);
+    pio_sm_exec(LINKCABLE_PIO, LINKCABLE_SM, pio_encode_jmp(linkcable_pio_initial_pc));
+    
+    pio_sm_set_enabled(LINKCABLE_PIO, LINKCABLE_SM, true);
+}
+
 void linkcable_reset(void) {
     pio_sm_set_enabled(LINKCABLE_PIO, LINKCABLE_SM, false);
     pio_sm_clear_fifos(LINKCABLE_PIO, LINKCABLE_SM);
@@ -24,8 +34,8 @@ void linkcable_reset(void) {
     pio_sm_set_enabled(LINKCABLE_PIO, LINKCABLE_SM, true);
 }
 
-void linkcable_init(irq_handler_t onDataReceive) {
-    linkcable_program_init(LINKCABLE_PIO, LINKCABLE_SM, linkcable_pio_initial_pc = pio_add_program(LINKCABLE_PIO, &linkcable_program));
+void linkcable_init(irq_handler_t onDataReceive, uint8_t BitsNum) {
+    linkcable_program_init(LINKCABLE_PIO, LINKCABLE_SM, linkcable_pio_initial_pc = pio_add_program(LINKCABLE_PIO, &linkcable_program), BitsNum);
 
 //    pio_sm_put_blocking(LINKCABLE_PIO, LINKCABLE_SM, LINKCABLE_BITS - 1);
     pio_enable_sm_mask_in_sync(LINKCABLE_PIO, (1u << LINKCABLE_SM));

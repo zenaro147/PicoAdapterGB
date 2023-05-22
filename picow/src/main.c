@@ -6,7 +6,6 @@
 #include <string.h>
 
 #include "pico/stdlib.h"
-// #include "pico/multicore.h"
 #include "hardware/pio.h"
 #include "pico/cyw43_arch.h"
 
@@ -66,7 +65,6 @@ static void impl_serial_disable(void *user) {
 }
 
 static void impl_serial_enable(void *user, bool mode_32bit) {
-    //(void)mode_32bit;
     struct mobile_user *mobile = (struct mobile_user *)user;
     
     if(!mode_32bit){
@@ -93,8 +91,8 @@ static bool impl_config_write(void *user, const void *src, const uintptr_t offse
     for(int i = 0; i < size; i++){
         mobile->config_eeprom[OFFSET_MAGB + offset + i] = ((uint8_t *)src)[i];
     }
-    haveConfigToWrite = true;
     LED_ON;
+    haveConfigToWrite = true;
     return true;
 }
 
@@ -237,11 +235,6 @@ void main(){
         gpio_set_dir(10, GPIO_OUT);
         gpio_put(10, false);
     #endif
-
-    // Initialize SPI pins
-    gpio_set_function(PIN_SPI_SCK, GPIO_FUNC_SPI), gpio_pull_up(PIN_SPI_SCK);
-    gpio_set_function(PIN_SPI_SIN, GPIO_FUNC_SPI);
-    gpio_set_function(PIN_SPI_SOUT, GPIO_FUNC_SPI);
     
     //Libmobile Variables
     mobile = malloc(sizeof(struct mobile_user));
@@ -296,7 +289,7 @@ void main(){
 
         // multicore_launch_core1(core1_context);
 
-        linkcable_init(link_cable_ISR);
+        linkcable_init(link_cable_ISR, 8);
         add_alarm_in_us(MS(300), link_cable_watchdog, NULL, true);
 
         mobile_start(mobile->adapter);

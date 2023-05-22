@@ -19,5 +19,6 @@ static inline void linkcable_send(uint8_t data) {
     pio_sm_put(LINKCABLE_PIO, LINKCABLE_SM, data);
 }
 
+void linkcable_changeBits(void);
 void linkcable_reset(void);
-void linkcable_init(irq_handler_t onReceive);
+void linkcable_init(irq_handler_t onReceive, uint8_t BitsNum);

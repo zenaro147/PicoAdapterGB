@@ -1,11 +1,14 @@
 #include "config_menu.h"
-
-#include <stdio.h>
-#include <string.h>
+#include "globals.h"
 
 #include "pico/cyw43_arch.h"
 
-#include "globals.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <mobile_inet.h>
+
 #include "gblink.h"
 
 int main_parse_addr(struct mobile_addr *dest, char *argv){
@@ -459,9 +462,9 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
 
             printf("Please reboot the device...\n");
             while(true){
-                cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, true);
+                LED_ON;
                 busy_wait_ms(300);
-                cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
+                LED_OFF;
                 busy_wait_ms(300);
             }
         }

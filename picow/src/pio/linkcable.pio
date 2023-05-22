@@ -24,18 +24,18 @@ bitloop:
 #define PIN_SIN             16
 #define PIN_SOUT            19
 
-static inline void linkcable_program_init(PIO pio, uint sm, uint offset) {
+static inline void linkcable_program_init(PIO pio, uint sm, uint offset, uint BitsNum) {
     pio_sm_config c = linkcable_program_get_default_config(offset);
 
     pio_sm_set_consecutive_pindirs(pio, sm, PIN_SCK, 1, false);
 
     sm_config_set_in_pins(&c, PIN_SIN);
     pio_sm_set_consecutive_pindirs(pio, sm, PIN_SIN, 1, false);
-    sm_config_set_in_shift(&c, false, false, LINKCABLE_BITS);
+    sm_config_set_in_shift(&c, false, false, BitsNum);
 
     sm_config_set_out_pins(&c, PIN_SOUT, 1);
     pio_sm_set_consecutive_pindirs(pio, sm, PIN_SOUT, 1, true);
-    sm_config_set_out_shift(&c, false, false, LINKCABLE_BITS);
+    sm_config_set_out_shift(&c, false, false, BitsNum);
 
 //    sm_config_set_clkdiv(&c, 5);                // Set clock division (Commented out, this one runs at full speed)
 

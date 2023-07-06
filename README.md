@@ -19,6 +19,9 @@ If you still have questions, ask us here or in the **REON Team Discord** [![Disc
 
 Refer to the [Wiki page](https://github.com/zenaro147/PicoAdapterGB/wiki) for more details on how to build one.
 
+# Demo
+[Watch here!](https://youtu.be/YvNsaXxCjOU)
+
 -----------------------
 ### Next steps:
 * Implement a native 32bits mode for GBA

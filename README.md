@@ -18,7 +18,7 @@ Refer to the [Wiki page](https://github.com/zenaro147/PicoAdapterGB/wiki) for mo
 
 ## Demo
 [![Click on the image to see the full video](https://github.com/zenaro147/PicoAdapterGB/blob/main/doc/demoPreview.gif)](https://youtu.be/YvNsaXxCjOU)<br> 
-<sub>Click on the image to see the full video</sub>
+<sub>Click on the image to watch the full video</sub>
 
 ## Current implementations
 - `pico_esp8266_at`: A Raspberry Pi Pico implementation using an ESP8266 ESP-01 to provide WiFi connectivity. 

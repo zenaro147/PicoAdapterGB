@@ -13,16 +13,18 @@ Latest Stable Release  [![Release Version](https://img.shields.io/github/v/relea
 
 If you still have questions, ask us here or in the **REON Team Discord** [![Discord Group](https://img.shields.io/badge/chat-on%20Discord-738ADB)](https://discord.gg/mKT4pTfUqC)
 
-# Current implementations
+## How to build
+Refer to the [Wiki page](https://github.com/zenaro147/PicoAdapterGB/wiki) for more details on how to build one according to your setup.
+
+## Demo
+[![Click on the image to see the full video](https://github.com/zenaro147/PicoAdapterGB/blob/main/doc/demoPreview.gif)](https://youtu.be/YvNsaXxCjOU)<br> 
+<sub>Click on the image to see the full video</sub>
+
+## Current implementations
 - `pico_esp8266_at`: A Raspberry Pi Pico implementation using an ESP8266 ESP-01 to provide WiFi connectivity. 
 - `picow`: A Raspberry Pi Pico W implementation using the internal WiFi connectivity. (recommended)
 
-Refer to the [Wiki page](https://github.com/zenaro147/PicoAdapterGB/wiki) for more details on how to build one.
-
-# Demo
-[Watch here!](https://youtu.be/YvNsaXxCjOU)
-
-# Posts about:
+## Posts about:
 * [Reddit post](https://www.reddit.com/r/Gameboy/comments/14scudy/just_dropping_this_mobile_adapter_gb_revival_wip/?sort=new)
 
 

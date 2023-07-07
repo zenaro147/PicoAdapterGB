@@ -25,6 +25,7 @@ Refer to the [Wiki page](https://github.com/zenaro147/PicoAdapterGB/wiki) for mo
 # Posts about:
 * [Reddit post](https://www.reddit.com/r/Gameboy/comments/14scudy/just_dropping_this_mobile_adapter_gb_revival_wip/?sort=new)
 
+
 -----------------------
 ### Next steps:
 * Implement a native 32bits mode for GBA

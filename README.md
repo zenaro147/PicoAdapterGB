@@ -19,8 +19,9 @@ If you still have questions, ask us here or in the **REON Team Discord** [![Disc
 
 Refer to the [Wiki page](https://github.com/zenaro147/PicoAdapterGB/wiki) for more details on how to build one.
 
-# Demo
-[Watch here!](https://youtu.be/YvNsaXxCjOU)
+## Demo
+[![Watch Demo](https://github.com/zenaro147/PicoAdapterGB/blob/main/doc/demoPreview.gif)](https://youtu.be/YvNsaXxCjOU)<br> 
+<sub>Click on the image to see the full video</sub>
 
 # Posts about:
 * [Reddit post](https://www.reddit.com/r/Gameboy/comments/14scudy/just_dropping_this_mobile_adapter_gb_revival_wip/?sort=new)

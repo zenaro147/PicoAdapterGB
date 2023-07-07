@@ -1,8 +1,6 @@
 #include "config_menu.h"
 #include "globals.h"
 
-#include "pico/cyw43_arch.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

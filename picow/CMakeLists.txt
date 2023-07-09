@@ -9,6 +9,7 @@ add_executable(${PROJECT_NAME}_PicoW
 
 # Add PIO code
 pico_generate_pio_header(${PROJECT_NAME}_PicoW ${CMAKE_CURRENT_LIST_DIR}/src/pio/linkcable.pio)
+pico_generate_pio_header(${PROJECT_NAME}_PicoW ${CMAKE_CURRENT_LIST_DIR}/src/pio/linkcable_sm.pio)
 
 target_include_directories(${PROJECT_NAME}_PicoW PRIVATE /.. ${CMAKE_CURRENT_LIST_DIR})
  

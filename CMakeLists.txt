@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(LIBMOBILE_ENABLE_NO32BIT ON)
 
-set(PICO_BOARD pico_w)
+#set(PICO_BOARD pico_w)
 
 include(pico_sdk_import.cmake)
 project(PicoAdapterGB C CXX ASM)

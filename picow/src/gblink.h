@@ -1,16 +1,19 @@
 #pragma once
 
+// #include "hardware/spi.h"
+#include "hardware/resets.h"
+
 #include <mobile.h>
+
 #include "socket_impl.h"
 #include "flash_eeprom.h"
 
-#include "hardware/spi.h"
-#include "hardware/resets.h"
-
 // SPI pins
-#define SPI_PORT            spi0
+#define SPI_PORT            0
 #define SPI_BAUDRATE_512    64 * 1024 * 8
 #define SPI_BAUDRATE_256    32 * 1024 * 8
+#define SPI_BAUDRATE_16     2 * 1024 * 8
+#define SPI_BAUDRATE_8      1024 * 8
 #define PIN_SPI_SIN         16
 #define PIN_SPI_SCK         18
 #define PIN_SPI_SOUT        19 
@@ -25,4 +28,5 @@ struct mobile_user {
     char number_peer[MOBILE_MAX_NUMBER_SIZE + 1];
 };
 
-void trigger_spi(spi_inst_t *spi, uint baudrate);
+// void trigger_spi(spi_inst_t *spi, uint baudrate, uint databits);
+void trigger_spi(int *spi, uint baudrate, uint databits);

@@ -39,7 +39,7 @@ void linkcable_reset(void) {
 }
 
 void linkcable_init(irq_handler_t onDataReceive, uint8_t BitsNum) {
-#ifdef STACKSMASHING
+#if STACKSMASHING
     linkcable_sm_program_init(LINKCABLE_PIO, LINKCABLE_SM, linkcable_pio_initial_pc = pio_add_program(LINKCABLE_PIO, &linkcable_sm_program), BitsNum);
 #else
     linkcable_program_init(LINKCABLE_PIO, LINKCABLE_SM, linkcable_pio_initial_pc = pio_add_program(LINKCABLE_PIO, &linkcable_program), BitsNum);

@@ -331,7 +331,20 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
                 
                 mobile_config_save(mobile->adapter);
                 busy_wait_ms(2*1000);
-                RefreshConfigBuff(mobile->config_eeprom,"WiFi_Network","P@$$w0rd");
+                
+                haveDNS1 = 0;
+                haveDNS2 = 0;
+                haveRelaySrv = 0;
+
+                mobile_config_get_dns(mobile->adapter, &dns1, &dns2);
+                mobile_config_get_relay(mobile->adapter, &relay);
+                
+                memset(newSSID,0x00,sizeof(newSSID));
+                memset(newPASS,0x00,sizeof(newPASS));
+                strcpy(newSSID,"WiFi_Network");
+                strcpy(newPASS,"P@$$w0rd");
+
+                RefreshConfigBuff(mobile->config_eeprom,newSSID,newPASS);
 
                 printf("Device formatted!\n");
                 needSave=true;

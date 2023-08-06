@@ -367,12 +367,12 @@ void main(){
                 mobile_config_get_dns(mobile->adapter, &dns1, &dns2);
                 mobile_config_get_relay(mobile->adapter, &relay);
                 
-                memset(newSSID,0x00,sizeof(newSSID));
-                memset(newPASS,0x00,sizeof(newPASS));
-                strcpy(newSSID,"WiFi_Network");
-                strcpy(newPASS,"P@$$w0rd");
+                memset(WiFiSSID,0x00,sizeof(WiFiSSID));
+                memset(WiFiPASS,0x00,sizeof(WiFiPASS));
+                strcpy(WiFiSSID,"WiFi_Network");
+                strcpy(WiFiPASS,"P@$$w0rd");
 
-                RefreshConfigBuff(mobile->config_eeprom,newSSID,newPASS);
+                RefreshConfigBuff(mobile->config_eeprom,WiFiSSID,WiFiPASS);
 
                 printf("Device formatted!\n");
                 needSave=true;

@@ -165,6 +165,8 @@ static void impl_update_number(void *user, enum mobile_number type, const char *
     } else {
         dest[0] = '\0';
     }
+
+    LED_OFF;
 }
 
 //////////////////////////
@@ -201,6 +203,23 @@ bool PicoW_Connect_WiFi(char *ssid, char *psk, uint32_t timeout){
         printf("Connected.\n");
     }
     return true;
+}
+
+void mobile_validate_relay(){
+    struct mobile_addr relay = {0};    
+    mobile_config_get_relay(mobile->adapter, &relay);
+    if (relay.type != MOBILE_ADDRTYPE_NONE){
+            busy_wait_us(MS(150));
+            LED_ON;
+            busy_wait_us(MS(150));
+            LED_OFF;
+            busy_wait_us(MS(150));
+            LED_ON;
+            busy_wait_us(MS(150));
+            LED_OFF;
+            busy_wait_us(MS(150));
+            LED_ON;
+    }
 }
 
 /////////////////////////
@@ -295,6 +314,9 @@ void main(){
         mobile_start(mobile->adapter);
         
         LED_OFF;
+        
+        mobile_validate_relay();
+
         while (true) {
             // Mobile Adapter Main Loop
             mobile_loop(mobile->adapter);

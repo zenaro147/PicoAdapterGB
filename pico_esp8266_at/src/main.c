@@ -89,6 +89,23 @@ void core1_context() {
     }
 }
 
+void mobile_validate_relay(){
+    struct mobile_addr relay = {0};    
+    mobile_config_get_relay(mobile->adapter, &relay);
+    if (relay.type != MOBILE_ADDRTYPE_NONE){
+            busy_wait_us(MS(150));
+            LED_ON;
+            busy_wait_us(MS(150));
+            LED_OFF;
+            busy_wait_us(MS(150));
+            LED_ON;
+            busy_wait_us(MS(150));
+            LED_OFF;
+            busy_wait_us(MS(150));
+            LED_ON;
+    }
+}
+
 void main(){
     //Setup Pico
     speed_240_MHz = set_sys_clock_khz(240000, false);
@@ -545,6 +562,9 @@ void main(){
         mobile_start(mobile->adapter);
 
         LED_OFF;
+
+        mobile_validate_relay();
+
         while (true) {
             mobile_loop(mobile->adapter);
 

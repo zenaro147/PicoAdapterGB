@@ -500,5 +500,7 @@ static void impl_update_number(void *user, enum mobile_number type, const char *
     } else {
         dest[0] = '\0';
     }
+    
+    LED_OFF;
 }
 

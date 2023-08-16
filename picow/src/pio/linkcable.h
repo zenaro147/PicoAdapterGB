@@ -2,25 +2,25 @@
 
 #include "hardware/pio.h"
 
-#define STACKSMASHING       0
+//#define STACKSMASHING
 
 #define LINKCABLE_PIO       pio0
 #define LINKCABLE_SM        0
 
-#define LINKCABLE_BITS       8
-#define LINKCABLE_16BITS      16
-#define LINKCABLE_32BITS      32
+#define LINKCABLE_BITS        8
+#define LINKCABLE_BITS_FULL   32
 
 #define CABLE_PINS_START    0
 
-static inline uint8_t linkcable_receive(void) {
-    return pio_sm_get(LINKCABLE_PIO, LINKCABLE_SM);
-}
+#define DEFAULT_SAVED_BITS 8
 
-static inline void linkcable_send(uint8_t data) {
-    pio_sm_put(LINKCABLE_PIO, LINKCABLE_SM, data);
-}
+uint32_t linkcable_receive(void);
+void linkcable_send(uint32_t data);
+void clean_linkcable_fifos(void);
+void linkcable_set_is_32(uint32_t is_32);
 
-void linkcable_changeBits(void);
 void linkcable_reset(void);
-void linkcable_init(irq_handler_t onReceive, uint8_t BitsNum);
+void linkcable_init(irq_handler_t onReceive);
+
+static void linkcable_isr(void);
+static void linkcable_time_isr(void);

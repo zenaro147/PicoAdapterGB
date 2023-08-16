@@ -71,7 +71,7 @@ static void impl_serial_disable(void *user) {
 static void impl_serial_enable(void *user, bool mode_32bit) {
     struct mobile_user *mobile = (struct mobile_user *)user;
 
-    //isLinkCable32 = mode_32bit;
+    isLinkCable32 = mode_32bit;
     linkcable_set_is_32(mode_32bit);
     
     #ifdef DEBUG_SIGNAL_PINS

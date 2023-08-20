@@ -330,7 +330,6 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
                 mobile_config_set_device(mobile->adapter, device, false);
                 
                 mobile_config_save(mobile->adapter);
-                busy_wait_ms(2*1000);
                 
                 haveDNS1 = 0;
                 haveDNS2 = 0;
@@ -470,7 +469,6 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
 
             //Save new Configs
             mobile_config_save(mobile->adapter);
-            busy_wait_ms(2*1000);
             RefreshConfigBuff(mobile->config_eeprom,newSSID,newPASS);
 
             printf("Please reboot the device...\n");

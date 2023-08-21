@@ -5,6 +5,7 @@
 #include "hardware/timer.h"
 
 #include "linkcable.h"
+#include "../globals.h"
 
 #ifdef STACKSMASHING
     #include "linkcable_sm.pio.h"
@@ -15,7 +16,9 @@
 static irq_handler_t linkcable_irq_handler = NULL;
 static uint32_t linkcable_pio_initial_pc = 0;
 static uint saved_bits = DEFAULT_SAVED_BITS;
-static uint64_t saved_time;
+static uint64_t saved_time = 0;
+bool is_enabled = false;
+
 
 static void linkcable_isr(void) {
     uint64_t curr_time = time_us_64();
@@ -24,7 +27,7 @@ static void linkcable_isr(void) {
     if (pio_interrupt_get(LINKCABLE_PIO, 0)) pio_interrupt_clear(LINKCABLE_PIO, 0);
     curr_time = time_us_64();
     if(dest_time > curr_time) {
-        if((dest_time - curr_time) < (100*1000))
+        if((dest_time - curr_time) < MS(100))
             busy_wait_us(dest_time - curr_time);
     }
     #ifdef STACKSMASHING
@@ -32,6 +35,16 @@ static void linkcable_isr(void) {
     #else
         linkcable_activate(LINKCABLE_PIO, LINKCABLE_SM);
     #endif
+}
+
+bool can_disable_linkcable_irq(void) {
+    if(!is_enabled)
+        return true;
+    uint64_t old_time = saved_time;
+    uint64_t curr_time = time_us_64();
+    if((curr_time - old_time) >= SEC(1))
+        return true;
+    return false;
 }
 
 static void linkcable_time_isr(void) {
@@ -53,13 +66,24 @@ void clean_linkcable_fifos(void) {
     pio_sm_clear_fifos(LINKCABLE_PIO, LINKCABLE_SM);
 }
 
-void linkcable_reset(void) {
+void linkcable_enable(void) {
+    is_enabled = true;
+    pio_sm_set_enabled(LINKCABLE_PIO, LINKCABLE_SM, true);
+}
+
+void linkcable_disable(void) {
+    linkcable_reset(false);
+}
+
+void linkcable_reset(bool re_enable) {
     pio_sm_set_enabled(LINKCABLE_PIO, LINKCABLE_SM, false);
+    is_enabled = false;
     pio_sm_clear_fifos(LINKCABLE_PIO, LINKCABLE_SM);
     pio_sm_restart(LINKCABLE_PIO, LINKCABLE_SM);
     pio_sm_clkdiv_restart(LINKCABLE_PIO, LINKCABLE_SM);
     pio_sm_exec(LINKCABLE_PIO, LINKCABLE_SM, pio_encode_jmp(linkcable_pio_initial_pc));
-    pio_sm_set_enabled(LINKCABLE_PIO, LINKCABLE_SM, true);
+    if(re_enable)
+        linkcable_enable();
 }
 
 void linkcable_set_is_32(uint32_t is_32) {
@@ -75,6 +99,7 @@ void linkcable_set_is_32(uint32_t is_32) {
 }
 
 void linkcable_init(irq_handler_t onDataReceive) {
+    saved_bits = DEFAULT_SAVED_BITS;
 #ifdef STACKSMASHING
     linkcable_sm_program_init(LINKCABLE_PIO, LINKCABLE_SM, linkcable_pio_initial_pc = pio_add_program(LINKCABLE_PIO, &linkcable_sm_program), DEFAULT_SAVED_BITS);
 #else

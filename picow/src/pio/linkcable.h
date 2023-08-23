@@ -14,6 +14,8 @@
 
 #define DEFAULT_SAVED_BITS 8
 
+#define FAST_ALIGNMENT
+
 uint32_t linkcable_receive(void);
 void linkcable_send(uint32_t data);
 void clean_linkcable_fifos(void);

@@ -167,7 +167,6 @@ static void impl_update_number(void *user, enum mobile_number type, const char *
 //////////////////////////
 
 void link_cable_ISR(void) {
-    //linkcable_send(mobile_transfer(mobile->adapter, linkcable_receive()));
     uint32_t data;
     if(isLinkCable32){
         data = mobile_transfer_32bit(mobile->adapter, linkcable_receive());
@@ -307,7 +306,6 @@ void main(){
 
         linkcable_init(link_cable_ISR);
         
-        //Maybe remove this watchdog?
         //add_alarm_in_us(MS(300), link_cable_watchdog, NULL, true);
 
         mobile_start(mobile->adapter);

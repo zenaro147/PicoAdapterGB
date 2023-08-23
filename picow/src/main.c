@@ -34,8 +34,9 @@ char WiFiPASS[28] = "P@$$w0rd";
 
 //Control Flash Write
 bool haveConfigToWrite = false;
-bool startWriteConfig = false;
-uint8_t currentTicks = 0;
+
+bool isLinkCable32 = false;
+bool link_cable_data_received = false;
 
 /////////////////////////////////
 // MOBILE ADAPTER GB FUNCTIONS //
@@ -54,28 +55,20 @@ static void impl_serial_disable(void *user) {
     #endif
     struct mobile_user *mobile = (struct mobile_user *)user;
 
-    if(haveConfigToWrite && !startWriteConfig){
-        if(currentTicks >= TICKSWAIT){
-            startWriteConfig = true;
-        }else{
-            currentTicks++;
-        }
-    }
+    linkcable_reset(false);
     // spi_deinit(SPI_PORT);    
 }
 
 static void impl_serial_enable(void *user, bool mode_32bit) {
     struct mobile_user *mobile = (struct mobile_user *)user;
-    
-    if(!mode_32bit){
-        trigger_spi(SPI_PORT,SPI_BAUDRATE_256,8);
-    }else{
-        trigger_spi(SPI_PORT,SPI_BAUDRATE_256,32);
-    }
+
+    isLinkCable32 = mode_32bit;
+    linkcable_set_is_32(mode_32bit);
     
     #ifdef DEBUG_SIGNAL_PINS
         gpio_put(10, false);
     #endif
+    linkcable_enable();
 }
 
 static bool impl_config_read(void *user, void *dest, const uintptr_t offset, const size_t size) {
@@ -172,16 +165,22 @@ static void impl_update_number(void *user, enum mobile_number type, const char *
 //////////////////////////
 // LINK CABLE FUNCTIONS //
 //////////////////////////
-bool link_cable_data_received = false;
+
 void link_cable_ISR(void) {
-    // linkcable_send(protocol_data_process(linkcable_receive()));
-    linkcable_send(mobile_transfer(mobile->adapter, linkcable_receive()));
+    uint32_t data;
+    if(isLinkCable32){
+        data = mobile_transfer_32bit(mobile->adapter, linkcable_receive());
+    }else{
+        data = mobile_transfer(mobile->adapter, linkcable_receive());
+    }
+    clean_linkcable_fifos();
+    linkcable_send(data);
     link_cable_data_received = true;
 }
 
 int64_t link_cable_watchdog(alarm_id_t id, void *user_data) {
     if (!link_cable_data_received) {
-        linkcable_reset();
+        linkcable_reset(true);
         // protocol_reset();
     } else link_cable_data_received = false;
     return MS(300);
@@ -305,8 +304,9 @@ void main(){
 
         // multicore_launch_core1(core1_context);
 
-        linkcable_init(link_cable_ISR, 8);
-        add_alarm_in_us(MS(300), link_cable_watchdog, NULL, true);
+        linkcable_init(link_cable_ISR);
+        
+        //add_alarm_in_us(MS(300), link_cable_watchdog, NULL, true);
 
         mobile_start(mobile->adapter);
 
@@ -318,18 +318,10 @@ void main(){
 
             // Check if there is any new config to write on Flash
             if(haveConfigToWrite){
-                bool checkSockStatus = false;
-                for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
-                    if(mobile->socket[i].tcp_pcb || mobile->socket[i].udp_pcb){
-                        checkSockStatus = true;
-                        break;
-                    } 
-                }
-                if(!checkSockStatus && startWriteConfig){
+                bool can_disable_irqs = can_disable_linkcable_irq();
+                if(can_disable_irqs) {
                     SaveFlashConfig(mobile->config_eeprom);
                     haveConfigToWrite = false;
-                    startWriteConfig = false;
-                    currentTicks = 0;
                     LED_OFF;
                 }
             }

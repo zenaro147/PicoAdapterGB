@@ -354,11 +354,7 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
 
             // Shows the actual device configuration
             }else if(FindCommand(UserCMD,"SHOW_CONFIG")){
-                printf("NETWORK SETTINGS\n");
-                printf("WiFi SSID: %s\n",newSSID);
-                printf("WiFi Password: %s\n",newPASS);
-                printf("\n");
-                printf("ADAPTER SETTINGS\n");
+                printf("NETWORK SETTINGS\nWiFi SSID: %s\nWiFi Password: %s\n\nADAPTER SETTINGS\n",newSSID,newPASS);
 
                 char tmpSrv[60] = {0};
                 parse_addr_string(&dns1,tmpSrv);
@@ -382,8 +378,7 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
 
                 bool tmpUnmet = false;
                 mobile_config_get_device(mobile->adapter,NULL,&tmpUnmet);
-                printf("Is Unmetered: %s\n", tmpUnmet == true ? "Yes":"No");
-                printf("\n");
+                printf("Is Unmetered: %s\n\n", tmpUnmet == true ? "Yes":"No");
 
             }else if(FindCommand(UserCMD,"HELP")){
                 printf("Command Sintax: <COMMAND>=<VALUE>\n");

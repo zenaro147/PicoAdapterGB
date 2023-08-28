@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <mobile.h>
 #include "globals.h"
 
 #include "pico/time.h"

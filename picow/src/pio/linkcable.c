@@ -20,7 +20,7 @@ static uint64_t saved_time = 0;
 bool is_enabled = false;
 
 
-static void linkcable_isr(void) {
+static void TIME_SENSITIVE(linkcable_isr)(void) {
     #ifdef FAST_ALIGNMENT
         uint64_t curr_time = time_us_64();
         uint64_t dest_time = curr_time + ((curr_time - saved_time + saved_bits - 1) / saved_bits);
@@ -53,23 +53,23 @@ bool can_disable_linkcable_irq(void) {
 }
 
 #ifdef FAST_ALIGNMENT
-static void linkcable_time_isr(void) {
+static void TIME_SENSITIVE(linkcable_time_isr)(void) {
     saved_time = time_us_64();
     if (pio_interrupt_get(LINKCABLE_PIO, 1)) pio_interrupt_clear(LINKCABLE_PIO, 1);
 }
 #endif
 
-uint32_t linkcable_receive(void) {
+uint32_t TIME_SENSITIVE(linkcable_receive)(void) {
     uint32_t retval = (pio_sm_get(LINKCABLE_PIO, LINKCABLE_SM) & ((1 << saved_bits) - 1));
     return retval;
 }
 
-void linkcable_send(uint32_t data) {
+void TIME_SENSITIVE(linkcable_send)(uint32_t data) {
     uint32_t sendval = (data << (32 - saved_bits));
     pio_sm_put(LINKCABLE_PIO, LINKCABLE_SM, sendval);
 }
 
-void clean_linkcable_fifos(void) {
+void TIME_SENSITIVE(clean_linkcable_fifos)(void) {
     pio_sm_clear_fifos(LINKCABLE_PIO, LINKCABLE_SM);
 }
 

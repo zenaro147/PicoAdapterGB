@@ -12,7 +12,7 @@ struct socket_impl {
     uint8_t udp_remote_port;
     bool client_status;
     //uint8_t buffer_tx[MOBILE_MAX_TRANSFER_SIZE];
-    uint8_t buffer_rx[BUFF_SIZE]; //Same as ESP-01
+    uint8_t buffer_rx[BUFF_SIZE];
     int buffer_rx_len;
     int buffer_tx_len;
 	union{
@@ -24,7 +24,7 @@ struct socket_impl {
 void socket_impl_init(struct socket_impl *state);
 void socket_impl_stop(struct socket_impl *state);
 
-bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport);
+bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport, void *user);
 void socket_impl_close(struct socket_impl *state);
 int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *addr);
 bool socket_impl_listen(struct socket_impl *state);

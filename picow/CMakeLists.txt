@@ -1,7 +1,6 @@
 add_executable(${PROJECT_NAME}_PicoW 
     	        src/main.c 
                 src/config_menu.c
-                src/gblink.c 
                 src/flash_eeprom.c 
                 src/picow_socket.c 
                 src/socket_impl.c

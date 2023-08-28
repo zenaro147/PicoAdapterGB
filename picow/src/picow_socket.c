@@ -4,12 +4,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "socket_impl.h"
 #include "pico/cyw43_arch.h"
+#include "globals.h"
 
 //UDP Callbacks
 void socket_recv_udp(void * arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t*addr, u16_t port){
-    struct socket_impl *state = (struct socket_impl*)arg;
+    struct mobile_user *mobile = (struct mobile_user*)arg;
+    struct socket_impl *state = &mobile->socket[mobile->currentReqSocket];
     // printf("UDP Receiving...\n");
     if (p->tot_len > 0) {
         // printf("received UDP from IP: %d.%d.%d.%d port: %d  length: %d\n",
@@ -20,11 +21,24 @@ void socket_recv_udp(void * arg, struct udp_pcb *pcb, struct pbuf *p, const ip_a
         // port,
         // p->len);
 
-        // Receive the buffer
-        state->buffer_rx_len = pbuf_copy_partial(p, &state->buffer_rx, p->tot_len, 0);
         memset(state->udp_remote_srv,0x00,sizeof(state->udp_remote_srv));
         sprintf(state->udp_remote_srv, "%d.%d.%d.%d", addr->addr&0xff, (addr->addr>>8)&0xff, (addr->addr>>16)&0xff, addr->addr>>24);
         state->udp_remote_port = port;
+
+        // Receive the buffer
+        state->buffer_rx_len = pbuf_copy_partial(p, &state->buffer_rx, p->tot_len, 0);
+        int copiedBytes = 0;
+        int remainingBytes = p->tot_len;
+
+        while (copiedBytes < p->tot_len) {
+            remainingBytes -= copiedBytes;
+            int recvsize = pbuf_copy_partial(p, state->buffer_rx, remainingBytes <= 512 ? remainingBytes : 512, copiedBytes);
+            copiedBytes += recvsize;
+            state->buffer_rx_len = recvsize;
+            while (state->buffer_rx_len > 0) {
+                mobile_loop(mobile->adapter);
+            }
+        }
     }
     pbuf_free(p);
 }
@@ -40,12 +54,14 @@ err_t socket_connected_tcp(void *arg, struct tcp_pcb *pcb, err_t err) {
 }
 
 void socket_err_tcp(void *arg, err_t err){
-    struct socket_impl *state = (struct socket_impl*)arg;
+    struct mobile_user *mobile = (struct mobile_user*)arg;
+    struct socket_impl *state = &mobile->socket[mobile->currentReqSocket];
     printf("TCP Generic Error %d\n", err);
 }
 
 err_t socket_accept_tcp(void *arg, struct tcp_pcb *pcb, err_t err){
-    struct socket_impl *state = (struct socket_impl*)arg;
+    struct mobile_user *mobile = (struct mobile_user*)arg;
+    struct socket_impl *state = &mobile->socket[mobile->currentReqSocket];
 
     if (err != ERR_OK || pcb == NULL) {
         // printf("Failure in accept\n");
@@ -54,7 +70,7 @@ err_t socket_accept_tcp(void *arg, struct tcp_pcb *pcb, err_t err){
     // printf("Client connected\n");
 
     state->tcp_pcb = pcb;
-    tcp_arg(pcb, state);
+    tcp_arg(pcb, arg);
     //tcp_poll(state->tcp_pcb, NULL, 0);
     tcp_accept(pcb, socket_accept_tcp);
     tcp_sent(pcb, socket_sent_tcp);
@@ -67,7 +83,8 @@ err_t socket_accept_tcp(void *arg, struct tcp_pcb *pcb, err_t err){
 }
 
 err_t socket_sent_tcp(void *arg, struct tcp_pcb *pcb, u16_t len){
-    struct socket_impl *state = (struct socket_impl*)arg;
+    struct mobile_user *mobile = (struct mobile_user*)arg;
+    struct socket_impl *state = &mobile->socket[mobile->currentReqSocket];
     err_t err = ERR_ABRT;
     if(state->buffer_tx_len != len){
         // printf("TCP sent %d bytes to: %s:%d. But should sent %d\n",len,ip4addr_ntoa(&pcb->remote_ip),pcb->remote_port,state->buffer_tx_len);
@@ -81,21 +98,32 @@ err_t socket_sent_tcp(void *arg, struct tcp_pcb *pcb, u16_t len){
 }
 
 err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err){
-    struct socket_impl *state = (struct socket_impl*)arg;
+    struct mobile_user *mobile = (struct mobile_user*)arg;
+    struct socket_impl *state = &mobile->socket[mobile->currentReqSocket];
     // printf("TCP Receiving...\n");
     if(p){
         if (p->tot_len > 0) {
-            int recvsize = 0;
+            int copiedBytes = 0;
+            int remainingBytes = p->tot_len;
             // uint8_t tmpbuff[BUFF_SIZE] ={0};
             // printf("reading %d bytes\n", p->tot_len);
             // Receive the buffer
-            recvsize = pbuf_copy_partial(p, state->buffer_rx + state->buffer_rx_len, p->tot_len, 0);
 
-            tcp_recved(pcb,recvsize);
-            // memcpy(state->buffer_rx + state->buffer_rx_len,tmpbuff,recvsize);
-            state->buffer_rx_len = state->buffer_rx_len + recvsize;
-            if (recvsize > 0){
-                // printf("received %d bytes\n", recvsize);
+            while (copiedBytes < p->tot_len) {
+                remainingBytes -= copiedBytes;
+                int recvsize = pbuf_copy_partial(p, state->buffer_rx, remainingBytes <= 512 ? remainingBytes : 512, copiedBytes);
+                copiedBytes += recvsize;
+                state->buffer_rx_len = recvsize;
+                while (state->buffer_rx_len > 0) {
+                    mobile_loop(mobile->adapter);
+                }
+            }
+
+            tcp_recved(pcb,copiedBytes);
+            // memcpy(state->buffer_rx + state->buffer_rx_len,tmpbuff,copiedBytes);
+
+            if (copiedBytes > 0){
+                // printf("received %d bytes\n", copiedBytes);
                 err = ERR_OK;
             }else{
                 err = ERR_BUF;

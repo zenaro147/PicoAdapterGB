@@ -28,7 +28,6 @@ bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, 
             
             tcp_arg(state->tcp_pcb, user);
             //tcp_poll(state->tcp_pcb, NULL, 0);
-            tcp_accept(state->tcp_pcb, socket_accept_tcp);
             tcp_sent(state->tcp_pcb, socket_sent_tcp);
             tcp_recv(state->tcp_pcb, socket_recv_tcp);
             tcp_err(state->tcp_pcb, socket_err_tcp);
@@ -314,15 +313,17 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
 
 }
 
-bool socket_impl_listen(struct socket_impl *state){
+bool socket_impl_listen(struct socket_impl *state, void *user){
     err_t err = ERR_ABRT;
     if(state->sock_type == SOCK_TCP){
         if(state->tcp_pcb->state==CLOSED){
             //err = tcp_bind(state->tcp_pcb,state->sock_addr == IPADDR_TYPE_V4 ? IP4_ADDR_ANY : IP6_ADDR_ANY,state->tcp_pcb->remote_port);
-            err = tcp_bind(state->tcp_pcb,IP4_ADDR_ANY,state->tcp_pcb->remote_port);
+            err = tcp_bind(state->tcp_pcb,IP4_ADDR_ANY,state->tcp_pcb->local_port);
             // printf("Listening TCP socket - err: %d\n",err);
             if(err == ERR_OK){
                 state->client_status=false;
+                state->tcp_pcb = tcp_listen_with_backlog(state->tcp_pcb,1);
+                tcp_arg(state->tcp_pcb, user);
                 tcp_accept(state->tcp_pcb, socket_accept_tcp);
                 // printf("Client Listening!\n");
                 return true;

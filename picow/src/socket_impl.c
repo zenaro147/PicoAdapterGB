@@ -7,7 +7,7 @@
 
 uint16_t buffrx_lastpos = 0;
 
-bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
+bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport, void *user){    
     switch (addrtype) {
         case MOBILE_ADDRTYPE_IPV4:
             state->sock_addr = IPADDR_TYPE_V4;
@@ -26,7 +26,7 @@ bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, 
             if(!state->tcp_pcb) return false;
             if(bindport != 0) state->tcp_pcb->local_port = bindport;
             
-            tcp_arg(state->tcp_pcb, state);
+            tcp_arg(state->tcp_pcb, user);
             //tcp_poll(state->tcp_pcb, NULL, 0);
             tcp_accept(state->tcp_pcb, socket_accept_tcp);
             tcp_sent(state->tcp_pcb, socket_sent_tcp);
@@ -40,7 +40,7 @@ bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, 
             if(!state->udp_pcb) return false;            
             if(bindport != 0) state->udp_pcb->local_port = bindport;
 
-            udp_recv(state->udp_pcb, socket_recv_udp, state);
+            udp_recv(state->udp_pcb, socket_recv_udp, user);
 
             break;
         default: 
@@ -105,7 +105,7 @@ int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *add
 
     //Check if is open
     if(state->sock_type == SOCK_TCP && state->tcp_pcb->state != CLOSED){
-        cyw43_arch_poll();
+        // cyw43_arch_poll();
         switch (state->tcp_pcb->state){
             case ESTABLISHED:
                 return 1;
@@ -223,7 +223,7 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
         return -1;
     } 
 
-    cyw43_arch_poll();
+    // cyw43_arch_poll();
 
     return state->buffer_tx_len;
 }
@@ -265,7 +265,7 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
         }     
     }
 
-    cyw43_arch_poll();
+    // cyw43_arch_poll();
 
     int recvd_buff = 0;
     if(state->buffer_rx_len > 0){
@@ -334,7 +334,7 @@ bool socket_impl_listen(struct socket_impl *state){
 }
 
 bool socket_impl_accept(struct socket_impl *state){
-    cyw43_arch_poll();
+    // cyw43_arch_poll();
     if(state->client_status && state->sock_type == SOCK_TCP && state->tcp_pcb){
         switch(state->tcp_pcb->state){
             case ESTABLISHED:

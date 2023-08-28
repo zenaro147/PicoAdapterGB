@@ -3,6 +3,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
 #set(LIBMOBILE_ENABLE_NO32BIT ON)
+#set(LIBMOBILE_TIME_SENSITIVE "__attribute__((section(\".time_critical.\" #x))) x")
 
 set(PICO_BOARD pico_w)
 

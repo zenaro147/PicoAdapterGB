@@ -9,16 +9,12 @@
 #include "hardware/pio.h"
 #include "pico/cyw43_arch.h"
 
-#include <mobile.h>
-#include <mobile_inet.h>
-
 #include "globals.h"
 
+#include <mobile_inet.h>
+
 #include "config_menu.h"
-#include "gblink.h"
-#include "flash_eeprom.h"
 #include "picow_socket.h"
-#include "socket_impl.h"
 #include "pio/linkcable.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -103,42 +99,49 @@ static bool impl_time_check_ms(void *user, unsigned timer, unsigned ms) {
 static bool impl_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
     struct mobile_user *mobile = (struct mobile_user *)user;
     // printf("mobile_impl_sock_open\n");
-    return socket_impl_open(&mobile->socket[conn], socktype, addrtype, bindport);
+    mobile->currentReqSocket = conn;
+    return socket_impl_open(&mobile->socket[conn], socktype, addrtype, bindport, user);
 }
 
 static void impl_sock_close(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
     // printf("mobile_impl_sock_close\n");
+    mobile->currentReqSocket = conn;
     return socket_impl_close(&mobile->socket[conn]);
 }
 
 static int impl_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
     // printf("mobile_impl_sock_connect\n"); 
+    mobile->currentReqSocket = conn;
     return socket_impl_connect(&mobile->socket[conn], addr);
 }
 
 static int impl_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
     // printf("mobile_impl_sock_send\n");
+    mobile->currentReqSocket = conn;
     return socket_impl_send(&mobile->socket[conn], data, size, addr);
 }
 
 static int impl_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;    
     // printf("mobile_impl_sock_recv\n");
+    mobile->currentReqSocket = conn;
     return socket_impl_recv(&mobile->socket[conn], data, size, addr);
 }
 
 static bool impl_sock_listen(void *user, unsigned conn){ 
     struct mobile_user *mobile = (struct mobile_user *)user;
     // printf("mobile_impl_sock_listen\n");
+    mobile->currentReqSocket = conn;
     return socket_impl_listen(&mobile->socket[conn]);
 }
 
 static bool impl_sock_accept(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
     // printf("mobile_impl_sock_accept\n"); 
+    mobile->currentReqSocket = conn;
     return socket_impl_accept(&mobile->socket[conn]);
 }
 
@@ -166,7 +169,7 @@ static void impl_update_number(void *user, enum mobile_number type, const char *
 // LINK CABLE FUNCTIONS //
 //////////////////////////
 
-void link_cable_ISR(void) {
+void TIME_SENSITIVE(link_cable_ISR)(void) {
     uint32_t data;
     if(isLinkCable32){
         data = mobile_transfer_32bit(mobile->adapter, linkcable_receive());
@@ -287,6 +290,7 @@ void main(){
         mobile->action = MOBILE_ACTION_NONE;
         mobile->number_user[0] = '\0';
         mobile->number_peer[0] = '\0';
+        mobile->currentReqSocket = -1;
         for (int i = 0; i < MOBILE_MAX_TIMERS; i++) mobile->picow_clock_latch[i] = 0;
         for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
             mobile->socket[i].tcp_pcb = NULL;
@@ -315,6 +319,13 @@ void main(){
         while (true) {
             // Mobile Adapter Main Loop
             mobile_loop(mobile->adapter);
+            
+            for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
+                if(mobile->socket[i].tcp_pcb || mobile->socket[i].udp_pcb){
+                    cyw43_arch_poll();
+                    break;
+                } 
+            }
 
             // Check if there is any new config to write on Flash
             if(haveConfigToWrite){

@@ -50,14 +50,14 @@ static void impl_serial_disable(void *user) {
         gpio_put(10, true);
     #endif
     struct mobile_user *mobile = (struct mobile_user *)user;
-
-    linkcable_reset(false);
+  
+    linkcable_reset(false);   
     // spi_deinit(SPI_PORT);    
 }
 
 static void impl_serial_enable(void *user, bool mode_32bit) {
     struct mobile_user *mobile = (struct mobile_user *)user;
-
+    
     isLinkCable32 = mode_32bit;
     linkcable_set_is_32(mode_32bit);
     
@@ -181,14 +181,6 @@ void TIME_SENSITIVE(link_cable_ISR)(void) {
     link_cable_data_received = true;
 }
 
-int64_t link_cable_watchdog(alarm_id_t id, void *user_data) {
-    if (!link_cable_data_received) {
-        linkcable_reset(true);
-        // protocol_reset();
-    } else link_cable_data_received = false;
-    return MS(300);
-}
-
 ///////////////////////////////
 // PICO W AUXILIAR FUNCTIONS //
 ///////////////////////////////
@@ -309,8 +301,6 @@ void main(){
         // multicore_launch_core1(core1_context);
 
         linkcable_init(link_cable_ISR);
-        
-        //add_alarm_in_us(MS(300), link_cable_watchdog, NULL, true);
 
         mobile_start(mobile->adapter);
 

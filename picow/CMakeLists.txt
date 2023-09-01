@@ -4,6 +4,7 @@ add_executable(${PROJECT_NAME}_PicoW
                 src/flash_eeprom.c 
                 src/picow_socket.c 
                 src/socket_impl.c
+                src/sync.c
                 src/pio/linkcable.c)
 
 # Add PIO code

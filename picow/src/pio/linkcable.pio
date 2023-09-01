@@ -12,7 +12,7 @@
 
 .wrap_target
     wait 0 gpio PIN_SCK [WAIT_FIRST]      ; wait for falling edge
-    ;irq 1                                ; comment out if no FAST_ALIGNMENT
+    ;irq 1                                ; comment out if no FAST_ALIGNMENT and no DEBUG_TIMEFRAMES
     pull noblock                          ; pull value for transmission from pico
     mov x, y
     out pins, 1                           ; out the MSB bit

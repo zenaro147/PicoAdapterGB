@@ -98,7 +98,7 @@ static void TIME_SENSITIVE(linkcable_isr)(void) {
 #ifdef STACKSMASHING
     linkcable_sm_activate(LINKCABLE_PIO, LINKCABLE_SM);
 #else
-    linkcable_sm_activate(LINKCABLE_PIO, LINKCABLE_SM);
+    linkcable_activate(LINKCABLE_PIO, LINKCABLE_SM);
 #endif
 #endif
 }

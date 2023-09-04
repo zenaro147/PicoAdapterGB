@@ -302,9 +302,12 @@ void main(){
 
         linkcable_init(link_cable_ISR);
 
+        printf("-------------------------\nSoftware Version:\nLibmobile: %i.%i.%i\nPicoAdapterGB: %s %s\n-------------------------\n",mobile_version_major,mobile_version_minor,mobile_version_patch,PICO_ADAPTER_HARDWARE,PICO_ADAPTER_SOFTWARE);
+
         mobile_start(mobile->adapter);
 
         mobile_validate_relay();
+
 
         while (true) {
             // Mobile Adapter Main Loop

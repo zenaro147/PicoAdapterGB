@@ -29,5 +29,5 @@ Refer to the [Wiki page](https://github.com/zenaro147/PicoAdapterGB/wiki) for mo
 
 ## Credits 
 * [REON Team](https://github.com/REONTeam/) - Mobile Adapter Library
-* [untoxa](https://github.com/untoxa) - GB Link cable PIO solution
+* [Lorenzooone](https://github.com/Lorenzooone/) - GB Link cable PIO solution
 

@@ -444,6 +444,7 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
                 printf("SHOW_CONFIG   | Show the actual device configuration.\n");
                 printf("EXIT          | Quit from Config Mode and Save the new values. If you change some value, the device will reboot.\n");
                 printf("HELP          | Show this command list on screen.\n\n");
+                printf("-------------------------\nSoftware Version:\nLibmobile: %i.%i.%i\nPicoAdapterGB: %s %s\n-------------------------\n\n",mobile_version_major,mobile_version_minor,mobile_version_patch,PICO_ADAPTER_HARDWARE,PICO_ADAPTER_SOFTWARE);
                 
             //Generic error return
             }else{

@@ -3,8 +3,10 @@
 
 .define public CLOCK_DIV 2
 .define public PIN_SCK 18
-.define public PIN_SIN 16
-.define public PIN_SOUT 19
+;16
+.define public PIN_SIN 19
+;19
+.define public PIN_SOUT 16
 
 .define WAIT_FIRST (0/CLOCK_DIV)
 .define WAIT_MIDDLE (2/CLOCK_DIV)

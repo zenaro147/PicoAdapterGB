@@ -9,7 +9,7 @@ struct socket_impl {
     uint8_t sock_addr;
     uint8_t sock_type;
     char udp_remote_srv[46];
-    uint8_t udp_remote_port;
+    unsigned udp_remote_port;
     bool client_status;
     //uint8_t buffer_tx[MOBILE_MAX_TRANSFER_SIZE];
     uint8_t buffer_rx[BUFF_SIZE];

@@ -5,7 +5,7 @@
 #include "flash_eeprom.h"
 
 #define PICO_ADAPTER_HARDWARE "PicoW"
-#define PICO_ADAPTER_SOFTWARE "2.0.0-b"
+#define PICO_ADAPTER_SOFTWARE "1.4.0-b"
 
 //#define DEBUG_SIGNAL_PINS
 

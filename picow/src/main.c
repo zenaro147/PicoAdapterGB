@@ -9,16 +9,12 @@
 #include "hardware/pio.h"
 #include "pico/cyw43_arch.h"
 
-#include <mobile.h>
-#include <mobile_inet.h>
-
 #include "globals.h"
 
+#include <mobile_inet.h>
+
 #include "config_menu.h"
-#include "gblink.h"
-#include "flash_eeprom.h"
 #include "picow_socket.h"
-#include "socket_impl.h"
 #include "pio/linkcable.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,8 +30,9 @@ char WiFiPASS[28] = "P@$$w0rd";
 
 //Control Flash Write
 bool haveConfigToWrite = false;
-bool startWriteConfig = false;
-uint8_t currentTicks = 0;
+
+bool isLinkCable32 = false;
+bool link_cable_data_received = false;
 
 /////////////////////////////////
 // MOBILE ADAPTER GB FUNCTIONS //
@@ -53,29 +50,21 @@ static void impl_serial_disable(void *user) {
         gpio_put(10, true);
     #endif
     struct mobile_user *mobile = (struct mobile_user *)user;
-
-    if(haveConfigToWrite && !startWriteConfig){
-        if(currentTicks >= TICKSWAIT){
-            startWriteConfig = true;
-        }else{
-            currentTicks++;
-        }
-    }
+  
+    linkcable_reset(false);   
     // spi_deinit(SPI_PORT);    
 }
 
 static void impl_serial_enable(void *user, bool mode_32bit) {
     struct mobile_user *mobile = (struct mobile_user *)user;
     
-    if(!mode_32bit){
-        trigger_spi(SPI_PORT,SPI_BAUDRATE_256,8);
-    }else{
-        trigger_spi(SPI_PORT,SPI_BAUDRATE_256,32);
-    }
+    isLinkCable32 = mode_32bit;
+    linkcable_set_is_32(mode_32bit);
     
     #ifdef DEBUG_SIGNAL_PINS
         gpio_put(10, false);
     #endif
+    linkcable_enable();
 }
 
 static bool impl_config_read(void *user, void *dest, const uintptr_t offset, const size_t size) {
@@ -110,42 +99,49 @@ static bool impl_time_check_ms(void *user, unsigned timer, unsigned ms) {
 static bool impl_sock_open(void *user, unsigned conn, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport){
     struct mobile_user *mobile = (struct mobile_user *)user;
     // printf("mobile_impl_sock_open\n");
-    return socket_impl_open(&mobile->socket[conn], socktype, addrtype, bindport);
+    mobile->currentReqSocket = conn;
+    return socket_impl_open(&mobile->socket[conn], socktype, addrtype, bindport, user);
 }
 
 static void impl_sock_close(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
     // printf("mobile_impl_sock_close\n");
+    mobile->currentReqSocket = conn;
     return socket_impl_close(&mobile->socket[conn]);
 }
 
 static int impl_sock_connect(void *user, unsigned conn, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
     // printf("mobile_impl_sock_connect\n"); 
+    mobile->currentReqSocket = conn;
     return socket_impl_connect(&mobile->socket[conn], addr);
 }
 
 static int impl_sock_send(void *user, unsigned conn, const void *data, const unsigned size, const struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;
     // printf("mobile_impl_sock_send\n");
+    mobile->currentReqSocket = conn;
     return socket_impl_send(&mobile->socket[conn], data, size, addr);
 }
 
 static int impl_sock_recv(void *user, unsigned conn, void *data, unsigned size, struct mobile_addr *addr){
     struct mobile_user *mobile = (struct mobile_user *)user;    
     // printf("mobile_impl_sock_recv\n");
+    mobile->currentReqSocket = conn;
     return socket_impl_recv(&mobile->socket[conn], data, size, addr);
 }
 
 static bool impl_sock_listen(void *user, unsigned conn){ 
     struct mobile_user *mobile = (struct mobile_user *)user;
     // printf("mobile_impl_sock_listen\n");
-    return socket_impl_listen(&mobile->socket[conn]);
+    mobile->currentReqSocket = conn;
+    return socket_impl_listen(&mobile->socket[conn],user);
 }
 
 static bool impl_sock_accept(void *user, unsigned conn){
     struct mobile_user *mobile = (struct mobile_user *)user;
     // printf("mobile_impl_sock_accept\n"); 
+    mobile->currentReqSocket = conn;
     return socket_impl_accept(&mobile->socket[conn]);
 }
 
@@ -165,24 +161,24 @@ static void impl_update_number(void *user, enum mobile_number type, const char *
     } else {
         dest[0] = '\0';
     }
+
+    LED_OFF;
 }
 
 //////////////////////////
 // LINK CABLE FUNCTIONS //
 //////////////////////////
-bool link_cable_data_received = false;
-void link_cable_ISR(void) {
-    // linkcable_send(protocol_data_process(linkcable_receive()));
-    linkcable_send(mobile_transfer(mobile->adapter, linkcable_receive()));
-    link_cable_data_received = true;
-}
 
-int64_t link_cable_watchdog(alarm_id_t id, void *user_data) {
-    if (!link_cable_data_received) {
-        linkcable_reset();
-        // protocol_reset();
-    } else link_cable_data_received = false;
-    return MS(300);
+void TIME_SENSITIVE(link_cable_ISR)(void) {
+    uint32_t data;
+    if(isLinkCable32){
+        data = mobile_transfer_32bit(mobile->adapter, linkcable_receive());
+    }else{
+        data = mobile_transfer(mobile->adapter, linkcable_receive());
+    }
+    clean_linkcable_fifos();
+    linkcable_send(data);
+    link_cable_data_received = true;
 }
 
 ///////////////////////////////
@@ -201,6 +197,22 @@ bool PicoW_Connect_WiFi(char *ssid, char *psk, uint32_t timeout){
         printf("Connected.\n");
     }
     return true;
+}
+
+void mobile_validate_relay(){
+    struct mobile_addr relay = {0};    
+    mobile_config_get_relay(mobile->adapter, &relay);
+    if (relay.type != MOBILE_ADDRTYPE_NONE){
+            for (int i = 0; i < 3; i++){
+                LED_ON;
+                busy_wait_us(MS(150));
+                LED_OFF;
+                busy_wait_us(MS(150));
+            }
+            LED_ON;
+    } else{
+        LED_OFF;
+    }
 }
 
 /////////////////////////
@@ -263,8 +275,6 @@ void main(){
     mobile_config_load(mobile->adapter);
 
     BootMenuConfig(mobile,WiFiSSID,WiFiPASS);
-    
-    busy_wait_us(SEC(2));
 
     isConnectedWiFi = PicoW_Connect_WiFi(WiFiSSID, WiFiPASS, MS(10));
     
@@ -272,6 +282,7 @@ void main(){
         mobile->action = MOBILE_ACTION_NONE;
         mobile->number_user[0] = '\0';
         mobile->number_peer[0] = '\0';
+        mobile->currentReqSocket = -1;
         for (int i = 0; i < MOBILE_MAX_TIMERS; i++) mobile->picow_clock_latch[i] = 0;
         for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
             mobile->socket[i].tcp_pcb = NULL;
@@ -289,30 +300,32 @@ void main(){
 
         // multicore_launch_core1(core1_context);
 
-        linkcable_init(link_cable_ISR, 8);
-        add_alarm_in_us(MS(300), link_cable_watchdog, NULL, true);
+        linkcable_init(link_cable_ISR);
+
+        printf("-------------------------\nSoftware Version:\nLibmobile: %i.%i.%i\nPicoAdapterGB: %s %s\n-------------------------\n",mobile_version_major,mobile_version_minor,mobile_version_patch,PICO_ADAPTER_HARDWARE,PICO_ADAPTER_SOFTWARE);
 
         mobile_start(mobile->adapter);
-        
-        LED_OFF;
+
+        mobile_validate_relay();
+
+
         while (true) {
             // Mobile Adapter Main Loop
             mobile_loop(mobile->adapter);
+            
+            for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
+                if(mobile->socket[i].tcp_pcb || mobile->socket[i].udp_pcb){
+                    cyw43_arch_poll();
+                    break;
+                } 
+            }
 
             // Check if there is any new config to write on Flash
             if(haveConfigToWrite){
-                bool checkSockStatus = false;
-                for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
-                    if(mobile->socket[i].tcp_pcb || mobile->socket[i].udp_pcb){
-                        checkSockStatus = true;
-                        break;
-                    } 
-                }
-                if(!checkSockStatus && startWriteConfig){
+                bool can_disable_irqs = can_disable_linkcable_irq();
+                if(can_disable_irqs) {
                     SaveFlashConfig(mobile->config_eeprom);
                     haveConfigToWrite = false;
-                    startWriteConfig = false;
-                    currentTicks = 0;
                     LED_OFF;
                 }
             }

@@ -21,7 +21,7 @@ Refer to the [Wiki page](https://github.com/zenaro147/PicoAdapterGB/wiki) for mo
 <sub>Click on the image to watch the full video</sub>
 
 ## Current implementations
-- `pico_esp8266_at`: A Raspberry Pi Pico implementation using an ESP8266 ESP-01 to provide WiFi connectivity. 
+- `pico_esp8266_at`: A Raspberry Pi Pico implementation using an ESP8266 ESP-01 to provide WiFi connectivity (outdated/suspended). 
 - `picow`: A Raspberry Pi Pico W implementation using the internal WiFi connectivity. (recommended)
 
 ## Posts about:
@@ -29,5 +29,5 @@ Refer to the [Wiki page](https://github.com/zenaro147/PicoAdapterGB/wiki) for mo
 
 ## Credits 
 * [REON Team](https://github.com/REONTeam/) - Mobile Adapter Library
-* [untoxa](https://github.com/untoxa) - GB Link cable PIO solution
+* [Lorenzooone](https://github.com/Lorenzooone/) - GB Link cable PIO solution
 

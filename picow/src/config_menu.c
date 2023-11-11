@@ -9,8 +9,6 @@
 
 #include <mobile_inet.h>
 
-#include "gblink.h"
-
 int main_parse_addr(struct mobile_addr *dest, char *argv){
     unsigned char ip[MOBILE_INET_PTON_MAXLEN];
     int rc = mobile_inet_pton(MOBILE_INET_PTON_ANY, argv, ip);
@@ -117,9 +115,6 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
     if(UserInput != PICO_ERROR_TIMEOUT){
         char UserCMD[512] = {0};
         bool needSave = false;
-        int haveDNS1 = 0;
-        int haveDNS2 = 0;
-        int haveRelaySrv = 0;
 
         char newSSID[28] = {0};
 		char newPASS[28] = {0};
@@ -130,16 +125,38 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
         //Libmobile Variables
         enum mobile_adapter_device device = MOBILE_ADAPTER_BLUE;
         bool device_unmetered = false;
-        struct mobile_addr dns1 = {0};
-        struct mobile_addr dns2 = {0};
-        struct mobile_addr relay = {0};
+        struct mobile_addr dns1 = (struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE};
+        struct mobile_addr dns2 = (struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE};
+        struct mobile_addr relay = (struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE};
         int dns_port = -1;
         bool relay_token_update = false;
         unsigned char *relay_token = NULL;
         unsigned char relay_token_buf[MOBILE_RELAY_TOKEN_SIZE];
 
-        mobile_config_get_dns(mobile->adapter, &dns1, &dns2);
+        mobile_config_get_dns(mobile->adapter, &dns1, MOBILE_DNS1);
+        mobile_config_get_dns(mobile->adapter, &dns2, MOBILE_DNS2);
         mobile_config_get_relay(mobile->adapter, &relay);
+        if(dns1.type != MOBILE_ADDRTYPE_NONE){
+            switch (dns1.type)
+            {
+            case MOBILE_ADDRTYPE_IPV4:
+                dns_port = dns1._addr4.port;
+                break;
+            case MOBILE_ADDRTYPE_IPV6:
+                dns_port = dns1._addr6.port;
+                break;
+            }
+        }else if(dns2.type != MOBILE_ADDRTYPE_NONE){
+            switch (dns2.type)
+            {
+            case MOBILE_ADDRTYPE_IPV4:
+                dns_port = dns2._addr4.port;
+                break;
+            case MOBILE_ADDRTYPE_IPV6:
+                dns_port = dns2._addr6.port;
+                break;
+            }
+        }
 
         while(1){
             printf("Enter a command: \n");
@@ -180,15 +197,21 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
                 if(strlen(UserCMD)-5 > 0){
                     char MAGB_DNS[60] = {0};
                     memcpy(MAGB_DNS,UserCMD+5,strlen(UserCMD)-5);
-                    haveDNS1 = main_parse_addr(&dns1, MAGB_DNS);
-                    if(haveDNS1 == 1){
+                    int ValidDNS = main_parse_addr(&dns1, MAGB_DNS);
+                    if(ValidDNS == 1){
+                        if(dns_port <= 0){
+                            dns_port = MOBILE_DNS_PORT;
+                        }
+                        main_set_port(&dns1, dns_port);
+                        mobile_config_set_dns(mobile->adapter, &dns1, MOBILE_DNS1);
                         printf("New DNS Server 1 defined.\n");
                         needSave=true;
                     } 
                 }else if(strlen(UserCMD)-5 == 0){
-                      haveDNS1 = -1;
-                      printf("Default DNS Server 1 defined.\n");
-                      needSave=true;
+                    dns1 = (struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE};
+                    mobile_config_set_dns(mobile->adapter, &dns1, MOBILE_DNS1);
+                    printf("Default DNS Server 1 defined.\n");
+                    needSave=true;
                 }else{
                     printf("Invalid parameter.\n");
                 }
@@ -198,15 +221,21 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
                 if(strlen(UserCMD)-5 > 0){
                     char MAGB_DNS[60] = {0};
                     memcpy(MAGB_DNS,UserCMD+5,strlen(UserCMD)-5);
-                    haveDNS2 = main_parse_addr(&dns2, MAGB_DNS);
-                    if(haveDNS2 == 1){
+                    int ValidDNS = main_parse_addr(&dns2, MAGB_DNS);
+                    if(ValidDNS == 1){
+                        if(dns_port <= 0){
+                            dns_port = MOBILE_DNS_PORT;
+                        }
+                        main_set_port(&dns2, dns_port);
+                        mobile_config_set_dns(mobile->adapter, &dns2, MOBILE_DNS2);
                         printf("New DNS Server 2 defined.\n");
                         needSave=true;
                     } 
                 }else if(strlen(UserCMD)-5 == 0){
-                      haveDNS2 = -1;
-                      printf("Default DNS Server 2 defined.\n");
-                      needSave=true;
+                    dns2 = (struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE};
+                    mobile_config_set_dns(mobile->adapter, &dns2, MOBILE_DNS2);
+                    printf("Default DNS Server 2 defined.\n");
+                    needSave=true;
                 }else{
                     printf("Invalid parameter.\n");
                 } 
@@ -218,6 +247,14 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
                     memcpy(dnsportstr,UserCMD+8,strlen(UserCMD)-8);
                     if(atoi(dnsportstr) > 0){
                         dns_port = atoi(dnsportstr);
+                        if(dns1.type != MOBILE_ADDRTYPE_NONE){
+                            main_set_port(&dns1, dns_port);
+                            mobile_config_set_dns(mobile->adapter, &dns1, MOBILE_DNS1);
+                        }
+                        if(dns2.type != MOBILE_ADDRTYPE_NONE){
+                            main_set_port(&dns2, dns_port);
+                            mobile_config_set_dns(mobile->adapter, &dns2, MOBILE_DNS2);
+                        }
                         printf("New DNS Server port defined.\n");
                     }else{
                         printf("Invalid parameter.\n");
@@ -225,6 +262,14 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
                     needSave=true;
                 }else if(strlen(UserCMD)-8 == 0){
                     dns_port = MOBILE_DNS_PORT;
+                    if(dns1.type != MOBILE_ADDRTYPE_NONE){
+                        main_set_port(&dns1, dns_port);
+                        mobile_config_set_dns(mobile->adapter, &dns1, MOBILE_DNS1);
+                    }
+                    if(dns2.type != MOBILE_ADDRTYPE_NONE){
+                        main_set_port(&dns2, dns_port);
+                        mobile_config_set_dns(mobile->adapter, &dns2, MOBILE_DNS2);
+                    }
                     printf("Default DNS Server port defined.\n");
                     needSave=true;
                 }else{
@@ -236,20 +281,21 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
                 if(strlen(UserCMD)-12 > 0){
                     char RELAY_SERVER[60] = {0};
                     memcpy(RELAY_SERVER,UserCMD+12,strlen(UserCMD)-12);
-                    haveRelaySrv = main_parse_addr(&relay, RELAY_SERVER);
-                    if(haveRelaySrv == 1){
+                    int ValidRelay = main_parse_addr(&relay, RELAY_SERVER);
+                    if(ValidRelay == 1){
                         main_set_port(&relay, MOBILE_DEFAULT_RELAY_PORT);
                         mobile_config_set_relay(mobile->adapter, &relay);
                         printf("New Relay Server Address defined.\n");
                         needSave=true;
                     } 
                 }else if(strlen(UserCMD)-12 == 0){
-                    mobile_config_set_relay(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
+                    relay = (struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE};
+                    mobile_config_set_relay(mobile->adapter, &relay);
                     printf("Relay Server Address removed.\n");
                     needSave=true;
                 }else{
                     printf("Invalid parameter.\n");
-                } 
+                }
 
             //Set the new Relay Token for Libmobile                    
             }else if(FindCommand(UserCMD,"RELAYTOKEN=")){
@@ -323,15 +369,25 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
                 printf("Formatting...\n");
                 memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
 
-                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
+                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, MOBILE_DNS1);
+                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, MOBILE_DNS2);
                 mobile_config_set_relay(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
                 mobile_config_set_relay_token(mobile->adapter, NULL);
                 mobile_config_set_p2p_port(mobile->adapter, MOBILE_DEFAULT_P2P_PORT);
                 mobile_config_set_device(mobile->adapter, device, false);
                 
                 mobile_config_save(mobile->adapter);
-                busy_wait_ms(2*1000);
-                RefreshConfigBuff(mobile->config_eeprom,"WiFi_Network","P@$$w0rd");
+
+                mobile_config_get_dns(mobile->adapter, &dns1, MOBILE_DNS1);
+                mobile_config_get_dns(mobile->adapter, &dns2, MOBILE_DNS2);
+                mobile_config_get_relay(mobile->adapter, &relay);
+                
+                memset(newSSID,0x00,sizeof(newSSID));
+                memset(newPASS,0x00,sizeof(newPASS));
+                strcpy(newSSID,"WiFi_Network");
+                strcpy(newPASS,"P@$$w0rd");
+
+                RefreshConfigBuff(mobile->config_eeprom,newSSID,newPASS);
 
                 printf("Device formatted!\n");
                 needSave=true;
@@ -342,11 +398,7 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
 
             // Shows the actual device configuration
             }else if(FindCommand(UserCMD,"SHOW_CONFIG")){
-                printf("NETWORK SETTINGS\n");
-                printf("WiFi SSID: %s\n",newSSID);
-                printf("WiFi Password: %s\n",newPASS);
-                printf("\n");
-                printf("ADAPTER SETTINGS\n");
+                printf("NETWORK SETTINGS\nWiFi SSID: %s\nWiFi Password: %s\n\nADAPTER SETTINGS\n",newSSID,newPASS);
 
                 char tmpSrv[60] = {0};
                 parse_addr_string(&dns1,tmpSrv);
@@ -370,8 +422,7 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
 
                 bool tmpUnmet = false;
                 mobile_config_get_device(mobile->adapter,NULL,&tmpUnmet);
-                printf("Is Unmetered: %s\n", tmpUnmet == true ? "Yes":"No");
-                printf("\n");
+                printf("Is Unmetered: %s\n\n", tmpUnmet == true ? "Yes":"No");
 
             }else if(FindCommand(UserCMD,"HELP")){
                 printf("Command Sintax: <COMMAND>=<VALUE>\n");
@@ -393,6 +444,7 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
                 printf("SHOW_CONFIG   | Show the actual device configuration.\n");
                 printf("EXIT          | Quit from Config Mode and Save the new values. If you change some value, the device will reboot.\n");
                 printf("HELP          | Show this command list on screen.\n\n");
+                printf("-------------------------\nSoftware Version:\nLibmobile: %i.%i.%i\nPicoAdapterGB: %s %s\n-------------------------\n\n",mobile_version_major,mobile_version_minor,mobile_version_patch,PICO_ADAPTER_HARDWARE,PICO_ADAPTER_SOFTWARE);
                 
             //Generic error return
             }else{
@@ -402,62 +454,9 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
 
         if(needSave){
             printf("Saving new configs...\n");
-            //Parsing new DNS Server
-            if (haveDNS1 == 1 && haveDNS2 == 1){
-                if(dns_port > 0){
-                    main_set_port(&dns1, dns_port);
-                    main_set_port(&dns2, dns_port);
-                }else{
-                    main_set_port(&dns1, MOBILE_DNS_PORT);
-                    main_set_port(&dns2, MOBILE_DNS_PORT);
-                }
-                mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
-            }else if (haveDNS1 == -1 && haveDNS2 == -1){
-                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
-            }else if (haveDNS1 == 1 && haveDNS2 == -1){
-                if(dns_port > 0){
-                    main_set_port(&dns1, dns_port);
-                }else{
-                    main_set_port(&dns1, MOBILE_DNS_PORT);
-                }
-                mobile_config_set_dns(mobile->adapter, &dns1, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
-            }else if (haveDNS1 == -1 && haveDNS2 == 1){
-                if(dns_port > 0){
-                    main_set_port(&dns2, dns_port);
-                }else{
-                    main_set_port(&dns2, MOBILE_DNS_PORT);
-                }
-                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &dns2);
-            }else if (haveDNS1 == 0 || haveDNS2 == 0){
-                if (haveDNS1 == 0 && haveDNS2 == -1){
-                    if(dns_port > 0){
-                        main_set_port(&dns1, dns_port);
-                    }else{
-                        main_set_port(&dns1, MOBILE_DNS_PORT);
-                    }
-                    mobile_config_set_dns(mobile->adapter, &dns1, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
-                }else if (haveDNS1 == -1 && haveDNS2 == 0){
-                    if(dns_port > 0){
-                        main_set_port(&dns2, dns_port);
-                    }else{
-                        main_set_port(&dns2, MOBILE_DNS_PORT);
-                    }
-                    mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &dns2);
-                }else{
-                    if(dns_port > 0){
-                        main_set_port(&dns1, dns_port);
-                        main_set_port(&dns2, dns_port);
-                    }else{
-                        main_set_port(&dns1, MOBILE_DNS_PORT);
-                        main_set_port(&dns2, MOBILE_DNS_PORT);
-                    }
-                    mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
-                }
-            }
 
             //Save new Configs
             mobile_config_save(mobile->adapter);
-            busy_wait_ms(2*1000);
             RefreshConfigBuff(mobile->config_eeprom,newSSID,newPASS);
 
             printf("Please reboot the device...\n");

@@ -1,12 +1,10 @@
 ; Program name
-.program linkcable
+.program linkcable_sm
 
 .define public CLOCK_DIV 2
-.define public PIN_SCK 18
-;16
-.define public PIN_SIN 19
-;19
-.define public PIN_SOUT 16
+.define public PIN_SCK 0
+.define public PIN_SIN 1
+.define public PIN_SOUT 2
 
 .define WAIT_FIRST (0/CLOCK_DIV)
 .define WAIT_MIDDLE (2/CLOCK_DIV)
@@ -35,37 +33,37 @@ sleeploop:
 
 % c-sdk {
 
-static inline void linkcable_select_mode(PIO pio, uint sm, uint num_bits) {
+static inline void linkcable_sm_select_mode(PIO pio, uint sm, uint num_bits) {
     pio_sm_exec(pio, sm, pio_encode_set(pio_y, num_bits - 2));
 }
 
 #ifdef FAST_ALIGNMENT
-static inline void linkcable_activate(PIO pio, uint sm) {
+static inline void linkcable_sm_activate(PIO pio, uint sm) {
     pio_sm_exec(pio, sm, pio_encode_set(pio_x, 1));
 }
 #endif
 
-static inline void linkcable_program_init(PIO pio, uint sm, uint offset, uint num_bits) {
-    pio_sm_config c = linkcable_program_get_default_config(offset);
+static inline void linkcable_sm_program_init(PIO pio, uint sm, uint offset, uint num_bits) {
+    pio_sm_config c = linkcable_sm_program_get_default_config(offset);
 
-    pio_sm_set_consecutive_pindirs(pio, sm, linkcable_PIN_SCK, 1, false);
+    pio_sm_set_consecutive_pindirs(pio, sm, linkcable_sm_PIN_SCK, 1, false);
 
-    sm_config_set_in_pins(&c, linkcable_PIN_SIN);
-    pio_sm_set_consecutive_pindirs(pio, sm, linkcable_PIN_SIN, 1, false);
+    sm_config_set_in_pins(&c, linkcable_sm_PIN_SIN);
+    pio_sm_set_consecutive_pindirs(pio, sm, linkcable_sm_PIN_SIN, 1, false);
     sm_config_set_in_shift(&c, false, false, LINKCABLE_BITS_FULL);
 
-    sm_config_set_out_pins(&c, linkcable_PIN_SOUT, 1);
-    pio_sm_set_consecutive_pindirs(pio, sm, linkcable_PIN_SOUT, 1, true);
+    sm_config_set_out_pins(&c, linkcable_sm_PIN_SOUT, 1);
+    pio_sm_set_consecutive_pindirs(pio, sm, linkcable_sm_PIN_SOUT, 1, true);
     sm_config_set_out_shift(&c, false, false, LINKCABLE_BITS_FULL);
 
-    sm_config_set_clkdiv(&c, linkcable_CLOCK_DIV);                // Set clock division
+    sm_config_set_clkdiv(&c, linkcable_sm_CLOCK_DIV);                // Set clock division
 
-    pio_gpio_init(pio, linkcable_PIN_SCK);
-    pio_gpio_init(pio, linkcable_PIN_SIN);
-    pio_gpio_init(pio, linkcable_PIN_SOUT);
+    pio_gpio_init(pio, linkcable_sm_PIN_SCK);
+    pio_gpio_init(pio, linkcable_sm_PIN_SIN);
+    pio_gpio_init(pio, linkcable_sm_PIN_SOUT);
 
     pio_sm_init(pio, sm, offset, &c);
-    linkcable_select_mode(pio, sm, num_bits);
+    linkcable_sm_select_mode(pio, sm, num_bits);
 
 //    pio_sm_set_enabled(pio, sm, true);          // Set the state machine running (commented out, I'll start this in the C)
 }

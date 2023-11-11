@@ -1,10 +1,10 @@
 #include "flash_eeprom.h"
+#include "hardware/sync.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <mobile.h>
 #include "globals.h"
 
 #include "pico/time.h"
@@ -45,11 +45,11 @@ void *memmem(const void *l, size_t l_len, const void *s, size_t s_len){
 
 //512 bytes for the Mobile Adapter GB + Adapter Configs and 256 bytes to WiFi Config and other stuffs
 void FormatFlashConfig(){
+    uint32_t irqs = save_and_disable_interrupts();
     printf("Erasing target region... ");
-    busy_wait_ms(1*1000);
     flash_range_erase(FLASH_TARGET_OFFSET, FLASH_DATA_SIZE);
-    busy_wait_ms(1*1000);
     printf("Done.\n");
+    restore_interrupts(irqs);
 }
 
 bool ReadConfigOption(uint8_t * buff, int offset, char *key, int datasize, char *varConfig){
@@ -68,6 +68,7 @@ bool ReadConfigOption(uint8_t * buff, int offset, char *key, int datasize, char 
 
 //Read flash memory and set the configs
 bool ReadFlashConfig(uint8_t * buff, char * WiFiSSID, char * WiFiPASS){
+    uint32_t irqs = save_and_disable_interrupts();
     printf("Reading the target region... ");
     memset(buff,0x00,FLASH_DATA_SIZE);
     memcpy(buff,flash_target_contents,FLASH_DATA_SIZE);
@@ -104,16 +105,17 @@ bool ReadFlashConfig(uint8_t * buff, char * WiFiSSID, char * WiFiPASS){
     }
 
     printf("Done.\n");
+    restore_interrupts(irqs);
     return true;
 }
 
 void SaveFlashConfig(uint8_t * buff){
     FormatFlashConfig();
-    printf("Programming target region... ");
-    busy_wait_ms(1*1000);
+    uint32_t irqs = save_and_disable_interrupts();
+    printf("Writing target region... ");
     flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);
-    busy_wait_ms(1*1000);
     printf("Done.\n");
+    restore_interrupts(irqs);
 }
 
 void RefreshConfigBuff(uint8_t * buff, char * WiFiSSID, char * WiFiPASS){
@@ -131,10 +133,10 @@ void RefreshConfigBuff(uint8_t * buff, char * WiFiSSID, char * WiFiPASS){
     sprintf(tmp_pass,"%s%s",KEY_PASS,WiFiPASS);
     memcpy(buff+OFFSET_PASS,tmp_pass,sizeof(tmp_pass));
 
-    FormatFlashConfig();
-    printf("Programming target region... ");
-    busy_wait_ms(1*1000);
+    FormatFlashConfig();    
+    uint32_t irqs = save_and_disable_interrupts();
+    printf("Writing target region... ");
     flash_range_program(FLASH_TARGET_OFFSET, buff, FLASH_DATA_SIZE);
-    busy_wait_ms(1*1000);
     printf("Done.\n");
+    restore_interrupts(irqs);
 }

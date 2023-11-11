@@ -89,6 +89,23 @@ void core1_context() {
     }
 }
 
+void mobile_validate_relay(){
+    struct mobile_addr relay = {0};    
+    mobile_config_get_relay(mobile->adapter, &relay);
+    if (relay.type != MOBILE_ADDRTYPE_NONE){
+            busy_wait_us(MS(150));
+            LED_ON;
+            busy_wait_us(MS(150));
+            LED_OFF;
+            busy_wait_us(MS(150));
+            LED_ON;
+            busy_wait_us(MS(150));
+            LED_OFF;
+            busy_wait_us(MS(150));
+            LED_ON;
+    }
+}
+
 void main(){
     //Setup Pico
     speed_240_MHz = set_sys_clock_khz(240000, false);
@@ -162,11 +179,9 @@ void main(){
     if(UserInput != PICO_ERROR_TIMEOUT){
         char UserCMD[512] = {0};
         bool needSave = false;
-        int haveDNS1 = 0;
-        int haveDNS2 = 0;
-        int haveRelaySrv = 0;
 
-        mobile_config_get_dns(mobile->adapter, &dns1, &dns2);
+        mobile_config_get_dns(mobile->adapter, &dns1, MOBILE_DNS1);
+        mobile_config_get_dns(mobile->adapter, &dns2, MOBILE_DNS2);
         mobile_config_get_relay(mobile->adapter, &relay);
 
         while(1){
@@ -208,13 +223,14 @@ void main(){
                 if(strlen(UserCMD)-5 > 0){
                     char MAGB_DNS[60] = {0};
                     memcpy(MAGB_DNS,UserCMD+5,strlen(UserCMD)-5);
-                    haveDNS1 = main_parse_addr(&dns1, MAGB_DNS);
-                    if(haveDNS1 == 1){
+                    int ValidDNS = main_parse_addr(&dns1, MAGB_DNS);
+                    if(ValidDNS == 1){
+                        mobile_config_set_dns(mobile->adapter, &dns1, MOBILE_DNS1);
                         printf("New DNS Server 1 defined.\n");
                         needSave=true;
                     } 
                 }else if(strlen(UserCMD)-5 == 0){
-                      haveDNS1 = -1;
+                      mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, MOBILE_DNS1);
                       printf("Default DNS Server 1 defined.\n");
                       needSave=true;
                 }else{
@@ -226,13 +242,14 @@ void main(){
                 if(strlen(UserCMD)-5 > 0){
                     char MAGB_DNS[60] = {0};
                     memcpy(MAGB_DNS,UserCMD+5,strlen(UserCMD)-5);
-                    haveDNS2 = main_parse_addr(&dns2, MAGB_DNS);
-                    if(haveDNS2 == 1){
+                    int ValidDNS = main_parse_addr(&dns2, MAGB_DNS);
+                    if(ValidDNS == 1){
+                        mobile_config_set_dns(mobile->adapter, &dns2, MOBILE_DNS2);
                         printf("New DNS Server 2 defined.\n");
                         needSave=true;
                     } 
                 }else if(strlen(UserCMD)-5 == 0){
-                      haveDNS2 = -1;
+                      mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, MOBILE_DNS2);
                       printf("Default DNS Server 2 defined.\n");
                       needSave=true;
                 }else{
@@ -264,8 +281,8 @@ void main(){
                 if(strlen(UserCMD)-12 > 0){
                     char RELAY_SERVER[60] = {0};
                     memcpy(RELAY_SERVER,UserCMD+12,strlen(UserCMD)-12);
-                    haveRelaySrv = main_parse_addr(&relay, RELAY_SERVER);
-                    if(haveRelaySrv == 1){
+                    int ValidRelay = main_parse_addr(&relay, RELAY_SERVER);
+                    if(ValidRelay == 1){
                         main_set_port(&relay, MOBILE_DEFAULT_RELAY_PORT);
                         mobile_config_set_relay(mobile->adapter, &relay);
                         printf("New Relay Server Address defined.\n");
@@ -351,15 +368,25 @@ void main(){
                 printf("Formatting...\n");
                 memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
 
-                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
+                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, MOBILE_DNS1);
+                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, MOBILE_DNS2);
                 mobile_config_set_relay(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
                 mobile_config_set_relay_token(mobile->adapter, NULL);
                 mobile_config_set_p2p_port(mobile->adapter, MOBILE_DEFAULT_P2P_PORT);
                 mobile_config_set_device(mobile->adapter, device, false);
                 
                 mobile_config_save(mobile->adapter);
-                busy_wait_ms(2*1000);
-                RefreshConfigBuff(mobile->config_eeprom,"WiFi_Network","P@$$w0rd");
+
+                mobile_config_get_dns(mobile->adapter, &dns1, MOBILE_DNS1);
+                mobile_config_get_dns(mobile->adapter, &dns2, MOBILE_DNS2);
+                mobile_config_get_relay(mobile->adapter, &relay);
+                
+                memset(WiFiSSID,0x00,sizeof(WiFiSSID));
+                memset(WiFiPASS,0x00,sizeof(WiFiPASS));
+                strcpy(WiFiSSID,"WiFi_Network");
+                strcpy(WiFiPASS,"P@$$w0rd");
+
+                RefreshConfigBuff(mobile->config_eeprom,WiFiSSID,WiFiPASS);
 
                 printf("Device formatted!\n");
                 needSave=true;
@@ -370,11 +397,7 @@ void main(){
 
             // Shows the actual device configuration
             }else if(FindCommand(UserCMD,"SHOW_CONFIG")){
-                printf("NETWORK SETTINGS\n");
-                printf("WiFi SSID: %s\n",WiFiSSID);
-                printf("WiFi Password: %s\n",WiFiPASS);
-                printf("\n");
-                printf("ADAPTER SETTINGS\n");
+                printf("NETWORK SETTINGS\nWiFi SSID: %s\nWiFi Password: %s\n\nADAPTER SETTINGS\n",WiFiSSID,WiFiPASS);
 
                 char tmpSrv[60] = {0};
                 parse_addr_string(&dns1,tmpSrv);
@@ -398,9 +421,7 @@ void main(){
 
                 bool tmpUnmet = false;
                 mobile_config_get_device(mobile->adapter,NULL,&tmpUnmet);
-                printf("Is Unmetered: %s\n", tmpUnmet == true ? "Yes":"No");
-                printf("\n");
-
+                printf("Is Unmetered: %s\n\n", tmpUnmet == true ? "Yes":"No");
 
             }else if(FindCommand(UserCMD,"HELP")){
                 printf("Command Sintax: <COMMAND>=<VALUE>\n");
@@ -431,59 +452,15 @@ void main(){
 
         if(needSave){
             printf("Saving new configs...\n");
-            //Parsing new DNS Server
-            if (haveDNS1 == 1 && haveDNS2 == 1){
-                if(dns_port > 0){
-                    main_set_port(&dns1, dns_port);
-                    main_set_port(&dns2, dns_port);
-                }else{
-                    main_set_port(&dns1, MOBILE_DNS_PORT);
-                    main_set_port(&dns2, MOBILE_DNS_PORT);
-                }
-                mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
-            }else if (haveDNS1 == -1 && haveDNS2 == -1){
-                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
-            }else if (haveDNS1 == 1 && haveDNS2 == -1){
-                if(dns_port > 0){
-                    main_set_port(&dns1, dns_port);
-                }else{
-                    main_set_port(&dns1, MOBILE_DNS_PORT);
-                }
-                mobile_config_set_dns(mobile->adapter, &dns1, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
-            }else if (haveDNS1 == -1 && haveDNS2 == 1){
-                if(dns_port > 0){
-                    main_set_port(&dns2, dns_port);
-                }else{
-                    main_set_port(&dns2, MOBILE_DNS_PORT);
-                }
-                mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &dns2);
-            }else if (haveDNS1 == 0 || haveDNS2 == 0){
-                if (haveDNS1 == 0 && haveDNS2 == -1){
-                    if(dns_port > 0){
-                        main_set_port(&dns1, dns_port);
-                    }else{
-                        main_set_port(&dns1, MOBILE_DNS_PORT);
-                    }
-                    mobile_config_set_dns(mobile->adapter, &dns1, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
-                }else if (haveDNS1 == -1 && haveDNS2 == 0){
-                    if(dns_port > 0){
-                        main_set_port(&dns2, dns_port);
-                    }else{
-                        main_set_port(&dns2, MOBILE_DNS_PORT);
-                    }
-                    mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE}, &dns2);
-                }else{
-                    if(dns_port > 0){
-                        main_set_port(&dns1, dns_port);
-                        main_set_port(&dns2, dns_port);
-                    }else{
-                        main_set_port(&dns1, MOBILE_DNS_PORT);
-                        main_set_port(&dns2, MOBILE_DNS_PORT);
-                    }
-                    mobile_config_set_dns(mobile->adapter, &dns1, &dns2);
-                }
+            //Saving the new DNS port
+            if(dns_port > 0){
+                main_set_port(&dns1, dns_port);
+                main_set_port(&dns2, dns_port);
+            }else{
+                main_set_port(&dns1, MOBILE_DNS_PORT);
+                main_set_port(&dns2, MOBILE_DNS_PORT);
             }
-
+            
             //Save new Configs
             mobile_config_save(mobile->adapter);
             RefreshConfigBuff(mobile->config_eeprom,WiFiSSID,WiFiPASS);
@@ -532,6 +509,9 @@ void main(){
         mobile_start(mobile->adapter);
 
         LED_OFF;
+
+        mobile_validate_relay();
+
         while (true) {
             mobile_loop(mobile->adapter);
 

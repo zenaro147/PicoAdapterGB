@@ -9,6 +9,8 @@
 
 #include <mobile_inet.h>
 
+#include "hardware/watchdog.h"
+
 int main_parse_addr(struct mobile_addr *dest, char *argv){
     unsigned char ip[MOBILE_INET_PTON_MAXLEN];
     int rc = mobile_inet_pton(MOBILE_INET_PTON_ANY, argv, ip);
@@ -136,6 +138,7 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
         mobile_config_get_dns(mobile->adapter, &dns1, MOBILE_DNS1);
         mobile_config_get_dns(mobile->adapter, &dns2, MOBILE_DNS2);
         mobile_config_get_relay(mobile->adapter, &relay);
+        mobile_config_get_device(mobile->adapter, &device, &device_unmetered);
         if(dns1.type != MOBILE_ADDRTYPE_NONE){
             switch (dns1.type)
             {
@@ -338,26 +341,64 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
                     printf("Invalid parameter.\n");
                 } 
             
+            //Set the adapter to emulate 
+            }else if(FindCommand(UserCMD,"DEVICE=")){
+                if(strlen(UserCMD)-7 > 0){
+                    char tmpDevice[7] = {0};
+                    memcpy(tmpDevice,UserCMD+7,6);
+                    if(strcmp(tmpDevice,"BLUE") == 0){
+                        device=MOBILE_ADAPTER_BLUE;
+                    }else if(strcmp(tmpDevice,"YELLOW") == 0){
+                        device=MOBILE_ADAPTER_YELLOW;
+                    }else if(strcmp(tmpDevice,"GREEN") == 0){
+                        device=MOBILE_ADAPTER_GREEN;
+                    }else if(strcmp(tmpDevice,"RED") == 0){
+                        device=MOBILE_ADAPTER_RED;
+                    }else if(strcmp(tmpDevice,"PURPLE") == 0){
+                        device=12;
+                    }else if(strcmp(tmpDevice,"BLACK") == 0){
+                        device=13;
+                    }else if(strcmp(tmpDevice,"PINK") == 0){
+                        device=14;
+                    }else if(strcmp(tmpDevice,"GREY") == 0){
+                        device=15;
+                    }else{
+                        printf("Invalid parameter. Applying default value.\n");
+                        device=MOBILE_ADAPTER_BLUE;
+                    }
+                    mobile_config_set_device(mobile->adapter, device, device_unmetered);
+                    printf("New Device defined.\n");
+                    needSave=true;
+                }else if(strlen(UserCMD)-7 == 0){
+                    device=MOBILE_ADAPTER_BLUE;
+                    mobile_config_set_device(mobile->adapter, device, false);
+                    printf("Default Device defined.\n");
+                    needSave=true;
+                }else{
+                    printf("Invalid parameter.\n");
+                } 
+            
             //Set the new Unmetered setting for Libmobile 
             }else if(FindCommand(UserCMD,"UNMETERED=")){
                 if(strlen(UserCMD)-10 == 1){
-                    bool unmeteredcheck=false;
                     switch (UserCMD[10]){
                         case '0':
-                            unmeteredcheck=false;
+                            device_unmetered=false;
                             break;
                         case '1':
-                            unmeteredcheck=true;
+                            device_unmetered=true;
                             break;
                         default:
                             printf("Invalid parameter. Applying default value.\n");
+                            device_unmetered=false;
                             break;
                     }
-                    mobile_config_set_device(mobile->adapter, device, unmeteredcheck);
+                    mobile_config_set_device(mobile->adapter, device, device_unmetered);
                     printf("New Unmetered value defined.\n");
                     needSave=true;
                 }else if(strlen(UserCMD)-10 == 0){
-                    mobile_config_set_device(mobile->adapter, device, false);
+                    device_unmetered=false;
+                    mobile_config_set_device(mobile->adapter, device, device_unmetered);
                     printf("Default Unmetered value defined.\n");
                     needSave=true;
                 }else{
@@ -374,13 +415,14 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
                 mobile_config_set_relay(mobile->adapter, &(struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE});
                 mobile_config_set_relay_token(mobile->adapter, NULL);
                 mobile_config_set_p2p_port(mobile->adapter, MOBILE_DEFAULT_P2P_PORT);
-                mobile_config_set_device(mobile->adapter, device, false);
+                mobile_config_set_device(mobile->adapter, 8, false);
                 
                 mobile_config_save(mobile->adapter);
 
                 mobile_config_get_dns(mobile->adapter, &dns1, MOBILE_DNS1);
                 mobile_config_get_dns(mobile->adapter, &dns2, MOBILE_DNS2);
                 mobile_config_get_relay(mobile->adapter, &relay);
+                mobile_config_get_device(mobile->adapter, &device, &device_unmetered);
                 
                 memset(newSSID,0x00,sizeof(newSSID));
                 memset(newPASS,0x00,sizeof(newPASS));
@@ -420,9 +462,40 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
                 mobile_config_get_p2p_port(mobile->adapter,&tmpPort);
                 printf("P2P Port: %i\n", tmpPort);
 
-                bool tmpUnmet = false;
-                mobile_config_get_device(mobile->adapter,NULL,&tmpUnmet);
-                printf("Is Unmetered: %s\n\n", tmpUnmet == true ? "Yes":"No");
+                printf("Device: ");
+                switch (device)
+                {
+                case 8:
+                    printf("Blue (PDC)\n");
+                    break;
+                case 9:
+                    printf("Yellow (cdmaOne)\n");
+                    break;
+                case 10:
+                    printf("reen (PHS-NTT, unreleased)\n");
+                    break;
+                case 11:
+                    printf("Red (DDI)\n");
+                    break;
+                case 12:
+                    printf("Purple (unreleased)\n");
+                    break;
+                case 13:
+                    printf("Black (unreleased)\n");
+                    break;
+                case 14:
+                    printf("Pink (unreleased)\n");
+                    break;
+                case 15:
+                    printf("Grey (unreleased)\n");
+                    break;                
+                default:
+                    if(device < 8 && device > 15){   
+                        printf("INVALID\n");
+                    }
+                    break;
+                }
+                printf("Is Unmetered: %s\n\n", device_unmetered == true ? "Yes":"No");
 
             }else if(FindCommand(UserCMD,"HELP")){
                 printf("Command Sintax: <COMMAND>=<VALUE>\n");
@@ -437,6 +510,7 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
                 printf("RELAYSERVER   | Set a Relay Server that will be use during P2P communications.\n");
                 printf("RELAYTOKEN    | Set a Relay Token that will be used on Relay Server to receive a valid number to use during P2P communications.\n");
                 printf("P2PPORT       | Set a custom P2P port to use during P2P communications (Local Network only).\n");
+                printf("DEVICE        | Set the Device to emulate (BLUE, RED or YELLOW).\n");
                 printf("UNMETERED     | Set if the device will be Unmetered (useful for Pokemon Crystal). Only accept 1 (true) or 0 (false).\n\n");
 
                 printf("Special commands (just enter the command, without =<VALUE>):\n");
@@ -458,14 +532,13 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
             //Save new Configs
             mobile_config_save(mobile->adapter);
             RefreshConfigBuff(mobile->config_eeprom,newSSID,newPASS);
+    
+            printf("Rebooting device...\n");
 
-            printf("Please reboot the device...\n");
-            while(true){
-                LED_ON;
-                busy_wait_ms(300);
-                LED_OFF;
-                busy_wait_ms(300);
-            }
+            LED_ON;
+            watchdog_enable(MS(3), 0);
+            watchdog_update();
+            while(1);
         }
     }
     printf("Continuing initialization...\n");

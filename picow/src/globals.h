@@ -2,7 +2,6 @@
 
 #include <mobile.h>
 #include "socket_impl.h"
-#include "flash_eeprom.h"
 
 #define PICO_ADAPTER_HARDWARE "PicoW"
 #define PICO_ADAPTER_SOFTWARE "1.4.1-b"

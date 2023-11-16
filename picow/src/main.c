@@ -14,6 +14,7 @@
 #include <mobile_inet.h>
 
 #include "config_menu.h"
+#include "flash_eeprom.h"
 #include "picow_socket.h"
 #include "pio/linkcable.h"
 

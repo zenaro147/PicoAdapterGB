@@ -429,7 +429,7 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
                 strcpy(newSSID,"WiFi_Network");
                 strcpy(newPASS,"P@$$w0rd");
 
-                RefreshConfigBuff(mobile->config_eeprom,newSSID,newPASS);
+                //RefreshConfigBuff(mobile->config_eeprom,newSSID,newPASS);
 
                 printf("Device formatted!\n");
                 needSave=true;
@@ -531,7 +531,7 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
 
             //Save new Configs
             mobile_config_save(mobile->adapter);
-            RefreshConfigBuff(mobile->config_eeprom,newSSID,newPASS);
+            //RefreshConfigBuff(mobile->config_eeprom,newSSID,newPASS);
     
             printf("Rebooting device...\n");
 

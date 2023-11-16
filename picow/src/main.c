@@ -21,15 +21,17 @@
 bool speed_240_MHz = false;
 
 //#define DEBUG_SIGNAL_PINS
+#define CONFIG_LAST_EDIT_TIMEOUT SEC(1)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 //Wi-Fi Controllers
 bool isConnectedWiFi = false;
-char WiFiSSID[28] = "WiFi_Network";
-char WiFiPASS[28] = "P@$$w0rd";
+
+struct wifi_settings *wifiSetup;
 
 //Control Flash Write
 bool haveConfigToWrite = false;
+static user_time_t time_last_config_edit = 0;
 
 bool isLinkCable32 = false;
 bool link_cable_data_received = false;
@@ -38,7 +40,7 @@ bool link_cable_data_received = false;
 // MOBILE ADAPTER GB FUNCTIONS //
 /////////////////////////////////
 
-struct mobile_user *mobile;
+struct mobile_user *mobile = NULL;
 
 static void impl_debug_log(void *user, const char *line){
     (void)user;
@@ -70,18 +72,25 @@ static void impl_serial_enable(void *user, bool mode_32bit) {
 static bool impl_config_read(void *user, void *dest, const uintptr_t offset, const size_t size) {
     struct mobile_user *mobile = (struct mobile_user *)user;
     for(int i = 0; i < size; i++){
-        ((char *)dest)[i] = (char)mobile->config_eeprom[OFFSET_MAGB + offset + i];
+        ((char *)dest)[i] = (char)mobile->config_eeprom[offset + i];
     }
     return true;
 }
 
 static bool impl_config_write(void *user, const void *src, const uintptr_t offset, const size_t size) {
     struct mobile_user *mobile = (struct mobile_user *)user;
-    for(int i = 0; i < size; i++){
-        mobile->config_eeprom[OFFSET_MAGB + offset + i] = ((uint8_t *)src)[i];
+    const uint8_t* src_8 = (const uint8_t *)src;
+    bool this_edited_config = false;
+    for(int i = 0; i < size; i++) {
+        if(mobile->config_eeprom[offset + i] != src_8[i])
+            this_edited_config = true;
+        mobile->config_eeprom[offset + i] = src_8[i];
     }
-    LED_ON;
-    haveConfigToWrite = true;
+    if(this_edited_config) {
+        LED_ON;
+        haveConfigToWrite = true;
+        time_last_config_edit = TIME_FUNCTION;
+    }
     return true;
 }
 
@@ -176,7 +185,7 @@ void TIME_SENSITIVE(link_cable_ISR)(void) {
     }else{
         data = mobile_transfer(mobile->adapter, linkcable_receive());
     }
-    clean_linkcable_fifos();
+    linkcable_flush();
     linkcable_send(data);
     link_cable_data_received = true;
 }
@@ -248,11 +257,20 @@ void main(){
         gpio_put(10, false);
     #endif
     
+    //Setup Wifi Struct    
+    wifiSetup = malloc(sizeof(struct wifi_settings));
+    strcpy(wifiSetup->WiFiSSID, "WiFi_Network");
+    strcpy(wifiSetup->WiFiPASS, "P@$$w0rd");
+
     //Libmobile Variables
     mobile = malloc(sizeof(struct mobile_user));
 
     memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
-    ReadFlashConfig(mobile->config_eeprom, WiFiSSID, WiFiPASS); 
+    InitSave();
+    struct saved_data_pointers ptrs;
+    InitSavedPointers(&ptrs, mobile);
+    ReadConfig(&ptrs);
+    //ReadFlashConfig(mobile->config_eeprom, WiFiSSID, WiFiPASS); 
 
     // Initialize mobile library
     mobile->adapter = mobile_new(mobile);
@@ -273,10 +291,9 @@ void main(){
     mobile_def_update_number(mobile->adapter, impl_update_number);
 
     mobile_config_load(mobile->adapter);
+    BootMenuConfig(mobile,wifiSetup->WiFiSSID,wifiSetup->WiFiPASS);
 
-    BootMenuConfig(mobile,WiFiSSID,WiFiPASS);
-
-    isConnectedWiFi = PicoW_Connect_WiFi(WiFiSSID, WiFiPASS, MS(10));
+    isConnectedWiFi = PicoW_Connect_WiFi(wifiSetup->WiFiSSID, wifiSetup->WiFiPASS, MS(10));
     
     if(isConnectedWiFi){
         mobile->action = MOBILE_ACTION_NONE;
@@ -297,6 +314,8 @@ void main(){
             mobile->socket[i].buffer_rx_len = 0;
             mobile->socket[i].buffer_tx_len = 0;
         } 
+        mobile->automatic_save = true;
+        mobile->force_save = false;
 
         // multicore_launch_core1(core1_context);
 
@@ -321,12 +340,16 @@ void main(){
             }
 
             // Check if there is any new config to write on Flash
-            if(haveConfigToWrite){
-                bool can_disable_irqs = can_disable_linkcable_irq();
-                if(can_disable_irqs) {
-                    SaveFlashConfig(mobile->config_eeprom);
+            if((haveConfigToWrite && mobile->automatic_save) || mobile->force_save) {
+                bool can_disable_irqs = can_disable_linkcable_handler();
+                user_time_t curr_time_last_config_edit = time_last_config_edit;
+                if(((TIME_FUNCTION - curr_time_last_config_edit) >= CONFIG_LAST_EDIT_TIMEOUT) && can_disable_irqs) {
+                    struct saved_data_pointers ptrs;
+                    InitSavedPointers(&ptrs, mobile);
+                    SaveConfig(&ptrs);
                     haveConfigToWrite = false;
-                    LED_OFF;
+                    mobile->force_save = false;
+                    LED_OFF;                    
                 }
             }
         }

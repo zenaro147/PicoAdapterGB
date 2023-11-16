@@ -1,23 +1,21 @@
 #pragma once
-
 #include "hardware/flash.h"
 
-#define KEY_CONFIG "CONFIG"
-#define KEY_SSID "SSID"
-#define KEY_PASS "PASS"
+#include "globals.h"
 
-#define TICKSWAIT 3
+struct saved_data_pointers {
+    uint8_t* eeprom;
+};
 
-#define FLASH_DATA_SIZE (FLASH_PAGE_SIZE * 3)
-#define FLASH_TARGET_OFFSET (FLASH_DATA_SIZE * 1024)
+void InitSave(void);
+void InitSavedPointers(struct saved_data_pointers* saved_ptrs, struct mobile_user* mobile);
+void ReadEeprom(uint8_t* buffer);
+void ReadConfig(struct saved_data_pointers* save_ptrs);
+void SaveConfig(struct saved_data_pointers* save_ptrs);
 
-#define OFFSET_CONFIG 0
-#define OFFSET_MAGB 16
-#define OFFSET_SSID MOBILE_CONFIG_SIZE+OFFSET_MAGB
-#define OFFSET_PASS OFFSET_SSID+32
+uint64_t read_big_endian(const uint8_t* buffer, size_t size);
+void write_big_endian(uint8_t* buffer, uint64_t data, size_t size);
 
-void FormatFlashConfig();
-bool ReadConfigOption(uint8_t * buff, int offset, char *key, int datasize, char *varConfig);
-bool ReadFlashConfig(uint8_t * buff, char * WiFiSSID, char * WiFiPASS);
-void SaveFlashConfig(uint8_t * buff);
-void RefreshConfigBuff(uint8_t * buff, char * WiFiSSID, char * WiFiPASS);
+uint16_t calc_checksum(const uint8_t* buffer, uint32_t size);
+void set_checksum(const uint8_t* buffer, uint32_t size, uint8_t* checksum_buffer);
+bool check_checksum(const uint8_t* buffer, uint32_t size, const uint8_t* checksum_buffer);

@@ -1,5 +1,6 @@
 #include "config_menu.h"
 #include "globals.h"
+#include "flash_eeprom.h"
 
 #include "pico/cyw43_arch.h"
 
@@ -108,7 +109,7 @@ bool FindCommand(char * buf, char * target){
     return false;
 } 
 
-void BootMenuConfig(void *user, char * wifissid, char * wifipass){
+void BootMenuConfig(void *user){
     struct mobile_user *mobile = (struct mobile_user *)user;
 
     int UserInput;
@@ -117,12 +118,6 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
     if(UserInput != PICO_ERROR_TIMEOUT){
         char UserCMD[512] = {0};
         bool needSave = false;
-
-        char newSSID[28] = {0};
-		char newPASS[28] = {0};
-        
-        memcpy(newSSID,wifissid,sizeof(newSSID));
-        memcpy(newPASS,wifipass,sizeof(newPASS));
 
         //Libmobile Variables
         enum mobile_adapter_device device = MOBILE_ADAPTER_BLUE;
@@ -168,12 +163,12 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
             //Set the new WiFi SSID
             if(FindCommand(UserCMD,"WIFISSID=")){
                 if(strlen(UserCMD)-9 > 0){
-                    memset(newSSID,0x00,sizeof(newSSID));
-                    memcpy(newSSID,UserCMD+9,strlen(UserCMD)-9);
+                    memset(mobile->wifiSSID,0x00,sizeof(mobile->wifiSSID));
+                    memcpy(mobile->wifiSSID,UserCMD+9,strlen(UserCMD)-9);
                     printf("New WiFi SSID defined.\n");
                     needSave=true;  
                 }else if(strlen(UserCMD)-9 == 0){
-                    memcpy(newSSID,"WiFi_Network",12);
+                    memcpy(mobile->wifiSSID,"WiFi_Network",12);
                     printf("Default WiFi SSID defined.\n");
                     needSave=true;  
                 }else{
@@ -183,12 +178,12 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
             //Set the new WiFi Password
             }else if(FindCommand(UserCMD,"WIFIPASS=")){
                 if(strlen(UserCMD)-9 > 0){
-                    memset(newPASS,0x00,sizeof(newPASS));
-                    memcpy(newPASS,UserCMD+9,strlen(UserCMD)-9);
+                    memset(mobile->wifiPASS,0x00,sizeof(mobile->wifiPASS));
+                    memcpy(mobile->wifiPASS,UserCMD+9,strlen(UserCMD)-9);
                     printf("New WiFi Password defined.\n");
                     needSave=true;
                 }else if(strlen(UserCMD)-9 == 0){
-                    memcpy(newPASS,"P@$$w0rd",8);
+                    memcpy(mobile->wifiPASS,"P@$$w0rd",8);
                     printf("Default WiFi Password defined.\n");
                     needSave=true;
                 }else{
@@ -424,12 +419,15 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
                 mobile_config_get_relay(mobile->adapter, &relay);
                 mobile_config_get_device(mobile->adapter, &device, &device_unmetered);
                 
-                memset(newSSID,0x00,sizeof(newSSID));
-                memset(newPASS,0x00,sizeof(newPASS));
-                strcpy(newSSID,"WiFi_Network");
-                strcpy(newPASS,"P@$$w0rd");
+                memset(mobile->wifiSSID,0x00,sizeof(mobile->wifiSSID));
+                memset(mobile->wifiPASS,0x00,sizeof(mobile->wifiPASS));
+                strcpy(mobile->wifiSSID,"WiFi_Network");
+                strcpy(mobile->wifiPASS,"P@$$w0rd");
 
-                //RefreshConfigBuff(mobile->config_eeprom,newSSID,newPASS);
+                mobile_config_save(mobile->adapter);
+                struct saved_data_pointers ptrs;
+                InitSavedPointers(&ptrs, mobile);
+                SaveConfig(&ptrs);
 
                 printf("Device formatted!\n");
                 needSave=true;
@@ -440,7 +438,7 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
 
             // Shows the actual device configuration
             }else if(FindCommand(UserCMD,"SHOW_CONFIG")){
-                printf("NETWORK SETTINGS\nWiFi SSID: %s\nWiFi Password: %s\n\nADAPTER SETTINGS\n",newSSID,newPASS);
+                printf("NETWORK SETTINGS\nWiFi SSID: %s\nWiFi Password: %s\n\nADAPTER SETTINGS\n",mobile->wifiSSID,mobile->wifiPASS);
 
                 char tmpSrv[60] = {0};
                 parse_addr_string(&dns1,tmpSrv);
@@ -531,7 +529,9 @@ void BootMenuConfig(void *user, char * wifissid, char * wifipass){
 
             //Save new Configs
             mobile_config_save(mobile->adapter);
-            //RefreshConfigBuff(mobile->config_eeprom,newSSID,newPASS);
+            struct saved_data_pointers ptrs;
+            InitSavedPointers(&ptrs, mobile);
+            SaveConfig(&ptrs);
     
             printf("Rebooting device...\n");
 

@@ -8,4 +8,4 @@ void main_set_port(struct mobile_addr *dest, unsigned port);
 static bool main_parse_hex(unsigned char *buf, char *str, unsigned size);
 
 bool FindCommand(char * buf, char * target);
-void BootMenuConfig(void *user, char * wifissid, char * wifipass);
+void BootMenuConfig(void *user);

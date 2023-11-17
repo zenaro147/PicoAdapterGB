@@ -28,8 +28,6 @@ bool speed_240_MHz = false;
 //Wi-Fi Controllers
 bool isConnectedWiFi = false;
 
-struct wifi_settings *wifiSetup;
-
 //Control Flash Write
 bool haveConfigToWrite = false;
 static user_time_t time_last_config_edit = 0;
@@ -247,23 +245,19 @@ void main(){
         gpio_put(10, false);
     #endif
     
-    //Setup Wifi Struct    
-    wifiSetup = malloc(sizeof(struct wifi_settings));
-    strcpy(wifiSetup->WiFiSSID, "WiFi_Network");
-    strcpy(wifiSetup->WiFiPASS, "P@$$w0rd");
-
     //Libmobile Variables
     mobile = malloc(sizeof(struct mobile_user));
-
     memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
+    strcpy(mobile->wifiSSID, "WiFi_Network");
+    strcpy(mobile->wifiPASS, "P@$$w0rd");
+
     InitSave();
     struct saved_data_pointers ptrs;
     InitSavedPointers(&ptrs, mobile);
     ReadConfig(&ptrs);
-    //ReadFlashConfig(mobile->config_eeprom, WiFiSSID, WiFiPASS); 
-
-    // Initialize mobile library
+    
     mobile->adapter = mobile_new(mobile);
+    // Initialize mobile callbacks
     mobile_def_debug_log(mobile->adapter, impl_debug_log);
     mobile_def_serial_disable(mobile->adapter, impl_serial_disable);
     mobile_def_serial_enable(mobile->adapter, impl_serial_enable);
@@ -281,9 +275,10 @@ void main(){
     mobile_def_update_number(mobile->adapter, impl_update_number);
 
     mobile_config_load(mobile->adapter);
-    BootMenuConfig(mobile,wifiSetup->WiFiSSID,wifiSetup->WiFiPASS);
 
-    isConnectedWiFi = PicoW_Connect_WiFi(wifiSetup->WiFiSSID, wifiSetup->WiFiPASS, MS(10));
+    BootMenuConfig(mobile);
+
+    isConnectedWiFi = PicoW_Connect_WiFi(mobile->wifiSSID, mobile->wifiPASS, MS(10));
     
     if(isConnectedWiFi){
         mobile->action = MOBILE_ACTION_NONE;

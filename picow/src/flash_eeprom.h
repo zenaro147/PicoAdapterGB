@@ -5,6 +5,8 @@
 
 struct saved_data_pointers {
     uint8_t* eeprom;
+    char* wifiSSID;
+    char* wifiPASS;
 };
 
 void InitSave(void);

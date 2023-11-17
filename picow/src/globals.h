@@ -4,7 +4,7 @@
 #include "socket_impl.h"
 
 #define PICO_ADAPTER_HARDWARE "PicoW"
-#define PICO_ADAPTER_SOFTWARE "1.4.1-b"
+#define PICO_ADAPTER_SOFTWARE "1.5.0-b"
 
 //#define DEBUG_SIGNAL_PINS
 
@@ -32,17 +32,14 @@ typedef uint64_t                user_time_t;
 #define DEBUG_PRINT_FUNCTION(x) printf(x)
 #define EEPROM_SIZE MOBILE_CONFIG_SIZE
 
-struct wifi_settings {
-    char WiFiSSID[32];
-    char WiFiPASS[32];
-};
-
 struct mobile_user {
     struct mobile_adapter *adapter;
     enum mobile_action action;
     uint8_t currentReqSocket;
     unsigned long picow_clock_latch[MOBILE_MAX_TIMERS];
     uint8_t config_eeprom[EEPROM_SIZE];
+    char wifiSSID[32];
+    char wifiPASS[32];
     struct socket_impl socket[MOBILE_MAX_CONNECTIONS];
     char number_user[MOBILE_MAX_NUMBER_SIZE + 1];
     char number_peer[MOBILE_MAX_NUMBER_SIZE + 1];

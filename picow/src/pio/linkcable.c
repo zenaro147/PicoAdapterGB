@@ -113,12 +113,12 @@ bool linkcable_is_enabled(void) {
     return is_enabled;
 }
 
-bool can_disable_linkcable_irq(void) {
+bool can_disable_linkcable_handler(void) {
     if(!is_enabled)
         return true;
     uint64_t old_time = get_last_transfer_time();
-    uint64_t curr_time = time_us_64();
-    if((curr_time - old_time) >= SEC(1))
+    uint64_t curr_time = TIME_FUNCTION;
+    if((curr_time - old_time) >= LINKCABLE_CAN_DISABLE_TIMEOUT)
         return true;
     return false;
 }
@@ -180,7 +180,7 @@ void TIME_SENSITIVE(linkcable_send)(uint32_t data) {
     pio_sm_put(LINKCABLE_PIO, LINKCABLE_SM, sendval);
 }
 
-void TIME_SENSITIVE(clean_linkcable_fifos)(void) {
+void TIME_SENSITIVE(linkcable_flush)(void) {
     pio_sm_clear_fifos(LINKCABLE_PIO, LINKCABLE_SM);
 }
 

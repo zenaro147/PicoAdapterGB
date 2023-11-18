@@ -198,7 +198,7 @@ bool PicoW_Connect_WiFi(char *ssid, char *psk, uint32_t timeout){
     cyw43_arch_enable_sta_mode();
 
     printf("Connecting to Wi-Fi...\n");
-    if (cyw43_arch_wifi_connect_timeout_ms("Zenaro", "Zenaro1234!@#$#$#", CYW43_AUTH_WPA2_AES_PSK, timeout)) {
+    if (cyw43_arch_wifi_connect_timeout_ms(ssid, psk, CYW43_AUTH_WPA2_AES_PSK, timeout)) {
         printf("failed to connect.\n");
         return false;
     } else {

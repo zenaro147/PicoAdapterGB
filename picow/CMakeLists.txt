@@ -8,8 +8,12 @@ add_executable(${PROJECT_NAME}_PicoW
                 src/pio/linkcable.c)
 
 # Add PIO code
-pico_generate_pio_header(${PROJECT_NAME}_PicoW ${CMAKE_CURRENT_LIST_DIR}/src/pio/linkcable.pio)
-pico_generate_pio_header(${PROJECT_NAME}_PicoW ${CMAKE_CURRENT_LIST_DIR}/src/pio/linkcable_sm.pio)
+if(ADAPTER EQUAL "REON")
+    pico_generate_pio_header(${PROJECT_NAME}_PicoW ${CMAKE_CURRENT_LIST_DIR}/src/pio/linkcable.pio)
+elseif(ADAPTER EQUAL "STACKSMASHING")
+    add_compile_definitions(STACKSMASHING)
+    pico_generate_pio_header(${PROJECT_NAME}_PicoW ${CMAKE_CURRENT_LIST_DIR}/src/pio/linkcable_sm.pio)
+endif()
 
 target_include_directories(${PROJECT_NAME}_PicoW PRIVATE /.. ${CMAKE_CURRENT_LIST_DIR})
  

@@ -12,7 +12,7 @@ if(ADAPTER STREQUAL "REON")
     pico_generate_pio_header(${PROJECT_NAME}_PicoW ${CMAKE_CURRENT_LIST_DIR}/src/pio/linkcable.pio)
 elseif(ADAPTER STREQUAL "STACKSMASHING")
     add_compile_definitions(STACKSMASHING)
-    pico_generate_pio_header(${PROJECT_NAME}_PicoW ${CMAKE_CURRENT_LIST_DIR}/src/pio/linkcable_sm.pio)
+    pico_generate_pio_header(${PROJECT_NAME}_PicoW_SmBoard ${CMAKE_CURRENT_LIST_DIR}/src/pio/linkcable_sm.pio)
 endif()
 
 target_include_directories(${PROJECT_NAME}_PicoW PRIVATE /.. ${CMAKE_CURRENT_LIST_DIR})

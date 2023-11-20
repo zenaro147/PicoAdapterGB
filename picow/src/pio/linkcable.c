@@ -58,7 +58,7 @@ void init_time_request_handler(void) {
     init_sync(&ack_time_request);
 }
 
-void TIME_SENSITIVE(handle_time_request)(void) {   
+void TIME_SENSITIVE(handle_time_request)(void) {
     if(is_sync_req(&ack_time_request)) {
         shared_last_transfer_time = last_transfer_time;
         ack_sync_req(&ack_time_request);
@@ -95,11 +95,7 @@ static void TIME_SENSITIVE(linkcable_isr)(void) {
         if((dest_time - curr_time) < MSEC(100))
             busy_wait_us(dest_time - curr_time);
     }
-#ifdef STACKSMASHING
-    linkcable_sm_activate(LINKCABLE_PIO, LINKCABLE_SM);
-#else
     linkcable_activate(LINKCABLE_PIO, LINKCABLE_SM);
-#endif
 #endif
 }
 
@@ -210,20 +206,13 @@ void linkcable_set_is_32(bool is_32) {
         saved_bits = 32;
     else
         saved_bits = 8;
-#ifdef STACKSMASHING
-    linkcable_sm_select_mode(LINKCABLE_PIO, LINKCABLE_SM, saved_bits);
-#else
     linkcable_select_mode(LINKCABLE_PIO, LINKCABLE_SM, saved_bits);
-#endif
 }
 
 void linkcable_init(irq_handler_t onDataReceive) {
     saved_bits = DEFAULT_SAVED_BITS;
-#ifdef STACKSMASHING
-    linkcable_sm_program_init(LINKCABLE_PIO, LINKCABLE_SM, linkcable_pio_initial_pc = pio_add_program(LINKCABLE_PIO, &linkcable_sm_program), saved_bits);
-#else
     linkcable_program_init(LINKCABLE_PIO, LINKCABLE_SM, linkcable_pio_initial_pc = pio_add_program(LINKCABLE_PIO, &linkcable_program), CABLE_PINS_START);
-#endif
+
 //    pio_sm_put_blocking(LINKCABLE_PIO, LINKCABLE_SM, LINKCABLE_BITS - 1);
     pio_enable_sm_mask_in_sync(LINKCABLE_PIO, (1u << LINKCABLE_SM));
 

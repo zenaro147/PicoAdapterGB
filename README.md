@@ -29,7 +29,7 @@ Refer to the [Wiki page](https://github.com/zenaro147/PicoAdapterGB/wiki) for mo
 
 ## Credits 
 * [REON Team](https://github.com/REONTeam/) - Mobile Adapter Library
-* [Lorenzooone](https://github.com/mid-kid/) - Help to structure the 32bits solution
+* [mid-kid](https://github.com/mid-kid/) - Help to structure the 32bits solution
 * [Lorenzooone](https://github.com/Lorenzooone/) - GB Link cable PIO solution and better eeprom save structure
-* [Lorenzooone](https://github.com/kabili207/) - Better Stacksmashing build options
+* [kabili207](https://github.com/kabili207/) - Better Stacksmashing build options
 

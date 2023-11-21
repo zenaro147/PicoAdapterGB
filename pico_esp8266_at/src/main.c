@@ -7,7 +7,7 @@
 
 #include "pico/stdlib.h"
 #include "hardware/pio.h"
-#include "pico/cyw43_arch.h"
+#include "hardware/gpio.h"
 
 #include "globals.h"
 

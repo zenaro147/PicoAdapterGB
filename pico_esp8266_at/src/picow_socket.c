@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "pico/cyw43_arch.h"
+#include "hardware/gpio.h"
 #include "globals.h"
 
 //UDP Callbacks

@@ -1,0 +1,72 @@
+; Program name
+.program linkcable
+
+.define public CLOCK_DIV 2
+.define public PIN_SCK 18
+;16
+.define public PIN_SIN 19
+;19
+.define public PIN_SOUT 16
+
+.define WAIT_FIRST (0/CLOCK_DIV)
+.define WAIT_MIDDLE (2/CLOCK_DIV)
+.define WAIT_LAST (1/CLOCK_DIV)
+
+.wrap_target
+    wait 0 gpio PIN_SCK [WAIT_FIRST]      ; wait for falling edge
+    ;irq 1                                ; comment out if no FAST_ALIGNMENT and no DEBUG_TIMEFRAMES
+    pull noblock                          ; pull value for transmission from pico
+    mov x, y
+    out pins, 1                           ; out the MSB bit
+    wait 1 gpio PIN_SCK [WAIT_MIDDLE]     ; wait for rising edge
+bitloop:
+        in pins, 1                        ; input bit
+        wait 0 gpio PIN_SCK [WAIT_MIDDLE] ; wait for falling edge
+        out pins, 1                       ; output rest of the bits one by one
+        wait 1 gpio PIN_SCK [WAIT_LAST]   ; wait for rising edge
+    jmp x-- bitloop                       ; loop through the rest of the bits
+    in pins, 1                            ; input rest of the bits one by one
+    push noblock                          ; push the received value to pico
+    irq 0
+    ;set x, 0                             ; comment out if no FAST_ALIGNMENT
+sleeploop:
+    ;jmp !x sleeploop                     ; comment out if no FAST_ALIGNMENT
+.wrap
+
+% c-sdk {
+
+static inline void linkcable_select_mode(PIO pio, uint sm, uint num_bits) {
+    pio_sm_exec(pio, sm, pio_encode_set(pio_y, num_bits - 2));
+}
+
+#ifdef FAST_ALIGNMENT
+static inline void linkcable_activate(PIO pio, uint sm) {
+    pio_sm_exec(pio, sm, pio_encode_set(pio_x, 1));
+}
+#endif
+
+static inline void linkcable_program_init(PIO pio, uint sm, uint offset, uint num_bits) {
+    pio_sm_config c = linkcable_program_get_default_config(offset);
+
+    pio_sm_set_consecutive_pindirs(pio, sm, linkcable_PIN_SCK, 1, false);
+
+    sm_config_set_in_pins(&c, linkcable_PIN_SIN);
+    pio_sm_set_consecutive_pindirs(pio, sm, linkcable_PIN_SIN, 1, false);
+    sm_config_set_in_shift(&c, false, false, LINKCABLE_BITS_FULL);
+
+    sm_config_set_out_pins(&c, linkcable_PIN_SOUT, 1);
+    pio_sm_set_consecutive_pindirs(pio, sm, linkcable_PIN_SOUT, 1, true);
+    sm_config_set_out_shift(&c, false, false, LINKCABLE_BITS_FULL);
+
+    sm_config_set_clkdiv(&c, linkcable_CLOCK_DIV);                // Set clock division
+
+    pio_gpio_init(pio, linkcable_PIN_SCK);
+    pio_gpio_init(pio, linkcable_PIN_SIN);
+    pio_gpio_init(pio, linkcable_PIN_SOUT);
+
+    pio_sm_init(pio, sm, offset, &c);
+    linkcable_select_mode(pio, sm, num_bits);
+
+//    pio_sm_set_enabled(pio, sm, true);          // Set the state machine running (commented out, I'll start this in the C)
+}
+%}

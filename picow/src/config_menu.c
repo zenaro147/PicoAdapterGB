@@ -116,7 +116,8 @@ void BootMenuConfig(void *user){
     printf("Press any key to enter in Setup Mode...\n");
     UserInput = getchar_timeout_us(SEC(5));
     if(UserInput != PICO_ERROR_TIMEOUT){
-        char UserCMD[512] = {0};
+        char UserCMD[520] = {0};
+        char temp;
         bool needSave = false;
 
         //Libmobile Variables
@@ -156,9 +157,19 @@ void BootMenuConfig(void *user){
             }
         }
 
+        scanf("%c",&temp); // temp statement to clear buffer for \r
+        scanf("%c",&temp); // temp statement to clear buffer for \n
+
         while(1){
             printf("Enter a command: \n");
-            scanf("%512s",UserCMD);
+            fgets(UserCMD,sizeof(UserCMD),stdin);
+            //Remove \r\n from the fgets
+            for (int i = 0; i < strlen(UserCMD); i++) {
+                if(UserCMD[i]=='\r' && UserCMD[i+1] == '\n' && UserCMD[i+2] == '\0'){
+                    UserCMD[i]='\0';
+                    break;
+                }
+            } 
 
             //Set the new WiFi SSID
             if(FindCommand(UserCMD,"WIFISSID=")){

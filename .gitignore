@@ -56,3 +56,4 @@ dkms.conf
 **/.vscode/*
 **/src/examples/*
 32bitsSample.sal
+pico_esp8266_at_old/*

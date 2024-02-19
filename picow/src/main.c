@@ -196,10 +196,11 @@ bool PicoW_Connect_WiFi(char *ssid, char *psk, uint32_t timeout){
 
     cyw43_pm_value(CYW43_NO_POWERSAVE_MODE,200,1,1,10);
     cyw43_arch_enable_sta_mode();
-
-    printf("Connecting to Wi-Fi...\n");
-    if (cyw43_arch_wifi_connect_timeout_ms(ssid, psk, CYW43_AUTH_WPA2_AES_PSK, timeout)) {
-        printf("failed to connect.\n");
+    
+    //printf("Connecting to Wi-Fi... SSID: %s -- Password: %s [end line]\n", ssid, psk);
+    int errorcode = cyw43_arch_wifi_connect_timeout_ms(ssid, psk, CYW43_AUTH_WPA2_AES_PSK, timeout);
+    if (errorcode != 0) {
+        printf("Failed to connect. Error: %i\n", errorcode);
         return false;
     } else {
         printf("Connected.\n");
@@ -278,7 +279,9 @@ void main(){
 
     BootMenuConfig(mobile);
 
-    isConnectedWiFi = PicoW_Connect_WiFi(mobile->wifiSSID, mobile->wifiPASS, MS(10));
+    printf("-------------------------\nSoftware Version:\nLibmobile: %i.%i.%i\nPicoAdapterGB: %s %s\n-------------------------\n",mobile_version_major,mobile_version_minor,mobile_version_patch,PICO_ADAPTER_HARDWARE,PICO_ADAPTER_SOFTWARE);
+
+    isConnectedWiFi = PicoW_Connect_WiFi(mobile->wifiSSID, mobile->wifiPASS, MS(60));
     
     if(isConnectedWiFi){
         mobile->action = MOBILE_ACTION_NONE;
@@ -305,8 +308,6 @@ void main(){
         // multicore_launch_core1(core1_context);
 
         linkcable_init(link_cable_ISR);
-
-        printf("-------------------------\nSoftware Version:\nLibmobile: %i.%i.%i\nPicoAdapterGB: %s %s\n-------------------------\n",mobile_version_major,mobile_version_minor,mobile_version_patch,PICO_ADAPTER_HARDWARE,PICO_ADAPTER_SOFTWARE);
 
         mobile_start(mobile->adapter);
 

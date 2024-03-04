@@ -10,12 +10,8 @@
 ////////////////////////////////////
 
 #include "pico/stdlib.h"
-#include "pico/multicore.h"
-#include "hardware/timer.h"
+#include "hardware/pio.h"
 #include "hardware/gpio.h"
-#include "hardware/spi.h"
-#include "hardware/resets.h"
-#include "hardware/flash.h"
 
 #include "common.h"
 #include "esp_at.h"

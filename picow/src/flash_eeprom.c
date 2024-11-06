@@ -13,7 +13,7 @@
 #define KEY_WIFIPASS_INDEX 2
 
 #define NON_FLASH_RELATED_SIZE (EEPROM_SIZE)
-#define FINAL_FLASH_MIN_SIZE (KEY_STR_SIZE + NON_FLASH_RELATED_SIZE + KEY_STR_SIZE + 32 + KEY_STR_SIZE + 32 + PROGRESSIVE_SIZE + CHECKSUM_SIZE)
+#define FINAL_FLASH_MIN_SIZE (KEY_STR_SIZE + NON_FLASH_RELATED_SIZE + KEY_STR_SIZE + SSID_LENGHT + KEY_STR_SIZE + PASS_LENGHT + PROGRESSIVE_SIZE + CHECKSUM_SIZE)
 
 #define FLASH_PAGE_NEEDED ((FINAL_FLASH_MIN_SIZE + FLASH_PAGE_SIZE - 1) / FLASH_PAGE_SIZE)
 #define FLASH_DATA_SIZE (FLASH_PAGE_SIZE * FLASH_PAGE_NEEDED)
@@ -27,9 +27,9 @@ struct saved_device_data {
     uint8_t config_key[KEY_STR_SIZE];
     uint8_t config_eeprom[EEPROM_SIZE];
     uint8_t config_wifissid_key[KEY_STR_SIZE];
-    char wifiSSID[32];
+    char wifiSSID[SSID_LENGHT];
     uint8_t config_wifipass_key[KEY_STR_SIZE];
-    char wifiPASS[32];
+    char wifiPASS[PASS_LENGHT];
     uint8_t unused[FLASH_DATA_SIZE - FINAL_FLASH_MIN_SIZE];
     uint8_t progressive_number[PROGRESSIVE_SIZE];
     uint8_t checksum[CHECKSUM_SIZE];
@@ -126,8 +126,8 @@ static bool save_single_config(uint8_t mirror, uint16_t position, uint16_t progr
     // Place other data saving here...
     if(save_ptrs != NULL) {
         prepare_data_unit(save_ptrs->eeprom, tmp_data.config_eeprom, EEPROM_SIZE, save_key_strings[KEY_CONFIG_INDEX], tmp_data.config_key);
-        prepare_data_unit(save_ptrs->wifiSSID, tmp_data.wifiSSID, 32, save_key_strings[KEY_WIFISSID_INDEX], tmp_data.config_wifissid_key);
-        prepare_data_unit(save_ptrs->wifiPASS, tmp_data.wifiPASS, 32, save_key_strings[KEY_WIFIPASS_INDEX], tmp_data.config_wifipass_key);
+        prepare_data_unit(save_ptrs->wifiSSID, tmp_data.wifiSSID, SSID_LENGHT, save_key_strings[KEY_WIFISSID_INDEX], tmp_data.config_wifissid_key);
+        prepare_data_unit(save_ptrs->wifiPASS, tmp_data.wifiPASS, PASS_LENGHT, save_key_strings[KEY_WIFIPASS_INDEX], tmp_data.config_wifipass_key);
     }
     else {
         prepare_data_unit(NULL, tmp_data.config_eeprom, EEPROM_SIZE, save_key_strings[KEY_CONFIG_INDEX], tmp_data.config_key);
@@ -239,9 +239,9 @@ void ReadConfig(struct saved_data_pointers* save_ptrs) {
     if(save_ptrs->eeprom != NULL)
         memcpy(save_ptrs->eeprom, tmp_data.config_eeprom, EEPROM_SIZE);
     if(save_ptrs->wifiSSID != NULL)
-        memcpy(save_ptrs->wifiSSID, tmp_data.wifiSSID, 32);
+        memcpy(save_ptrs->wifiSSID, tmp_data.wifiSSID, SSID_LENGHT);
     if(save_ptrs->wifiPASS != NULL)
-        memcpy(save_ptrs->wifiPASS, tmp_data.wifiPASS, 32);
+        memcpy(save_ptrs->wifiPASS, tmp_data.wifiPASS, PASS_LENGHT);
     
     memcpy(unused_data, tmp_data.unused, FLASH_DATA_SIZE - FINAL_FLASH_MIN_SIZE);
     DEBUG_PRINT_FUNCTION("Done.\n");

@@ -4,7 +4,7 @@
 #include "socket_impl.h"
 
 #define PICO_ADAPTER_HARDWARE "PicoW"
-#define PICO_ADAPTER_SOFTWARE "1.5.2-b"
+#define PICO_ADAPTER_SOFTWARE "1.5.3-b"
 
 //#define DEBUG_SIGNAL_PINS
 

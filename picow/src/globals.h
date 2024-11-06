@@ -4,9 +4,13 @@
 #include "socket_impl.h"
 
 #define PICO_ADAPTER_HARDWARE "PicoW"
-#define PICO_ADAPTER_SOFTWARE "1.5.1-b"
+#define PICO_ADAPTER_SOFTWARE "1.5.3"
 
 //#define DEBUG_SIGNAL_PINS
+
+// WIFI SSID AND PASSWORD LENGHT
+#define SSID_LENGHT 33 //32 chars + 1 to not overflow
+#define PASS_LENGHT 64 //63 chars + 1 to not overflow
 
 //LED Config
 #define LED_PIN       		  	CYW43_WL_GPIO_LED_PIN
@@ -38,8 +42,8 @@ struct mobile_user {
     uint8_t currentReqSocket;
     unsigned long picow_clock_latch[MOBILE_MAX_TIMERS];
     uint8_t config_eeprom[EEPROM_SIZE];
-    char wifiSSID[32];
-    char wifiPASS[32];
+    char wifiSSID[SSID_LENGHT];
+    char wifiPASS[PASS_LENGHT];
     struct socket_impl socket[MOBILE_MAX_CONNECTIONS];
     char number_user[MOBILE_MAX_NUMBER_SIZE + 1];
     char number_peer[MOBILE_MAX_NUMBER_SIZE + 1];

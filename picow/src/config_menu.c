@@ -174,25 +174,33 @@ void BootMenuConfig(void *user){
             //Set the new WiFi SSID
             if(FindCommand(UserCMD,"WIFISSID=")){
                 if(strlen(UserCMD)-9 > 0){
-                    memset(mobile->wifiSSID,0x00,sizeof(mobile->wifiSSID));
-                    memcpy(mobile->wifiSSID,UserCMD+9,strlen(UserCMD)-9);
-                    printf("New WiFi SSID defined.\n");
-                    needSave=true;  
+                    if(strlen(UserCMD)-9 < SSID_LENGHT){
+                        memset(mobile->wifiSSID,0x00,sizeof(mobile->wifiSSID));
+                        memcpy(mobile->wifiSSID,UserCMD+9,strlen(UserCMD)-9);
+                        printf("New WiFi SSID defined.\n");
+                        needSave=true;
+                    }else{
+                        printf("WiFi SSID must have up to 32 characters.\n"); 
+                    }
                 }else if(strlen(UserCMD)-9 == 0){
                     memcpy(mobile->wifiSSID,"WiFi_Network",12);
                     printf("Default WiFi SSID defined.\n");
                     needSave=true;  
                 }else{
-                    printf("Invalid parameter.\n");
+                    printf("Invalid parameter.\n");  
                 }
 
             //Set the new WiFi Password
             }else if(FindCommand(UserCMD,"WIFIPASS=")){
                 if(strlen(UserCMD)-9 > 0){
-                    memset(mobile->wifiPASS,0x00,sizeof(mobile->wifiPASS));
-                    memcpy(mobile->wifiPASS,UserCMD+9,strlen(UserCMD)-9);
-                    printf("New WiFi Password defined.\n");
-                    needSave=true;
+                    if(strlen(UserCMD)-9 < PASS_LENGHT){
+                        memset(mobile->wifiPASS,0x00,sizeof(mobile->wifiPASS));
+                        memcpy(mobile->wifiPASS,UserCMD+9,strlen(UserCMD)-9);
+                        printf("New WiFi Password defined.\n");
+                        needSave=true;
+                    }else{
+                        printf("WiFi password must have up to 63 characters.\n"); 
+                    }
                 }else if(strlen(UserCMD)-9 == 0){
                     memcpy(mobile->wifiPASS,"P@$$w0rd",8);
                     printf("Default WiFi Password defined.\n");

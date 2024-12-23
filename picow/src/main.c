@@ -228,7 +228,7 @@ void mobile_validate_relay(){
 // Main and Core1 Loop //
 /////////////////////////
 void main(){
-    speed_240_MHz = set_sys_clock_khz(240000, false);
+//    speed_240_MHz = set_sys_clock_khz(240000, false);
 
     stdio_init_all();
     printf("Booting...\n");

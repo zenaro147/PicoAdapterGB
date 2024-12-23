@@ -17,7 +17,21 @@ endif()
 
 message("Adapter pinout is ${ADAPTER}")
 
-set(PICO_BOARD pico_w)
+
+
+if(NOT (PICO_BOARD MATCHES "pico_w|pico2_w"))
+    message(WARNING "Unknown board '${PICO_BOARD}', using 'pico_w' instead")
+    set(PICO_BOARD pico_w CACHE STRING "Board type")
+    set(PICO_PLATFORM "rp2040")
+elseif(PICO_BOARD STREQUAL pico_w)
+    set(PICO_BOARD pico_w CACHE STRING "Board type")
+    set(PICO_PLATFORM "rp2040")
+elseif(PICO_BOARD STREQUAL "pico2_w")
+    set(PICO_BOARD pico2_w CACHE STRING "Board type")
+    set(PICO_PLATFORM "rp2350")
+endif()
+
+message("PICO_BOARD version is ${PICO_BOARD}")
 
 include(pico_sdk_import.cmake)
 project(PicoAdapterGB C CXX ASM)

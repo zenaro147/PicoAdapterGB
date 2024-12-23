@@ -35,8 +35,8 @@ target_include_directories(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} PRIV
 target_link_libraries(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} libmobile_static pico_stdlib hardware_pio hardware_flash pico_cyw43_arch_lwip_poll)
 
 # disable usb output, enable uart output
-pico_enable_stdio_usb(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} 0)
-pico_enable_stdio_uart(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} 1)
+pico_enable_stdio_usb(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} 1)
+pico_enable_stdio_uart(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} 0)
 
 # create map/bin/hex file etc.
 pico_add_extra_outputs(${PROJECT_NAME}${ProjBoardType}${ProjOutputType})

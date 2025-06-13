@@ -123,6 +123,7 @@ void BootMenuConfig(void *user){
         //Libmobile Variables
         enum mobile_adapter_device device = MOBILE_ADAPTER_BLUE;
         bool device_unmetered = false;
+        bool change_mail_port = true;
         struct mobile_addr dns1 = (struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE};
         struct mobile_addr dns2 = (struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE};
         struct mobile_addr relay = (struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE};
@@ -135,6 +136,7 @@ void BootMenuConfig(void *user){
         mobile_config_get_dns(mobile->adapter, &dns2, MOBILE_DNS2);
         mobile_config_get_relay(mobile->adapter, &relay);
         mobile_config_get_device(mobile->adapter, &device, &device_unmetered);
+        mobile_config_get_alt_mail(mobile->adapter, &change_mail_port);
         if(dns1.type != MOBILE_ADDRTYPE_NONE){
             switch (dns1.type)
             {
@@ -419,6 +421,33 @@ void BootMenuConfig(void *user){
                     printf("Invalid parameter.\n");
                 } 
             
+            //Set the SMTP port redirection
+            }else if(FindCommand(UserCMD,"NOREDIRMAIL=")){
+                if(strlen(UserCMD)-12 == 1){
+                    switch (UserCMD[12]){
+                        case '0':
+                            change_mail_port=false;
+                            break;
+                        case '1':
+                            change_mail_port=true;
+                            break;
+                        default:
+                            printf("Invalid parameter. Applying default value.\n");
+                            change_mail_port=false;
+                            break;
+                    }
+                    mobile_config_set_alt_mail(mobile->adapter, change_mail_port);
+                    printf("New Mail Port Redirection value defined.\n");
+                    needSave=true;
+                }else if(strlen(UserCMD)-12 == 0){
+                    change_mail_port=false;
+                    mobile_config_set_alt_mail(mobile->adapter, change_mail_port);
+                    printf("Default Mail Port Redirection value defined.\n");
+                    needSave=true;
+                }else{
+                    printf("Invalid parameter.\n");
+                } 
+            
             //Format the entire EEPROM, if necessary
             }else if(FindCommand(UserCMD,"FORMAT_EEPROM")){
                 printf("Formatting...\n");
@@ -512,7 +541,8 @@ void BootMenuConfig(void *user){
                     }
                     break;
                 }
-                printf("Is Unmetered: %s\n\n", device_unmetered == true ? "Yes":"No");
+                printf("Is Unmetered: %s\n", device_unmetered == true ? "Yes":"No");
+                printf("Redirect Mail Port: %s\n\n", change_mail_port == true ? "Yes":"No");
 
             }else if(FindCommand(UserCMD,"HELP")){
                 printf("Command Sintax: <COMMAND>=<VALUE>\n");
@@ -528,7 +558,8 @@ void BootMenuConfig(void *user){
                 printf("RELAYTOKEN    | Set a Relay Token that will be used on Relay Server to receive a valid number to use during P2P communications.\n");
                 printf("P2PPORT       | Set a custom P2P port to use during P2P communications (Local Network only).\n");
                 printf("DEVICE        | Set the Device to emulate (BLUE, RED or YELLOW).\n");
-                printf("UNMETERED     | Set if the device will be Unmetered (useful for Pokemon Crystal). Only accept 1 (true) or 0 (false).\n\n");
+                printf("UNMETERED     | Set if the device will be Unmetered (useful for Pokemon Crystal). Only accept 1 (true) or 0 (false).\n");
+                printf("NOREDIRMAIL   | Set the device to only use port 25 for SMTP communication.\n\n");
 
                 printf("Special commands (just enter the command, without =<VALUE>):\n");
                 printf("FORMAT_EEPROM | Format the eeprom, if necessary.\n");
@@ -545,7 +576,6 @@ void BootMenuConfig(void *user){
 
         if(needSave){
             printf("Saving new configs...\n");
-
             //Save new Configs
             mobile_config_save(mobile->adapter);
             struct saved_data_pointers ptrs;
@@ -555,8 +585,8 @@ void BootMenuConfig(void *user){
             printf("Rebooting device...\n");
 
             LED_ON;
-            watchdog_enable(MS(3), 0);
-            watchdog_update();
+            //watchdog_enable(MS(3), 0);
+            //watchdog_update();
             while(1);
         }
     }

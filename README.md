@@ -24,8 +24,12 @@ Refer to the [Wiki page](https://github.com/zenaro147/PicoAdapterGB/wiki) for mo
 - `pico_esp8266_at`: A Raspberry Pi Pico implementation using an ESP8266 ESP-01 to provide WiFi connectivity (outdated/suspended). 
 - `picow`: A Raspberry Pi Pico W implementation using the internal WiFi connectivity. (recommended)
 
+## 3D printed shell
+* Check out the Hatch's [Thingverse Page](https://www.thingiverse.com/thing:7057318)
+
 ## Posts about:
-* [Reddit post](https://www.reddit.com/r/Gameboy/comments/14scudy/just_dropping_this_mobile_adapter_gb_revival_wip/?sort=new)
+* [Reddit post 1](https://www.reddit.com/r/Gameboy/comments/14scudy/just_dropping_this_mobile_adapter_gb_revival_wip/)
+* [Reddit post 2](https://www.reddit.com/r/Gameboy/comments/16ly811/first_mobile_reon_adapter_working_pretty_good_now/)
 
 ## Credits 
 * [REON Team](https://github.com/REONTeam/) - Mobile Adapter Library

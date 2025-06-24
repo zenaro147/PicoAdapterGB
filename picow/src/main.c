@@ -326,7 +326,9 @@ void main(){
             memset(mobile->socket[i].udp_remote_srv,0x00,sizeof(mobile->socket[i].udp_remote_srv));
             mobile->socket[i].udp_remote_port = 0;
             mobile->socket[i].client_status = false;
+            mobile->socket[i].inside_callback = false;
             mobile->socket[i].pending_close = false;
+            mobile->socket[i].socket_status = 0;
             memset(mobile->socket[i].buffer_rx,0x00,sizeof(mobile->socket[i].buffer_rx));
             //memset(mobile->socket[i].buffer_tx,0x00,sizeof(mobile->socket[i].buffer_tx));
             mobile->socket[i].buffer_rx_len = 0;

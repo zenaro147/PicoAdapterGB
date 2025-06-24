@@ -11,7 +11,9 @@ struct socket_impl {
     char udp_remote_srv[46];
     unsigned udp_remote_port;
     bool client_status;
+    bool inside_callback;
     bool pending_close;
+    int socket_status;
     //uint8_t buffer_tx[MOBILE_MAX_TRANSFER_SIZE];
     uint8_t buffer_rx[BUFF_SIZE];
     int buffer_rx_len;

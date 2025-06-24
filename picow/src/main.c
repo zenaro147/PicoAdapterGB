@@ -255,8 +255,10 @@ void mobile_validate_relay(){
 // Main and Core1 Loop //
 /////////////////////////
 void main(){
-    speed_240_MHz = set_sys_clock_khz(240000, false);
-
+    #ifndef PICO_CYW43_ARCH_POLL
+        speed_240_MHz = set_sys_clock_khz(240000, false);
+    #endif
+    
     stdio_init_all();
     printf("Booting...\n");
     cyw43_arch_init();

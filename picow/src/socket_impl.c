@@ -50,46 +50,51 @@ bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, 
 }
 
 void socket_impl_close(struct socket_impl *state){
-    bool sock_status = false;
-    err_t err = ERR_ARG;
-    switch (state->sock_type) {
-        case SOCK_TCP:
-            if(state->tcp_pcb){
-                err = tcp_close(state->tcp_pcb);
-                if (err != ERR_OK) {
-                    // printf("close failed %d, calling abort\n", err);
-                    tcp_abort(state->tcp_pcb);
-                }
-                tcp_arg(state->tcp_pcb, NULL);
-                //tcp_poll(state->tcp_pcb, NULL, 0);
-                tcp_accept(state->tcp_pcb, NULL);
-                tcp_sent(state->tcp_pcb, NULL);
-                tcp_recv(state->tcp_pcb, NULL);
-                tcp_err(state->tcp_pcb, NULL);
-                state->tcp_pcb = 0x0;
-                state->tcp_pcb = NULL;
-            }
-            break;
-        case SOCK_UDP:             
-            udp_disconnect(state->udp_pcb);
-            udp_remove(state->udp_pcb);
-            udp_recv(state->udp_pcb, NULL, NULL);
-            state->udp_pcb = 0x0;
-            state->udp_pcb = NULL;
-            break;
-        default: 
-            break;
-    }
-    state->sock_addr = -1;
-    state->sock_type = SOCK_NONE;
-    memset(state->udp_remote_srv,0x00,sizeof(state->udp_remote_srv));
-    state->udp_remote_port = 0;
-    state->client_status = false;
-    memset(state->buffer_rx,0x00,sizeof(state->buffer_rx));
-    //memset(state->buffer_tx,0x00,sizeof(state->buffer_tx));
-    state->buffer_rx_len = 0;
-    state->buffer_tx_len = 0;
-    // printf("Socket Closed.\n");
+    // if (state->inside_callback) {
+    state->pending_close = true;
+    // }
+
+    // err_t err = ERR_ARG;
+    // switch (state->sock_type) {
+    //     case SOCK_TCP:
+    //         if(state->tcp_pcb){
+    //             tcp_arg(state->tcp_pcb, NULL);
+    //             tcp_poll(state->tcp_pcb, NULL, 0);
+    //             tcp_accept(state->tcp_pcb, NULL);
+    //             tcp_sent(state->tcp_pcb, NULL);
+    //             tcp_recv(state->tcp_pcb, NULL);
+    //             tcp_err(state->tcp_pcb, NULL);
+    //             err = tcp_close(state->tcp_pcb);
+    //             if (err != ERR_OK) {
+    //                  printf("close failed %d, calling abort\n", err);
+    //                 tcp_abort(state->tcp_pcb);
+    //             }else{
+    //                 printf("TCP Socket Closed.\n");
+    //             }
+    //             state->tcp_pcb = NULL;
+    //         }
+    //         break;
+    //     case SOCK_UDP:             
+    //         udp_remove(state->udp_pcb);
+    //         udp_recv(state->udp_pcb, NULL, NULL);
+    //         udp_disconnect(state->udp_pcb);
+    //         state->udp_pcb = NULL;
+    //         break;
+    //     default: 
+    //         break;
+    // }
+    // state->sock_addr = -1;
+    // state->sock_type = SOCK_NONE;
+    // memset(state->udp_remote_srv,0x00,sizeof(state->udp_remote_srv));
+    // state->udp_remote_port = 0;
+    // state->client_status = false;
+    // state->inside_callback = false;
+    // state->pending_close = false;
+    // memset(state->buffer_rx,0x00,sizeof(state->buffer_rx));
+    // //memset(state->buffer_tx,0x00,sizeof(state->buffer_tx));
+    // state->buffer_rx_len = 0;
+    // state->buffer_tx_len = 0;
+    // // printf("Socket Closed.\n");
 }
 
 int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *addr){
@@ -317,7 +322,7 @@ bool socket_impl_listen(struct socket_impl *state, void *user){
     err_t err = ERR_ABRT;
     if(state->sock_type == SOCK_TCP){
         if(state->tcp_pcb->state==CLOSED){
-            //err = tcp_bind(state->tcp_pcb,state->sock_addr == IPADDR_TYPE_V4 ? IP4_ADDR_ANY : IP6_ADDR_ANY,state->tcp_pcb->remote_port);
+            // err = tcp_bind(state->tcp_pcb,state->sock_addr == IPADDR_TYPE_V4 ? IP4_ADDR_ANY : IP6_ADDR_ANY,state->tcp_pcb->remote_port);
             err = tcp_bind(state->tcp_pcb,IP4_ADDR_ANY,state->tcp_pcb->local_port);
             // printf("Listening TCP socket - err: %d\n",err);
             if(err == ERR_OK){
@@ -348,4 +353,48 @@ bool socket_impl_accept(struct socket_impl *state){
     }
     // printf("Client Waiting...!\n");
     return false;
+}
+
+void socket_impl_close_commands(struct socket_impl *state){
+    err_t err = ERR_ARG;
+    switch (state->sock_type) {
+        case SOCK_TCP:
+            if(state->tcp_pcb){
+                tcp_arg(state->tcp_pcb, NULL);
+                tcp_poll(state->tcp_pcb, NULL, 0);
+                tcp_accept(state->tcp_pcb, NULL);
+                tcp_sent(state->tcp_pcb, NULL);
+                tcp_recv(state->tcp_pcb, NULL);
+                tcp_err(state->tcp_pcb, NULL);
+                err = tcp_close(state->tcp_pcb);
+                if (err != ERR_OK) {
+                     printf("close failed %d, calling abort\n", err);
+                    tcp_abort(state->tcp_pcb);
+                }else{
+                    // printf("TCP Socket Closed.\n");
+                }
+                state->tcp_pcb = NULL;
+            }
+            break;
+        case SOCK_UDP:             
+            udp_remove(state->udp_pcb);
+            udp_recv(state->udp_pcb, NULL, NULL);
+            udp_disconnect(state->udp_pcb);
+            state->udp_pcb = NULL;
+            break;
+        default: 
+            break;
+    }
+    state->sock_addr = -1;
+    state->sock_type = SOCK_NONE;
+    memset(state->udp_remote_srv,0x00,sizeof(state->udp_remote_srv));
+    state->udp_remote_port = 0;
+    state->client_status = false;
+    // state->inside_callback = false;
+    state->pending_close = false;
+    memset(state->buffer_rx,0x00,sizeof(state->buffer_rx));
+    //memset(state->buffer_tx,0x00,sizeof(state->buffer_tx));
+    state->buffer_rx_len = 0;
+    state->buffer_tx_len = 0;
+    // printf("Socket Closed.\n");
 }

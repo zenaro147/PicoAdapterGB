@@ -204,10 +204,33 @@ bool PicoW_Connect_WiFi(char *ssid, char *psk, uint32_t timeout){
         printf("Failed to connect. Error: %i\n", errorcode);
         return false;
     } else {
-        printf("Connected.\n");
+        printf("Device IP: %s\nConnected.\n", ip4addr_ntoa(netif_ip4_addr(netif_list)));
     }
     return true;
 }
+
+bool check_and_reconnect_wifi(char *ssid, char *psk, uint32_t timeout) {
+    int errorcode = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
+    if (errorcode != CYW43_LINK_UP) {
+        printf("Wi-Fi disconnected. Reconnecting...\n");
+        
+        cyw43_arch_disable_sta_mode();
+        sleep_ms(1000);  // Espera um pouco antes de tentar de novo
+        cyw43_pm_value(CYW43_NO_POWERSAVE_MODE,200,1,1,10);
+        cyw43_arch_enable_sta_mode();
+
+        int errorcode = cyw43_arch_wifi_connect_timeout_ms(ssid, psk, CYW43_AUTH_WPA2_AES_PSK, timeout);
+        if (errorcode != 0) {
+            printf("Reconnect failed: %i\n", errorcode);
+            return false;
+        } else {
+            printf("Wi-Fi reconnected. IP: %s\n", ip4addr_ntoa(netif_ip4_addr(netif_list)));
+            return true;
+        }
+    }
+    return true;
+}
+
 
 void mobile_validate_relay(){
     struct mobile_addr relay = {0};    
@@ -298,6 +321,7 @@ void main(){
             memset(mobile->socket[i].udp_remote_srv,0x00,sizeof(mobile->socket[i].udp_remote_srv));
             mobile->socket[i].udp_remote_port = 0;
             mobile->socket[i].client_status = false;
+            mobile->socket[i].pending_close = false;
             memset(mobile->socket[i].buffer_rx,0x00,sizeof(mobile->socket[i].buffer_rx));
             //memset(mobile->socket[i].buffer_tx,0x00,sizeof(mobile->socket[i].buffer_tx));
             mobile->socket[i].buffer_rx_len = 0;
@@ -318,12 +342,17 @@ void main(){
         while (true) {
             // Mobile Adapter Main Loop
             mobile_loop(mobile->adapter);
+            // cyw43_arch_poll();
             
             for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
-                if(mobile->socket[i].tcp_pcb || mobile->socket[i].udp_pcb){
+                if(mobile->socket[i].tcp_pcb || mobile->socket[i].udp_pcb){                    
                     cyw43_arch_poll();
-                    break;
-                } 
+                    check_and_reconnect_wifi(mobile->wifiSSID, mobile->wifiPASS, MS(60));
+                    //break;
+                }
+                if (mobile->socket[i].pending_close) {
+                    socket_impl_close_commands(&mobile->socket[i]);
+                }
             }
 
             // Check if there is any new config to write on Flash

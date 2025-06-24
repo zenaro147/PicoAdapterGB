@@ -48,7 +48,7 @@ err_t socket_connected_tcp(void *arg, struct tcp_pcb *pcb, err_t err) {
     if (err != ERR_OK) {
         // printf("connect failed %d\n", err);
     }else{
-        //  printf("TCP connected!\n");
+        // printf("TCP connected!\n");
     }
     return err;
 }
@@ -131,19 +131,18 @@ err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
             pbuf_free(p);
         }
     }else{
-        err = tcp_close(state->tcp_pcb);
-        if (err != ERR_OK) {
-            // printf("close failed %d, calling abort\n", err);
-            tcp_abort(state->tcp_pcb);
-            err = ERR_ABRT;
-        }
         tcp_arg(state->tcp_pcb, NULL);
         //tcp_poll(state->tcp_pcb, NULL, 0);
         tcp_accept(state->tcp_pcb, NULL);
         tcp_sent(state->tcp_pcb, NULL);
         tcp_recv(state->tcp_pcb, NULL);
         tcp_err(state->tcp_pcb, NULL);
-        state->tcp_pcb = 0x0;
+        err = tcp_close(state->tcp_pcb);
+        if (err != ERR_OK) {
+            // printf("close failed %d, calling abort\n", err);
+            tcp_abort(state->tcp_pcb);
+            err = ERR_ABRT;
+        }
         state->tcp_pcb = NULL;
     }
     return err;

@@ -11,6 +11,7 @@ struct socket_impl {
     char udp_remote_srv[46];
     unsigned udp_remote_port;
     bool client_status;
+    bool pending_close;
     //uint8_t buffer_tx[MOBILE_MAX_TRANSFER_SIZE];
     uint8_t buffer_rx[BUFF_SIZE];
     int buffer_rx_len;
@@ -31,3 +32,5 @@ bool socket_impl_listen(struct socket_impl *state, void *user);
 bool socket_impl_accept(struct socket_impl *state);
 int socket_impl_send(struct socket_impl *state, const void *data, const unsigned size, const struct mobile_addr *addr);
 int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struct mobile_addr *addr);
+
+void socket_impl_close_commands(struct socket_impl *state);

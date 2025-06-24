@@ -426,21 +426,21 @@ void BootMenuConfig(void *user){
                 if(strlen(UserCMD)-12 == 1){
                     switch (UserCMD[12]){
                         case '0':
-                            change_mail_port=false;
+                            change_mail_port=true;
                             break;
                         case '1':
-                            change_mail_port=true;
+                            change_mail_port=false;
                             break;
                         default:
                             printf("Invalid parameter. Applying default value.\n");
-                            change_mail_port=false;
+                            change_mail_port=true;
                             break;
                     }
                     mobile_config_set_alt_mail(mobile->adapter, change_mail_port);
                     printf("New Mail Port Redirection value defined.\n");
                     needSave=true;
                 }else if(strlen(UserCMD)-12 == 0){
-                    change_mail_port=false;
+                    change_mail_port=true;
                     mobile_config_set_alt_mail(mobile->adapter, change_mail_port);
                     printf("Default Mail Port Redirection value defined.\n");
                     needSave=true;

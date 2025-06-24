@@ -1,5 +1,8 @@
 ////////////////////////////////////
 // -- MOBILE_ENABLE_NO32BIT - try to build with this option enabled to handle GBA games
+// -- /usr/local/bin/openocd -f interface/cmsis-dap.cfg -f target/rp2350.cfg
+// -- cd "/media/rafael/Dados/_BACKUP/Arquivos/Projetos/Gameboy Projects/MobileAdapterGB/libmobile-bgb" \
+// -- && build/mobile --dns1 18.223.26.183 --unmetered --relay 192.168.1.9 --relay-token "A96F8F0226A2E6C4A2C13689413BB09E"
 ////////////////////////////////////
 #include <stdio.h>
 #include <stdlib.h>
@@ -342,14 +345,14 @@ void main(){
         while (true) {
             // Mobile Adapter Main Loop
             mobile_loop(mobile->adapter);
-            // cyw43_arch_poll();
+            cyw43_arch_poll();
             
             for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
-                if(mobile->socket[i].tcp_pcb || mobile->socket[i].udp_pcb){                    
-                    cyw43_arch_poll();
-                    check_and_reconnect_wifi(mobile->wifiSSID, mobile->wifiPASS, MS(60));
-                    //break;
-                }
+                // if(mobile->socket[i].tcp_pcb || mobile->socket[i].udp_pcb){                    
+                //     cyw43_arch_poll();
+                //     check_and_reconnect_wifi(mobile->wifiSSID, mobile->wifiPASS, MS(60));
+                //     break;
+                // }
                 if (mobile->socket[i].pending_close) {
                     socket_impl_close_commands(&mobile->socket[i]);
                 }

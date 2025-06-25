@@ -113,11 +113,10 @@ void BootMenuConfig(void *user){
     struct mobile_user *mobile = (struct mobile_user *)user;
 
     int UserInput;
-    printf("Press any key to enter in Setup Mode...\n");
+    printf("Press ENTER to enter in Setup Mode...\n");
     UserInput = getchar_timeout_us(SEC(5));
     if(UserInput != PICO_ERROR_TIMEOUT){
         char UserCMD[520] = {0};
-        char temp;
         bool needSave = false;
 
         //Libmobile Variables
@@ -159,19 +158,34 @@ void BootMenuConfig(void *user){
             }
         }
 
-        scanf("%c",&temp); // temp statement to clear buffer for \r
-        scanf("%c",&temp); // temp statement to clear buffer for \n
-
         while(1){
+            // Limpa finais de linha residuais do buffer antes de ler o próximo comando
+            int temp;
+            while (1) {
+                temp = getchar_timeout_us(0);
+                if (temp == '\r' || temp == '\n') continue;
+                if (temp == PICO_ERROR_TIMEOUT) break;
+                break;
+            }
             printf("Enter a command: \n");
-            fgets(UserCMD,sizeof(UserCMD),stdin);
-            //Remove \r\n from the fgets
+            // Leitura manual para máxima compatibilidade de final de linha
+            int idx = 0, c;
+            memset(UserCMD, 0, sizeof(UserCMD));
+            while (idx < sizeof(UserCMD) - 1) {
+                c = getchar_timeout_us(60 * 1000 * 1000); // 60 segundos de timeout
+                if (c == PICO_ERROR_TIMEOUT) break;
+                if (c == '\r' || c == '\n') break;
+                UserCMD[idx++] = (char)c;
+            }
+            UserCMD[idx] = '\0';
+
+            //Remove \r\n from a possível fgets
             for (int i = 0; i < strlen(UserCMD); i++) {
-                if(UserCMD[i]=='\r' && UserCMD[i+1] == '\n' && UserCMD[i+2] == '\0'){
-                    UserCMD[i]='\0';
+                if (UserCMD[i] == '\r' || UserCMD[i] == '\n') {
+                    UserCMD[i] = '\0';
                     break;
                 }
-            } 
+            }
 
             //Set the new WiFi SSID
             if(FindCommand(UserCMD,"WIFISSID=")){

@@ -57,7 +57,7 @@ void socket_err_tcp(void *arg, err_t err){
     struct mobile_user *mobile = (struct mobile_user*)arg;
     struct socket_impl *state = &mobile->socket[mobile->currentReqSocket];
     state->socket_status = err;
-    printf("TCP Generic Error %d\n", err);
+    DEBUG_PRINT_FUNCTION("TCP Generic Error %d", err);
 }
 
 err_t socket_accept_tcp(void *arg, struct tcp_pcb *pcb, err_t err){

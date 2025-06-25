@@ -204,10 +204,11 @@ bool PicoW_Connect_WiFi(char *ssid, char *psk, uint32_t timeout){
     //printf("Connecting to Wi-Fi... SSID: %s -- Password: %s [end line]\n", ssid, psk);
     int errorcode = cyw43_arch_wifi_connect_timeout_ms(ssid, psk, CYW43_AUTH_WPA2_AES_PSK, timeout);
     if (errorcode != 0) {
-        printf("Failed to connect. Error: %i\n", errorcode);
+        DEBUG_PRINT_FUNCTION("Failed to connect. Error: %i", errorcode);
         return false;
     } else {
-        printf("Device IP: %s\nConnected.\n", ip4addr_ntoa(netif_ip4_addr(netif_list)));
+        DEBUG_PRINT_FUNCTION("Device IP: %s", ip4addr_ntoa(netif_ip4_addr(netif_list)));
+        DEBUG_PRINT_FUNCTION("Connected.");
     }
     return true;
 }
@@ -215,7 +216,7 @@ bool PicoW_Connect_WiFi(char *ssid, char *psk, uint32_t timeout){
 bool check_and_reconnect_wifi(char *ssid, char *psk, uint32_t timeout) {
     int errorcode = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
     if (errorcode != CYW43_LINK_UP) {
-        printf("Wi-Fi disconnected. Reconnecting...\n");
+        DEBUG_PRINT_FUNCTION("Wi-Fi disconnected. Reconnecting...");
         
         cyw43_arch_disable_sta_mode();
         sleep_ms(1000);  // Espera um pouco antes de tentar de novo
@@ -224,10 +225,10 @@ bool check_and_reconnect_wifi(char *ssid, char *psk, uint32_t timeout) {
 
         int errorcode = cyw43_arch_wifi_connect_timeout_ms(ssid, psk, CYW43_AUTH_WPA2_AES_PSK, timeout);
         if (errorcode != 0) {
-            printf("Reconnect failed: %i\n", errorcode);
+            DEBUG_PRINT_FUNCTION("Reconnect failed: %i", errorcode);
             return false;
         } else {
-            printf("Wi-Fi reconnected. IP: %s\n", ip4addr_ntoa(netif_ip4_addr(netif_list)));
+            DEBUG_PRINT_FUNCTION("Wi-Fi reconnected. IP: %s", ip4addr_ntoa(netif_ip4_addr(netif_list)));
             return true;
         }
     }
@@ -377,7 +378,7 @@ void main(){
             }
         }
     }else{
-        printf("Error during WiFi connection!\n");
+        DEBUG_PRINT_FUNCTION("Error during WiFi connection!");
         while(true){
             LED_ON;
             busy_wait_us(MS(300));

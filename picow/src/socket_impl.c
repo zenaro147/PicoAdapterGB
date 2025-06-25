@@ -1,5 +1,6 @@
 #include "socket_impl.h"
 #include "picow_socket.h"
+#include "globals.h"
 
 #include "pico/cyw43_arch.h"
 
@@ -9,7 +10,7 @@ uint16_t buffrx_lastpos = 0;
 
 bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport, void *user){    
 
-    // if (state->tcp_pcb == NULL && state->udp_pcb == NULL) return false;
+    if (state->tcp_pcb != NULL || state->udp_pcb != NULL) return false;
 
     switch (addrtype) {
         case MOBILE_ADDRTYPE_IPV4:
@@ -68,10 +69,10 @@ void socket_impl_close(struct socket_impl *state){
                     tcp_err(state->tcp_pcb, NULL);
                     err = tcp_close(state->tcp_pcb);
                     if (err != ERR_OK) {
-                        printf("close failed %d, calling abort\n", err);
+                        DEBUG_PRINT_FUNCTION("Socket close failed %d, calling abort", err);
                         tcp_abort(state->tcp_pcb);
                     }else{
-                        printf("TCP Socket Closed.\n");
+                        DEBUG_PRINT_FUNCTION("Socket Closed.");
                     }
                     state->tcp_pcb = NULL;
                 }
@@ -377,10 +378,10 @@ void socket_impl_close_commands(struct socket_impl *state){
                 tcp_err(state->tcp_pcb, NULL);
                 err = tcp_close(state->tcp_pcb);
                 if (err != ERR_OK) {
-                     printf("close failed %d, calling abort\n", err);
+                     DEBUG_PRINT_FUNCTION("Socket close failed %d, calling abort", err);
                     tcp_abort(state->tcp_pcb);
                 }else{
-                    printf("TCP Socket Closed.\n");
+                    DEBUG_PRINT_FUNCTION("Socket Closed.");
                 }
                 state->tcp_pcb = NULL;
             }

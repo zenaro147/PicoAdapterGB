@@ -1,0 +1,8 @@
+build/
+.git/
+*.o
+*.a
+*.elf
+*.uf2
+*.bin
+*.hex

@@ -16,17 +16,12 @@ cmake_minimum_required(VERSION 3.12)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
-if(NOT BUILD STREQUAL "DEBUG")
-    set(CMAKE_BUILD_TYPE "Release")
-    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-endif()
-
 #set(LIBMOBILE_ENABLE_NO32BIT ON)
 set(ADAPTER "REON" CACHE STRING "The adapter pinout to build for, options are: 'REON', 'STACKSMASHING'.")
 set_property(CACHE ADAPTER PROPERTY STRINGS "REON;STACKSMASHING")
 
 if(NOT (PICO_BOARD MATCHES "pico_w|pico2_w"))
-    message(WARNING "Unknown board '${PICO_BOARD}', using 'pico_w' instead")
+    message("Unknown board '${PICO_BOARD}', using 'pico_w' instead")
     set(PICO_BOARD pico_w CACHE STRING "Board type")
     set(PICO_PLATFORM "rp2040")    
     add_compile_definitions(BOARD_PICOW)

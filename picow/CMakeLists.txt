@@ -35,8 +35,8 @@ target_include_directories(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} PRIV
 target_link_libraries(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} libmobile_static pico_stdlib hardware_pio hardware_flash pico_cyw43_arch_lwip_poll)
 
 # disable usb output, enable uart output
-if(BUILD STREQUAL "DEBUG")
-    message(WARNING "USING DEBUG MODE: USB output disabled, UART output enabled")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message("USING DEBUG MODE: USB output disabled, UART output enabled")
     pico_enable_stdio_usb(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} 0)
     pico_enable_stdio_uart(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} 1)
 else()

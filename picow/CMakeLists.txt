@@ -12,14 +12,13 @@ else()
     set(ProjOutputType "")
 endif()
 
+file(GLOB_RECURSE SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c"
+)
+
 add_executable(${PROJECT_NAME}${ProjBoardType}${ProjOutputType}
-    	        src/main.c 
-                src/config_menu.c
-                src/flash_eeprom.c 
-                src/picow_socket.c 
-                src/socket_impl.c
-                src/sync.c
-                src/pio/linkcable.c)
+    ${SOURCES}
+)
 
 # Add PIO code
 if(ADAPTER STREQUAL "REON")

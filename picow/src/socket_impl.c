@@ -246,6 +246,10 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
     //If the socket is a TCP and don't have any buff, check if it's disconnected to return an error
     if(state->sock_type == SOCK_TCP && state->buffer_rx_len <= 0){
         if(!data){
+            // PCB already closed by socket_recv_tcp (remote FIN received)
+            if (state->tcp_pcb == NULL) {
+                return -2;
+            }
             // CLOSED      = 0,
             // LISTEN      = 1,
             // SYN_SENT    = 2,
@@ -274,7 +278,7 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
                     break;
             }
         }
-        if((state->tcp_pcb->state == CLOSED || !state->tcp_pcb)){
+        if((!state->tcp_pcb || state->tcp_pcb->state == CLOSED)){
             return -2;
         }     
     }

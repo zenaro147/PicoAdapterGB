@@ -8,8 +8,9 @@ This is the first standalone implementation of [Mobile Adapter GB](https://bulba
 It's possible to connect to any [REON project](https://github.com/REONTeam/reon) custom server as soon it releases.
 
 ## Development Status
-Latest Stable Release  [![Release Version](https://img.shields.io/github/v/release/zenaro147/PicoAdapterGB?style=plastic)](https://github.com/zenaro147/PicoAdapterGB/releases/latest/)  [![Release Date](https://img.shields.io/github/release-date/zenaro147/PicoAdapterGB?style=plastic)](https://github.com/zenaro147/PicoAdapterGB/releases/latest/)
-<br>Latest Development Release  [![Release Version](https://img.shields.io/github/release/zenaro147/PicoAdapterGB/all.svg?style=plastic)](https://github.com/zenaro147/PicoAdapterGB/releases/) [![Release Date](https://img.shields.io/github/release-date-pre/zenaro147/PicoAdapterGB.svg?style=plastic)](https://github.com/zenaro147/PicoAdapterGB/releases/) 
+Latest Stable Release  [![Release Version](https://img.shields.io/github/v/release/zenaror/PicoAdapterGB?style=plastic)](https://github.com/zenaror/PicoAdapterGB/releases/latest/)  [![Release Date](https://img.shields.io/github/release-date/zenaror/PicoAdapterGB?style=plastic)](https://github.com/zenaror/PicoAdapterGB/releases/latest/)<br>
+Latest Beta Release  [![Beta Version](https://img.shields.io/github/v/release/zenaror/PicoAdapterGB?include_prereleases&filter=beta-*%26style=plastic)](https://github.com/zenaror/PicoAdapterGB/releases?q=beta-)  [![Beta Release Date](https://img.shields.io/github/release-date-pre/zenaror/PicoAdapterGB?style=plastic)](https://github.com/zenaror/PicoAdapterGB/releases?q=beta-)<br>
+Bleeding Edge  [![Bleeding Edge](https://img.shields.io/github/v/release/zenaror/PicoAdapterGB?filter=bleeding-edge&style=plastic)](https://github.com/zenaror/PicoAdapterGB/releases/tag/bleeding-edge)
 
 If you still have questions, ask us here or in the **REON Team Discord** [![Discord Group](https://img.shields.io/badge/chat-on%20Discord-738ADB)](https://discord.gg/mKT4pTfUqC)
 

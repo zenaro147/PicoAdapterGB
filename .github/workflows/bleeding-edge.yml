@@ -2,9 +2,6 @@ name: PicoAdapterGB Bleeding Edge
 
 on:
   workflow_dispatch:
-  # push:
-  #   branches:
-  #     - develop
 
 permissions:
   contents: read

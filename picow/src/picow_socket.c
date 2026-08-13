@@ -48,7 +48,7 @@ err_t socket_connected_tcp(void *arg, struct tcp_pcb *pcb, err_t err) {
     if (err != ERR_OK) {
         // printf("connect failed %d\n", err);
     }else{
-        //  printf("TCP connected!\n");
+        // printf("TCP connected!\n");
     }
     return err;
 }
@@ -56,7 +56,8 @@ err_t socket_connected_tcp(void *arg, struct tcp_pcb *pcb, err_t err) {
 void socket_err_tcp(void *arg, err_t err){
     struct mobile_user *mobile = (struct mobile_user*)arg;
     struct socket_impl *state = &mobile->socket[mobile->currentReqSocket];
-    printf("TCP Generic Error %d\n", err);
+    state->socket_status = err;
+    DEBUG_PRINT_FUNCTION("TCP Generic Error %d", err);
 }
 
 err_t socket_accept_tcp(void *arg, struct tcp_pcb *pcb, err_t err){
@@ -101,6 +102,7 @@ err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
     struct mobile_user *mobile = (struct mobile_user*)arg;
     struct socket_impl *state = &mobile->socket[mobile->currentReqSocket];
     // printf("TCP Receiving...\n");
+    state->pending_close = true;
     if(p){
         if (p->tot_len > 0) {
             int copiedBytes = 0;
@@ -131,20 +133,20 @@ err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
             pbuf_free(p);
         }
     }else{
-        err = tcp_close(state->tcp_pcb);
-        if (err != ERR_OK) {
-            // printf("close failed %d, calling abort\n", err);
-            tcp_abort(state->tcp_pcb);
-            err = ERR_ABRT;
-        }
         tcp_arg(state->tcp_pcb, NULL);
         //tcp_poll(state->tcp_pcb, NULL, 0);
         tcp_accept(state->tcp_pcb, NULL);
         tcp_sent(state->tcp_pcb, NULL);
         tcp_recv(state->tcp_pcb, NULL);
         tcp_err(state->tcp_pcb, NULL);
-        state->tcp_pcb = 0x0;
+        err = tcp_close(state->tcp_pcb);
+        if (err != ERR_OK) {
+            // printf("close failed %d, calling abort\n", err);
+            tcp_abort(state->tcp_pcb);
+            err = ERR_ABRT;
+        }
         state->tcp_pcb = NULL;
     }
+    state->pending_close = false;
     return err;
 }

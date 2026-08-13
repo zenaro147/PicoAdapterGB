@@ -112,17 +112,32 @@ bool FindCommand(char * buf, char * target){
 void BootMenuConfig(void *user){
     struct mobile_user *mobile = (struct mobile_user *)user;
 
-    int UserInput;
-    printf("Press any key to enter in Setup Mode...\n");
-    UserInput = getchar_timeout_us(SEC(5));
-    if(UserInput != PICO_ERROR_TIMEOUT){
+    printf("Press ENTER to enter in Setup Mode...\n");
+
+    // Wait for a real line terminator: CR or LF. Ignore any stray bytes before
+    // that, as serial monitors often send characters and CRLF together.
+    int UserInput = PICO_ERROR_TIMEOUT;
+    bool enteredSetup = false;
+    while (1) {
+        UserInput = getchar_timeout_us(SEC(5));
+        if (UserInput == PICO_ERROR_TIMEOUT) {
+            break;
+        }
+        if (UserInput == '\r' || UserInput == '\n') {
+            enteredSetup = true;
+            break;
+        }
+        // Ignore stray characters until the real Enter is received.
+    }
+
+    if(enteredSetup){
         char UserCMD[520] = {0};
-        char temp;
         bool needSave = false;
 
         //Libmobile Variables
         enum mobile_adapter_device device = MOBILE_ADAPTER_BLUE;
         bool device_unmetered = false;
+        bool change_mail_port = true;
         struct mobile_addr dns1 = (struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE};
         struct mobile_addr dns2 = (struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE};
         struct mobile_addr relay = (struct mobile_addr){.type=MOBILE_ADDRTYPE_NONE};
@@ -135,6 +150,7 @@ void BootMenuConfig(void *user){
         mobile_config_get_dns(mobile->adapter, &dns2, MOBILE_DNS2);
         mobile_config_get_relay(mobile->adapter, &relay);
         mobile_config_get_device(mobile->adapter, &device, &device_unmetered);
+        mobile_config_get_alt_mail(mobile->adapter, &change_mail_port);
         if(dns1.type != MOBILE_ADDRTYPE_NONE){
             switch (dns1.type)
             {
@@ -157,19 +173,34 @@ void BootMenuConfig(void *user){
             }
         }
 
-        scanf("%c",&temp); // temp statement to clear buffer for \r
-        scanf("%c",&temp); // temp statement to clear buffer for \n
-
         while(1){
+            // Limpa finais de linha residuais do buffer antes de ler o próximo comando
+            int temp;
+            while (1) {
+                temp = getchar_timeout_us(0);
+                if (temp == '\r' || temp == '\n') continue;
+                if (temp == PICO_ERROR_TIMEOUT) break;
+                break;
+            }
             printf("Enter a command: \n");
-            fgets(UserCMD,sizeof(UserCMD),stdin);
-            //Remove \r\n from the fgets
+            // Leitura manual para máxima compatibilidade de final de linha
+            int idx = 0, c;
+            memset(UserCMD, 0, sizeof(UserCMD));
+            while (idx < sizeof(UserCMD) - 1) {
+                c = getchar_timeout_us(60 * 1000 * 1000); // 60 segundos de timeout
+                if (c == PICO_ERROR_TIMEOUT) break;
+                if (c == '\r' || c == '\n') break;
+                UserCMD[idx++] = (char)c;
+            }
+            UserCMD[idx] = '\0';
+
+            //Remove \r\n from a possível fgets
             for (int i = 0; i < strlen(UserCMD); i++) {
-                if(UserCMD[i]=='\r' && UserCMD[i+1] == '\n' && UserCMD[i+2] == '\0'){
-                    UserCMD[i]='\0';
+                if (UserCMD[i] == '\r' || UserCMD[i] == '\n') {
+                    UserCMD[i] = '\0';
                     break;
                 }
-            } 
+            }
 
             //Set the new WiFi SSID
             if(FindCommand(UserCMD,"WIFISSID=")){
@@ -419,6 +450,33 @@ void BootMenuConfig(void *user){
                     printf("Invalid parameter.\n");
                 } 
             
+            //Set the SMTP port redirection
+            }else if(FindCommand(UserCMD,"NOREDIRMAIL=")){
+                if(strlen(UserCMD)-12 == 1){
+                    switch (UserCMD[12]){
+                        case '0':
+                            change_mail_port=true;
+                            break;
+                        case '1':
+                            change_mail_port=false;
+                            break;
+                        default:
+                            printf("Invalid parameter. Applying default value.\n");
+                            change_mail_port=true;
+                            break;
+                    }
+                    mobile_config_set_alt_mail(mobile->adapter, change_mail_port);
+                    printf("New Mail Port Redirection value defined.\n");
+                    needSave=true;
+                }else if(strlen(UserCMD)-12 == 0){
+                    change_mail_port=true;
+                    mobile_config_set_alt_mail(mobile->adapter, change_mail_port);
+                    printf("Default Mail Port Redirection value defined.\n");
+                    needSave=true;
+                }else{
+                    printf("Invalid parameter.\n");
+                } 
+            
             //Format the entire EEPROM, if necessary
             }else if(FindCommand(UserCMD,"FORMAT_EEPROM")){
                 printf("Formatting...\n");
@@ -512,7 +570,8 @@ void BootMenuConfig(void *user){
                     }
                     break;
                 }
-                printf("Is Unmetered: %s\n\n", device_unmetered == true ? "Yes":"No");
+                printf("Is Unmetered: %s\n", device_unmetered == true ? "Yes":"No");
+                printf("Redirect Mail Port: %s\n\n", change_mail_port == true ? "Yes":"No");
 
             }else if(FindCommand(UserCMD,"HELP")){
                 printf("Command Sintax: <COMMAND>=<VALUE>\n");
@@ -528,7 +587,8 @@ void BootMenuConfig(void *user){
                 printf("RELAYTOKEN    | Set a Relay Token that will be used on Relay Server to receive a valid number to use during P2P communications.\n");
                 printf("P2PPORT       | Set a custom P2P port to use during P2P communications (Local Network only).\n");
                 printf("DEVICE        | Set the Device to emulate (BLUE, RED or YELLOW).\n");
-                printf("UNMETERED     | Set if the device will be Unmetered (useful for Pokemon Crystal). Only accept 1 (true) or 0 (false).\n\n");
+                printf("UNMETERED     | Set if the device will be Unmetered (useful for Pokemon Crystal). Only accept 1 (true) or 0 (false).\n");
+                printf("NOREDIRMAIL   | Set the device to only use port 25 for SMTP communication.\n\n");
 
                 printf("Special commands (just enter the command, without =<VALUE>):\n");
                 printf("FORMAT_EEPROM | Format the eeprom, if necessary.\n");
@@ -545,7 +605,6 @@ void BootMenuConfig(void *user){
 
         if(needSave){
             printf("Saving new configs...\n");
-
             //Save new Configs
             mobile_config_save(mobile->adapter);
             struct saved_data_pointers ptrs;

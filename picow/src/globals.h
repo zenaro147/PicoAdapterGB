@@ -3,8 +3,23 @@
 #include <mobile.h>
 #include "socket_impl.h"
 
-#define PICO_ADAPTER_HARDWARE "PicoW"
-#define PICO_ADAPTER_SOFTWARE "1.5.3"
+#ifdef BOARD_PICO2W
+    #define PICO_ADAPTER_HARDWARE "Pico2W"
+#else
+    #ifdef BOARD_PICOW
+         #define PICO_ADAPTER_HARDWARE "PicoW"
+    #else
+         #define PICO_ADAPTER_HARDWARE "Pico+ESP"
+    #endif   
+#endif
+
+#ifdef STACKSMASHING
+    #define PICO_ADAPTER_PINOUT "StackSmashing"
+#else    
+    #define PICO_ADAPTER_PINOUT "REON"
+#endif
+
+#define PICO_ADAPTER_SOFTWARE "1.5.6-beta"
 
 //#define DEBUG_SIGNAL_PINS
 
@@ -30,10 +45,10 @@ typedef uint64_t                user_time_t;
 #define TIME_SENSITIVE(x) __not_in_flash_func(x)
 
 #ifndef TIME_SENSITIVE
-#define TIME_SENSITIVE(x) x
+    #define TIME_SENSITIVE(x) x
 #endif
 
-#define DEBUG_PRINT_FUNCTION(x) printf(x)
+#define DEBUG_PRINT_FUNCTION(fmt, ...) printf("[PicoAdapterGB] " fmt "\n", ##__VA_ARGS__)
 #define EEPROM_SIZE MOBILE_CONFIG_SIZE
 
 struct mobile_user {

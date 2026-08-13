@@ -315,11 +315,14 @@ jobs:
         run: |
           gh release delete bleeding-edge --yes --cleanup-tag || true
 
-          gh release create bleeding-edge \
-            --target develop \
-            --title "PicoAdapterGB Bleeding Edge" \
-            --prerelease \
-            --notes "Automated bleeding-edge build from develop.
+          for attempt in 1 2 3 4 5; do
+            echo "Creating Bleeding Edge release (attempt $attempt/5)..."
+
+            if gh release create bleeding-edge \
+              --target develop \
+              --title "PicoAdapterGB Bleeding Edge" \
+              --prerelease \
+              --notes "Automated bleeding-edge build from develop.
 
           Commit: ${GITHUB_SHA}
 
@@ -328,4 +331,16 @@ jobs:
           - Pico W / STACKSMASHING
           - Pico 2 W / REON
           - Pico 2 W / STACKSMASHING" \
-            release/*.uf2
+              release/*.uf2; then
+              echo "Bleeding Edge release created successfully."
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 5 ]; then
+              echo "GitHub API failed. Waiting 15 seconds before retry..."
+              sleep 15
+            fi
+          done
+
+          echo "Failed to create Bleeding Edge release after 5 attempts."
+          exit 1

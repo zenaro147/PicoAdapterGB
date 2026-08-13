@@ -280,6 +280,12 @@ jobs:
       actions: read
 
     steps:
+      - name: Checkout PicoAdapterGB
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 1
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:

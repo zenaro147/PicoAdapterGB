@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - develop
-
   workflow_dispatch:
 
 permissions:
@@ -13,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    name: Build ${{ matrix.adapter }} / ${{ matrix.board_name }}
+    name: ${{ matrix.board_name }} - ${{ matrix.adapter }}
     runs-on: ubuntu-22.04
 
     strategy:
@@ -24,43 +23,49 @@ jobs:
             board: pico_w
             board_name: PicoW
             target: PicoAdapterGB_PicoW
-            artifact_name: PicoAdapterGB-REON-PicoW.uf2
+            firmware: PicoAdapterGB-REON-PicoW.uf2
 
           - adapter: STACKSMASHING
             board: pico_w
             board_name: PicoW
             target: PicoAdapterGB_PicoW_SmBoard
-            artifact_name: PicoAdapterGB-STACKSMASHING-PicoW.uf2
+            firmware: PicoAdapterGB-STACKSMASHING-PicoW.uf2
 
           - adapter: REON
             board: pico2_w
             board_name: Pico2W
             target: PicoAdapterGB_Pico2W
-            artifact_name: PicoAdapterGB-REON-Pico2W.uf2
+            firmware: PicoAdapterGB-REON-Pico2W.uf2
 
           - adapter: STACKSMASHING
             board: pico2_w
             board_name: Pico2W
             target: PicoAdapterGB_Pico2W_SmBoard
-            artifact_name: PicoAdapterGB-STACKSMASHING-Pico2W.uf2
+            firmware: PicoAdapterGB-STACKSMASHING-Pico2W.uf2
 
     env:
       PICO_SDK_VERSION: 2.1.1
-      PICO_TOOLCHAIN_VERSION: 14_2_Rel1
-      PICOTOOL_VERSION: 2.1.1
 
     steps:
       - name: Checkout PicoAdapterGB
         uses: actions/checkout@v4
         with:
           ref: develop
-          submodules: recursive
           fetch-depth: 1
+          submodules: recursive
 
-      - name: Install build dependencies
+      - name: Checkout Pico SDK
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-sdk
+          ref: 2.1.1
+          path: pico-sdk
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Install dependencies
         run: |
           sudo apt-get update
-
           sudo apt-get install -y \
             cmake \
             ninja-build \
@@ -71,95 +76,77 @@ jobs:
             libnewlib-arm-none-eabi \
             libstdc++-arm-none-eabi-newlib
 
-      - name: Checkout Pico SDK
-        uses: actions/checkout@v4
-        with:
-          repository: raspberrypi/pico-sdk
-          ref: ${{ env.PICO_SDK_VERSION }}
-          path: pico-sdk
-          submodules: recursive
-          fetch-depth: 1
-
-      - name: Configure CMake
+      - name: Configure
         env:
           PICO_SDK_PATH: ${{ github.workspace }}/pico-sdk
         run: |
-          cmake -S . -B build \
+          cmake \
+            -S . \
+            -B build \
             -G Ninja \
             -DPICO_SDK_PATH="${PICO_SDK_PATH}" \
             -DPICO_BOARD="${{ matrix.board }}" \
             -DADAPTER="${{ matrix.adapter }}" \
             -DCMAKE_BUILD_TYPE=Release
 
-      - name: Build firmware
+      - name: Build
         run: |
-          cmake --build build \
+          cmake \
+            --build build \
             --target "${{ matrix.target }}" \
             --parallel
 
-      - name: Verify firmware
+      - name: Verify UF2
         run: |
           UF2="build/${{ matrix.target }}.uf2"
 
-          if [ ! -f "$UF2" ]; then
-            echo "::error::Expected UF2 was not generated: $UF2"
-            echo ""
-            echo "Generated firmware files:"
-            find build -type f \
-              \( -name "*.uf2" -o -name "*.bin" -o -name "*.hex" -o -name "*.elf" \) \
-              -print
+          if [ ! -f "${UF2}" ]; then
+            echo "::error::UF2 not found: ${UF2}"
+            echo "Generated files:"
+            find build -type f -print
             exit 1
           fi
 
-          echo "Firmware generated successfully:"
-          ls -lh "$UF2"
+          echo "Generated firmware:"
+          ls -lh "${UF2}"
 
       - name: Prepare artifact
-        env:
-          ADAPTER: ${{ matrix.adapter }}
-          BOARD: ${{ matrix.board }}
-          BOARD_NAME: ${{ matrix.board_name }}
-          TARGET: ${{ matrix.target }}
-          ARTIFACT_NAME: ${{ matrix.artifact_name }}
         run: |
           mkdir -p artifact
 
-          cp "build/${TARGET}.uf2" \
-             "artifact/${ARTIFACT_NAME}"
+          cp \
+            "build/${{ matrix.target }}.uf2" \
+            "artifact/${{ matrix.firmware }}"
 
           cat > artifact/build-info.txt <<EOF
-          PicoAdapterGB Bleeding Edge
+PicoAdapterGB Bleeding Edge
 
-          Repository: ${GITHUB_REPOSITORY}
-          Branch: develop
+Repository: ${GITHUB_REPOSITORY}
+Branch: develop
 
-          Commit: ${GITHUB_SHA}
-          Commit short: ${GITHUB_SHA::7}
+Commit: ${GITHUB_SHA}
+Commit short: ${GITHUB_SHA::7}
 
-          Adapter: ${ADAPTER}
-          Board: ${BOARD}
-          Board name: ${BOARD_NAME}
+Adapter: ${{ matrix.adapter }}
+Board: ${{ matrix.board }}
+Board name: ${{ matrix.board_name }}
 
-          Pico SDK: ${PICO_SDK_VERSION}
-          Toolchain: ${PICO_TOOLCHAIN_VERSION}
-          Picotool: ${PICOTOOL_VERSION}
+CMake target: ${{ matrix.target }}
+Pico SDK: ${PICO_SDK_VERSION}
+Build type: Release
 
-          Build type: Release
-          CMake target: ${TARGET}
+Workflow run: ${GITHUB_RUN_NUMBER}
+Workflow URL: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+EOF
 
-          Workflow run: ${GITHUB_RUN_NUMBER}
-          Workflow URL: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
-          EOF
+          echo "Artifact:"
+          find artifact -type f -maxdepth 1 -print
 
-          echo ""
-          echo "Artifact contents:"
-          find artifact -type f -maxdepth 2 -print
-
-      - name: Upload bleeding-edge artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: PicoAdapterGB-bleeding-edge-${{ matrix.board_name }}-${{ matrix.adapter }}-${{ github.sha }}
-          path: artifact/
+          path: artifact
           if-no-files-found: error
           retention-days: 14
 ```

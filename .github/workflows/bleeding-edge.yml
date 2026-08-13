@@ -1,0 +1,346 @@
+name: PicoAdapterGB Bleeding Edge
+
+on:
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  pico_w_reon:
+    name: Pico W - REON
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout PicoAdapterGB
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Checkout Pico SDK
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-sdk
+          ref: 2.1.1
+          path: pico-sdk
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DPICO_SDK_PATH="${GITHUB_WORKSPACE}/pico-sdk" \
+            -DPICO_BOARD=pico_w \
+            -DADAPTER=REON \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cmake --build build --target PicoAdapterGB_PicoW --parallel
+
+      - name: Verify
+        run: |
+          test -f build/release/REON/PicoW/PicoAdapterGB_PicoW.uf2
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p artifact
+          cp build/release/REON/PicoW/PicoAdapterGB_PicoW.uf2 artifact/PicoAdapterGB-REON-PicoW.uf2
+
+          printf '%s\n' \
+            'PicoAdapterGB Bleeding Edge' \
+            '' \
+            "Branch: develop" \
+            "Commit: ${GITHUB_SHA}" \
+            "Adapter: REON" \
+            "Board: pico_w" \
+            "Pico SDK: 2.1.1" \
+            > artifact/build-info.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PicoAdapterGB-bleeding-edge-PicoW-REON
+          path: artifact
+          retention-days: 14
+
+  pico_w_stacksmashing:
+    name: Pico W - STACKSMASHING
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout PicoAdapterGB
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Checkout Pico SDK
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-sdk
+          ref: 2.1.1
+          path: pico-sdk
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DPICO_SDK_PATH="${GITHUB_WORKSPACE}/pico-sdk" \
+            -DPICO_BOARD=pico_w \
+            -DADAPTER=STACKSMASHING \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cmake --build build --target PicoAdapterGB_PicoW_SmBoard --parallel
+
+      - name: Verify
+        run: |
+          test -f build/release/SmBoard/PicoW/PicoAdapterGB_PicoW_SmBoard.uf2
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p artifact
+          cp build/release/SmBoard/PicoW/PicoAdapterGB_PicoW_SmBoard.uf2 artifact/PicoAdapterGB-STACKSMASHING-PicoW.uf2
+
+          printf '%s\n' \
+            'PicoAdapterGB Bleeding Edge' \
+            '' \
+            "Branch: develop" \
+            "Commit: ${GITHUB_SHA}" \
+            "Adapter: STACKSMASHING" \
+            "Board: pico_w" \
+            "Pico SDK: 2.1.1" \
+            > artifact/build-info.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PicoAdapterGB-bleeding-edge-PicoW-STACKSMASHING
+          path: artifact
+          retention-days: 14
+
+  pico2_w_reon:
+    name: Pico 2 W - REON
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout PicoAdapterGB
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Checkout Pico SDK
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-sdk
+          ref: 2.1.1
+          path: pico-sdk
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DPICO_SDK_PATH="${GITHUB_WORKSPACE}/pico-sdk" \
+            -DPICO_BOARD=pico2_w \
+            -DADAPTER=REON \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cmake --build build --target PicoAdapterGB_Pico2W --parallel
+
+      - name: Verify
+        run: |
+          test -f build/release/REON/Pico2W/PicoAdapterGB_Pico2W.uf2
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p artifact
+          cp build/release/REON/Pico2W/PicoAdapterGB_Pico2W.uf2 artifact/PicoAdapterGB-REON-Pico2W.uf2
+
+          printf '%s\n' \
+            'PicoAdapterGB Bleeding Edge' \
+            '' \
+            "Branch: develop" \
+            "Commit: ${GITHUB_SHA}" \
+            "Adapter: REON" \
+            "Board: pico2_w" \
+            "Pico SDK: 2.1.1" \
+            > artifact/build-info.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PicoAdapterGB-bleeding-edge-Pico2W-REON
+          path: artifact
+          retention-days: 14
+
+  pico2_w_stacksmashing:
+    name: Pico 2 W - STACKSMASHING
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout PicoAdapterGB
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Checkout Pico SDK
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-sdk
+          ref: 2.1.1
+          path: pico-sdk
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DPICO_SDK_PATH="${GITHUB_WORKSPACE}/pico-sdk" \
+            -DPICO_BOARD=pico2_w \
+            -DADAPTER=STACKSMASHING \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cmake --build build --target PicoAdapterGB_Pico2W_SmBoard --parallel
+
+      - name: Verify
+        run: |
+          test -f build/release/SmBoard/Pico2W/PicoAdapterGB_Pico2W_SmBoard.uf2
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p artifact
+          cp build/release/SmBoard/Pico2W/PicoAdapterGB_Pico2W_SmBoard.uf2 artifact/PicoAdapterGB-STACKSMASHING-Pico2W.uf2
+
+          printf '%s\n' \
+            'PicoAdapterGB Bleeding Edge' \
+            '' \
+            "Branch: develop" \
+            "Commit: ${GITHUB_SHA}" \
+            "Adapter: STACKSMASHING" \
+            "Board: pico2_w" \
+            "Pico SDK: 2.1.1" \
+            > artifact/build-info.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PicoAdapterGB-bleeding-edge-Pico2W-STACKSMASHING
+          path: artifact
+          retention-days: 14
+  
+  publish_bleeding_edge:
+    name: Publish Bleeding Edge Release
+    runs-on: ubuntu-22.04
+
+    needs:
+      - pico_w_reon
+      - pico_w_stacksmashing
+      - pico2_w_reon
+      - pico2_w_stacksmashing
+
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Checkout PicoAdapterGB
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 1
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+
+          cp artifacts/PicoAdapterGB-bleeding-edge-PicoW-REON/PicoAdapterGB-REON-PicoW.uf2 \
+            release/PicoAdapterGB-REON-PicoW.uf2
+
+          cp artifacts/PicoAdapterGB-bleeding-edge-PicoW-STACKSMASHING/PicoAdapterGB-STACKSMASHING-PicoW.uf2 \
+            release/PicoAdapterGB-STACKSMASHING-PicoW.uf2
+
+          cp artifacts/PicoAdapterGB-bleeding-edge-Pico2W-REON/PicoAdapterGB-REON-Pico2W.uf2 \
+            release/PicoAdapterGB-REON-Pico2W.uf2
+
+          cp artifacts/PicoAdapterGB-bleeding-edge-Pico2W-STACKSMASHING/PicoAdapterGB-STACKSMASHING-Pico2W.uf2 \
+            release/PicoAdapterGB-STACKSMASHING-Pico2W.uf2
+
+          ls -lh release
+
+      - name: Create Bleeding Edge release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete bleeding-edge --yes --cleanup-tag || true
+
+          for attempt in 1 2 3 4 5; do
+            echo "Creating Bleeding Edge release (attempt $attempt/5)..."
+
+            if gh release create bleeding-edge \
+              --target develop \
+              --title "PicoAdapterGB Bleeding Edge" \
+              --latest=false \
+              --notes "Automated bleeding-edge build from develop.
+
+          Commit: ${GITHUB_SHA}
+
+          Included builds:
+          - Pico W / REON
+          - Pico W / STACKSMASHING
+          - Pico 2 W / REON
+          - Pico 2 W / STACKSMASHING" \
+              release/*.uf2; then
+              echo "Bleeding Edge release created successfully."
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 5 ]; then
+              echo "GitHub API failed. Waiting 15 seconds before retry..."
+              sleep 15
+            fi
+          done
+
+          echo "Failed to create Bleeding Edge release after 5 attempts."
+          exit 1

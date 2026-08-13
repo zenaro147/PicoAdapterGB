@@ -1,11 +1,15 @@
 ////////////////////////////////////
 // -- MOBILE_ENABLE_NO32BIT - try to build with this option enabled to handle GBA games
+// -- /usr/local/bin/openocd -f interface/cmsis-dap.cfg -f target/rp2350.cfg
+// -- cd "/media/rafael/Dados/_BACKUP/Arquivos/Projetos/Gameboy Projects/MobileAdapterGB/libmobile-bgb" \
+// -- && build/mobile --dns1 18.223.26.183 --unmetered --relay 192.168.1.9 --relay-token "A96F8F0226A2E6C4A2C13689413BB09E"
 ////////////////////////////////////
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "pico/stdlib.h"
+#include "pico/multicore.h"
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
 #include "pico/cyw43_arch.h"
@@ -17,6 +21,7 @@
 #include "config_menu.h"
 #include "flash_eeprom.h"
 #include "picow_socket.h"
+#include "web_config.h"
 #include "pio/linkcable.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,6 +40,11 @@ static user_time_t time_last_config_edit = 0;
 
 bool isLinkCable32 = false;
 bool link_cable_data_received = false;
+
+// Set by core1 the instant the Game Boy starts any communication, so the web
+// server can be torn down immediately and never re-enabled until reboot.
+static volatile bool web_should_stop = false;
+static bool web_alive = false;
 
 /////////////////////////////////
 // MOBILE ADAPTER GB FUNCTIONS //
@@ -193,6 +203,19 @@ void TIME_SENSITIVE(link_cable_ISR)(void) {
 ///////////////////////////////
 // PICO W AUXILIAR FUNCTIONS //
 ///////////////////////////////
+static const char *wifi_link_status_str(int status){
+    switch (status) {
+        case CYW43_LINK_DOWN:    return "DOWN (wifi not connected)";
+        case CYW43_LINK_JOIN:    return "JOIN (connected, no IP yet)";
+        case CYW43_LINK_NOIP:    return "NOIP (connected, no IP address)";
+        case CYW43_LINK_UP:      return "UP (connected with IP address)";
+        case CYW43_LINK_FAIL:    return "FAIL (connection failed)";
+        case CYW43_LINK_NONET:   return "NONET (SSID not found)";
+        case CYW43_LINK_BADAUTH: return "BADAUTH (authentication failure)";
+        default:                 return "UNKNOWN";
+    }
+}
+
 bool PicoW_Connect_WiFi(char *ssid, char *psk, uint32_t timeout){
 
     cyw43_pm_value(CYW43_NO_POWERSAVE_MODE,200,1,1,10);
@@ -201,13 +224,53 @@ bool PicoW_Connect_WiFi(char *ssid, char *psk, uint32_t timeout){
     //printf("Connecting to Wi-Fi... SSID: %s -- Password: %s [end line]\n", ssid, psk);
     int errorcode = cyw43_arch_wifi_connect_timeout_ms(ssid, psk, CYW43_AUTH_WPA2_AES_PSK, timeout);
     if (errorcode != 0) {
-        printf("Failed to connect. Error: %i\n", errorcode);
+        DEBUG_PRINT_FUNCTION("Failed to connect. Error: %i", errorcode);
         return false;
     } else {
-        printf("Connected.\n");
+        DEBUG_PRINT_FUNCTION("Device IP: %s", ip4addr_ntoa(netif_ip4_addr(netif_list)));
+        DEBUG_PRINT_FUNCTION("Connected.");
     }
     return true;
 }
+
+// Runs on core1 only while the web config server is alive. Watches for the
+// Game Boy's first byte transfer and signals core0 (the sole owner of
+// cyw43/lwIP) to tear the server down immediately. Never restarts itself.
+// Must stay resident in RAM: core0 disables flash XIP while saving config
+// (SaveConfig/flash_range_program), which would crash core1 if it were still
+// fetching instructions from flash at that moment.
+static void TIME_SENSITIVE(core1_web_killswitch)(void){
+    while (!link_cable_data_received) {
+        tight_loop_contents();
+    }
+    web_should_stop = true;
+    while (true) {
+        tight_loop_contents();
+    }
+}
+
+bool check_and_reconnect_wifi(char *ssid, char *psk, uint32_t timeout) {
+    int errorcode = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
+    if (errorcode != CYW43_LINK_UP) {
+        DEBUG_PRINT_FUNCTION("Wi-Fi disconnected. Reconnecting...");
+        
+        cyw43_arch_disable_sta_mode();
+        sleep_ms(1000);  // Espera um pouco antes de tentar de novo
+        cyw43_pm_value(CYW43_NO_POWERSAVE_MODE,200,1,1,10);
+        cyw43_arch_enable_sta_mode();
+
+        int errorcode = cyw43_arch_wifi_connect_timeout_ms(ssid, psk, CYW43_AUTH_WPA2_AES_PSK, timeout);
+        if (errorcode != 0) {
+            DEBUG_PRINT_FUNCTION("Reconnect failed: %i", errorcode);
+            return false;
+        } else {
+            DEBUG_PRINT_FUNCTION("Wi-Fi reconnected. IP: %s", ip4addr_ntoa(netif_ip4_addr(netif_list)));
+            return true;
+        }
+    }
+    return true;
+}
+
 
 void mobile_validate_relay(){
     struct mobile_addr relay = {0};    
@@ -229,8 +292,10 @@ void mobile_validate_relay(){
 // Main and Core1 Loop //
 /////////////////////////
 void main(){
-    speed_240_MHz = set_sys_clock_khz(240000, false);
-
+    #ifndef PICO_CYW43_ARCH_POLL
+        speed_240_MHz = set_sys_clock_khz(240000, false);
+    #endif
+    
     stdio_init_all();
     printf("Booting...\n");
     cyw43_arch_init();
@@ -278,13 +343,27 @@ void main(){
 
     mobile_config_load(mobile->adapter);
 
-    BootMenuConfig(mobile);
+    // BootMenuConfig(mobile);
 
     printf("-------------------------\nSoftware Version:\nLibmobile: %i.%i.%i\nPicoAdapterGB: %s-%s %s\n-------------------------\n",mobile_version_major,mobile_version_minor,mobile_version_patch,PICO_ADAPTER_HARDWARE,PICO_ADAPTER_PINOUT,PICO_ADAPTER_SOFTWARE);
 
     isConnectedWiFi = PicoW_Connect_WiFi(mobile->wifiSSID, mobile->wifiPASS, MS(60));
+
+    if (!isConnectedWiFi) {
+        // No usable WiFi: fall back to our own hotspot so the device can still
+        // be reached and configured. There's nothing useful to continue with,
+        // so this blocks forever; only a reboot (from the web page) gets out.
+        const char *WIFI_HOTSPOT_SSID = "PicoAdapterGB";
+        const char *WIFI_HOTSPOT_PASS = "magb!123";
+        DEBUG_PRINT_FUNCTION("Could not connect to WiFi. Starting hotspot \"PicoAdapterGB\"...", WIFI_HOTSPOT_SSID);
+        cyw43_arch_disable_sta_mode();
+        cyw43_arch_enable_ap_mode(WIFI_HOTSPOT_SSID, WIFI_HOTSPOT_PASS, CYW43_AUTH_WPA2_AES_PSK);
+        DEBUG_PRINT_FUNCTION("Hotspot up. Connect to \"%s\" and open http://192.168.4.1/", WIFI_HOTSPOT_SSID);
+        web_config_run_blocking(mobile);
+        return; // unreachable: web_config_run_blocking never returns
+    }
     
-    if(isConnectedWiFi){
+    {
         mobile->action = MOBILE_ACTION_NONE;
         mobile->number_user[0] = '\0';
         mobile->number_peer[0] = '\0';
@@ -298,6 +377,9 @@ void main(){
             memset(mobile->socket[i].udp_remote_srv,0x00,sizeof(mobile->socket[i].udp_remote_srv));
             mobile->socket[i].udp_remote_port = 0;
             mobile->socket[i].client_status = false;
+            mobile->socket[i].inside_callback = false;
+            mobile->socket[i].pending_close = false;
+            mobile->socket[i].socket_status = 0;
             memset(mobile->socket[i].buffer_rx,0x00,sizeof(mobile->socket[i].buffer_rx));
             //memset(mobile->socket[i].buffer_tx,0x00,sizeof(mobile->socket[i].buffer_tx));
             mobile->socket[i].buffer_rx_len = 0;
@@ -306,7 +388,13 @@ void main(){
         mobile->automatic_save = true;
         mobile->force_save = false;
 
-        // multicore_launch_core1(core1_context);
+        // The web setup UI is reachable from boot until the Game Boy starts
+        // talking; core1 watches for that and signals core0 (the sole lwIP
+        // owner) to tear it down. It never comes back until reboot.
+        web_config_start(mobile);
+        web_alive = true;
+        DEBUG_PRINT_FUNCTION("Web Setup available at http://%s/", ip4addr_ntoa(netif_ip4_addr(netif_list)));
+        multicore_launch_core1(core1_web_killswitch);
 
         linkcable_init(link_cable_ISR);
 
@@ -314,16 +402,27 @@ void main(){
 
         mobile_validate_relay();
 
-
         while (true) {
             // Mobile Adapter Main Loop
             mobile_loop(mobile->adapter);
+            cyw43_arch_poll();
+
+            if (web_alive && web_should_stop) {
+                web_config_stop();
+                web_alive = false;
+                DEBUG_PRINT_FUNCTION("Game Boy communication detected, Web Setup server stopped.");
+                DEBUG_PRINT_FUNCTION("WiFi status: %s", wifi_link_status_str(cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA)));
+            }
             
             for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
-                if(mobile->socket[i].tcp_pcb || mobile->socket[i].udp_pcb){
-                    cyw43_arch_poll();
-                    break;
-                } 
+                // if(mobile->socket[i].tcp_pcb || mobile->socket[i].udp_pcb){                    
+                //     cyw43_arch_poll();
+                //     check_and_reconnect_wifi(mobile->wifiSSID, mobile->wifiPASS, MS(60));
+                //     break;
+                // }
+                if (mobile->socket[i].pending_close) {
+                    socket_impl_close_commands(&mobile->socket[i]);
+                }
             }
 
             // Check if there is any new config to write on Flash
@@ -339,14 +438,6 @@ void main(){
                     LED_OFF;                    
                 }
             }
-        }
-    }else{
-        printf("Error during WiFi connection!\n");
-        while(true){
-            LED_ON;
-            busy_wait_us(MS(300));
-            LED_OFF;
-            busy_wait_us(MS(300));
         }
     }
 }

@@ -150,7 +150,7 @@ static bool save_single_config(uint8_t mirror, uint16_t position, uint16_t progr
 
 // Read flash memory and prepare the values to access the saved data
 void InitSave(void) {
-    DEBUG_PRINT_FUNCTION("Reading the target region... ");
+    DEBUG_PRINT_FUNCTION("Reading the target region...");
     uint16_t valid_progressive_numbers[TOTAL_SAVE_REGIONS];
     bool valid_regions[TOTAL_SAVE_REGIONS];
     bool found_one = false;
@@ -244,7 +244,7 @@ void ReadConfig(struct saved_data_pointers* save_ptrs) {
         memcpy(save_ptrs->wifiPASS, tmp_data.wifiPASS, PASS_LENGHT);
     
     memcpy(unused_data, tmp_data.unused, FLASH_DATA_SIZE - FINAL_FLASH_MIN_SIZE);
-    DEBUG_PRINT_FUNCTION("Done.\n");
+    DEBUG_PRINT_FUNCTION("Done.");
 }
 
 // Setup the save in the proper position, with the logic to choose where to save
@@ -273,7 +273,7 @@ void SaveConfig(struct saved_data_pointers* save_ptrs) {
         success = true;
 
     if(success) {
-        DEBUG_PRINT_FUNCTION("Done.\n");
+        DEBUG_PRINT_FUNCTION("Done.");
         
         // Update data position
         save_mirror = new_mirror;

@@ -1,3 +1,4 @@
 [submodule "dependences/libmobile"]
 	path = dependences/libmobile
-	url = https://github.com/REONTeam/libmobile.git
+	url = https://github.com/zenaro147/libmobile.git
+	branch = feature/custom-mail-port

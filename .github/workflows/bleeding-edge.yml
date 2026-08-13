@@ -264,3 +264,62 @@ jobs:
           name: PicoAdapterGB-bleeding-edge-Pico2W-STACKSMASHING
           path: artifact
           retention-days: 14
+  
+  publish_bleeding_edge:
+    name: Publish Bleeding Edge Release
+    runs-on: ubuntu-22.04
+
+    needs:
+      - pico_w_reon
+      - pico_w_stacksmashing
+      - pico2_w_reon
+      - pico2_w_stacksmashing
+
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+
+          cp artifacts/PicoAdapterGB-bleeding-edge-PicoW-REON/PicoAdapterGB-REON-PicoW.uf2 \
+            release/PicoAdapterGB-REON-PicoW.uf2
+
+          cp artifacts/PicoAdapterGB-bleeding-edge-PicoW-STACKSMASHING/PicoAdapterGB-STACKSMASHING-PicoW.uf2 \
+            release/PicoAdapterGB-STACKSMASHING-PicoW.uf2
+
+          cp artifacts/PicoAdapterGB-bleeding-edge-Pico2W-REON/PicoAdapterGB-REON-Pico2W.uf2 \
+            release/PicoAdapterGB-REON-Pico2W.uf2
+
+          cp artifacts/PicoAdapterGB-bleeding-edge-Pico2W-STACKSMASHING/PicoAdapterGB-STACKSMASHING-Pico2W.uf2 \
+            release/PicoAdapterGB-STACKSMASHING-Pico2W.uf2
+
+          ls -lh release
+
+      - name: Create Bleeding Edge release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete bleeding-edge --yes --cleanup-tag || true
+
+          gh release create bleeding-edge \
+            --target develop \
+            --title "PicoAdapterGB Bleeding Edge" \
+            --prerelease \
+            --notes "Automated bleeding-edge build from develop.
+
+          Commit: ${GITHUB_SHA}
+
+          Included builds:
+          - Pico W / REON
+          - Pico W / STACKSMASHING
+          - Pico 2 W / REON
+          - Pico 2 W / STACKSMASHING" \
+            release/*.uf2

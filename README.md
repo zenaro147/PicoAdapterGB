@@ -9,7 +9,7 @@ It's possible to connect to any [REON project](https://github.com/REONTeam/reon)
 
 ## Development Status
 Latest Stable Release  [![Release Version](https://img.shields.io/github/v/release/zenaror/PicoAdapterGB?style=plastic)](https://github.com/zenaror/PicoAdapterGB/releases/latest/)  [![Release Date](https://img.shields.io/github/release-date/zenaror/PicoAdapterGB?style=plastic)](#)<br>
-Latest Beta Release  [![Release Version](https://img.shields.io/github/release/zenaro147/PicoAdapterGB/all.svg?style=plastic)](https://github.com/zenaro147/PicoAdapterGB/releases/?q=beta-) [![Release Date](https://img.shields.io/github/release-date-pre/zenaro147/PicoAdapterGB.svg?style=plastic)](#)<br>
+Latest Beta Release  [![GitHub Release](https://img.shields.io/github/v/release/zenaror/PicoAdapterGB?include_prereleases&filter=beta*)](https://github.com/zenaro147/PicoAdapterGB/releases/?q=beta)<br>
 Bleeding Edge  [![Bleeding Edge](https://img.shields.io/github/actions/workflow/status/zenaror/PicoAdapterGB/bleeding-edge.yml?branch=develop&style=plastic&label=Bleeding%20Edge)](https://github.com/zenaror/PicoAdapterGB/releases#release-bleeding-edge)
 
 If you still have questions, ask us here or in the **REON Team Discord** [![Discord Group](https://img.shields.io/badge/chat-on%20Discord-738ADB)](https://discord.gg/mKT4pTfUqC)

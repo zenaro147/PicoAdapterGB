@@ -5,6 +5,8 @@ on:
     branches:
       - develop
 
+  workflow_dispatch:
+
 permissions:
   contents: read
 
@@ -321,7 +323,7 @@ jobs:
             if gh release create bleeding-edge \
               --target develop \
               --title "PicoAdapterGB Bleeding Edge" \
-              --latest=false \
+              --prerelease \
               --notes "Automated bleeding-edge build from develop.
 
           Commit: ${GITHUB_SHA}

@@ -15,3 +15,7 @@ void web_config_stop(void);
 // There's no valid network to fall back to, so the only way out is the user
 // rebooting the device from the web page.
 void web_config_run_blocking(struct mobile_user *mobile);
+
+static int main_parse_addr(struct mobile_addr *dest, char *argv);
+static void main_set_port(struct mobile_addr *dest, unsigned port);
+static bool web_parse_hex(unsigned char *buf, char *str, unsigned size);

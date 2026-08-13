@@ -112,10 +112,25 @@ bool FindCommand(char * buf, char * target){
 void BootMenuConfig(void *user){
     struct mobile_user *mobile = (struct mobile_user *)user;
 
-    int UserInput;
     printf("Press ENTER to enter in Setup Mode...\n");
-    UserInput = getchar_timeout_us(SEC(5));
-    if(UserInput != PICO_ERROR_TIMEOUT){
+
+    // Wait for a real line terminator: CR or LF. Ignore any stray bytes before
+    // that, as serial monitors often send characters and CRLF together.
+    int UserInput = PICO_ERROR_TIMEOUT;
+    bool enteredSetup = false;
+    while (1) {
+        UserInput = getchar_timeout_us(SEC(5));
+        if (UserInput == PICO_ERROR_TIMEOUT) {
+            break;
+        }
+        if (UserInput == '\r' || UserInput == '\n') {
+            enteredSetup = true;
+            break;
+        }
+        // Ignore stray characters until the real Enter is received.
+    }
+
+    if(enteredSetup){
         char UserCMD[520] = {0};
         bool needSave = false;
 
@@ -599,8 +614,8 @@ void BootMenuConfig(void *user){
             printf("Rebooting device...\n");
 
             LED_ON;
-            //watchdog_enable(MS(3), 0);
-            //watchdog_update();
+            watchdog_enable(MS(3), 0);
+            watchdog_update();
             while(1);
         }
     }

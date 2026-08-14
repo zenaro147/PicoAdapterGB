@@ -38,7 +38,10 @@ bool haveConfigToWrite = false;
 static user_time_t time_last_config_edit = 0;
 
 bool isLinkCable32 = false;
-bool link_cable_data_received = false;
+// Shared between the Game Boy ISR on core0 and the web shutdown watchdog on
+// core1. It must remain volatile so release builds do not cache stale values
+// across the two cores.
+volatile bool link_cable_data_received = false;
 
 // Set by core1 the instant the Game Boy starts any communication, so the web
 // server can be torn down immediately and never re-enabled until reboot.
@@ -387,11 +390,18 @@ void main(){
         mobile->automatic_save = true;
         mobile->force_save = false;
 
+        // Reset the shared cross-core gate before starting the web server. The
+        // shutdown watchdog on core1 waits for the Game Boy ISR on core0 to set
+        // link_cable_data_received; this reset keeps the startup state explicit.
+        link_cable_data_received = false;
+        web_should_stop = false;
+        web_alive = true;
+
         // The web setup UI is reachable from boot until the Game Boy starts
         // talking; core1 watches for that and signals core0 (the sole lwIP
         // owner) to tear it down. It never comes back until reboot.
         web_config_start(mobile);
-        web_alive = true;
+        
         DEBUG_PRINT_FUNCTION("Web Setup available at http://%s/", ip4addr_ntoa(netif_ip4_addr(netif_list)));
         multicore_launch_core1(core1_web_killswitch);
 

@@ -9,7 +9,6 @@
 #include "pico/cyw43_arch.h"
 #include "hardware/watchdog.h"
 
-#include "config_menu.h"
 #include "flash_eeprom.h"
 
 // No auth: this server is only reachable on the adapter's own trusted WiFi
@@ -212,18 +211,21 @@ static bool web_form_get(const char *body, const char *key, char *out, size_t ou
     return false;
 }
 
-static bool web_parse_hex(unsigned char *buf, const char *str, unsigned size){
-    if (strlen(str) < size * 2) return false;
+// Parses a hex string and stores in buf. Returns true on success, false if invalid format or buffer too small.
+// Accepts: '0'-'9', 'A'-'F', 'a'-'f'. Rejects any other character (e.g., '@', '$', 'Z').
+static bool web_parse_hex(unsigned char *buf, char *str, unsigned size) {
     unsigned char x = 0;
-    for (unsigned i = 0; i < size * 2; i++){
-        char ch = str[i];
-        if (ch >= '0' && ch <= '9') ch -= '0';
-        else if (ch >= 'A' && ch <= 'F') ch -= 'A' - 10;
-        else if (ch >= 'a' && ch <= 'f') ch -= 'a' - 10;
+    for (unsigned i = 0; i < size * 2; i++) {
+        char c = str[i];
+        if (c >= '0' && c <= '9') c -= '0';
+        else if (c >= 'A' && c <= 'F') c -= 'A' - 10;
+        else if (c >= 'a' && c <= 'f') c -= 'a' - 10;
         else return false;
+
         x <<= 4;
-        x |= ch;
-        if (i % 2 == 1){
+        x |= c;
+
+        if (i % 2 == 1) {
             buf[i / 2] = x;
             x = 0;
         }
@@ -318,6 +320,49 @@ static void handle_get_config(struct web_conn *c){
         PICO_ADAPTER_SOFTWARE);
 
     web_send_response(c, 200, "OK", "application/json", body);
+}
+
+// Parses IP address string and stores in dest. Returns 1 on success, 0 if invalid format.
+static int main_parse_addr(struct mobile_addr *dest, char *argv) {
+    if (!dest || !argv[0]) return 0;
+
+    unsigned char ip[MOBILE_INET_PTON_MAXLEN];
+    int rc = mobile_inet_pton(MOBILE_INET_PTON_ANY, argv, ip);
+
+    struct mobile_addr4 *addr4 = (struct mobile_addr4 *)dest;
+    struct mobile_addr6 *addr6 = (struct mobile_addr6 *)dest;
+
+    switch (rc) {
+        case MOBILE_INET_PTON_IPV4:
+            addr4->type = MOBILE_ADDRTYPE_IPV4;
+            memcpy(addr4->host, ip, sizeof(addr4->host));
+            return 1;
+        case MOBILE_INET_PTON_IPV6:
+            addr6->type = MOBILE_ADDRTYPE_IPV6;
+            memcpy(addr6->host, ip, sizeof(addr6->host));
+            return 1;
+        default:
+            printf("Invalid IP address\n");
+            return 0;
+    }
+}
+
+// Sets the port on an already-parsed mobile_addr (IPv4 or IPv6). Returns void.
+static void main_set_port(struct mobile_addr *dest, unsigned port) {
+    struct mobile_addr4 *addr4 = (struct mobile_addr4 *)dest;
+    struct mobile_addr6 *addr6 = (struct mobile_addr6 *)dest;
+
+    switch (dest->type) {
+        case MOBILE_ADDRTYPE_IPV4:
+            addr4->port = port;
+            return;
+        case MOBILE_ADDRTYPE_IPV6:
+            addr6->port = port;
+            return;
+        default:
+            printf("Invalid Port\n");
+            return;
+    }
 }
 
 static void handle_post_config(struct web_conn *c, const char *body){

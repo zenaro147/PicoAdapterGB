@@ -18,7 +18,6 @@
 
 #include <mobile_inet.h>
 
-#include "config_menu.h"
 #include "flash_eeprom.h"
 #include "picow_socket.h"
 #include "web_config.h"
@@ -342,8 +341,6 @@ void main(){
     mobile_def_update_number(mobile->adapter, impl_update_number);
 
     mobile_config_load(mobile->adapter);
-
-    // BootMenuConfig(mobile);
 
     printf("-------------------------\nSoftware Version:\nLibmobile: %i.%i.%i\nPicoAdapterGB: %s-%s %s\n-------------------------\n",mobile_version_major,mobile_version_minor,mobile_version_patch,PICO_ADAPTER_HARDWARE,PICO_ADAPTER_PINOUT,PICO_ADAPTER_SOFTWARE);
 

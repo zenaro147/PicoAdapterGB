@@ -196,7 +196,9 @@ void TIME_SENSITIVE(link_cable_ISR)(void) {
     }
     linkcable_flush();
     linkcable_send(data);
-    link_cable_data_received = true;
+    if (!link_cable_data_received) {
+        link_cable_data_received = true;
+    }
 }
 
 ///////////////////////////////

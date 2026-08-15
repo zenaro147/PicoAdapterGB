@@ -8,6 +8,10 @@
 void handle_get_config(struct web_conn *c);
 void handle_post_config(struct web_conn *c, const char *body);
 
+// Lightweight poll used by the page while waiting for the relay number to
+// arrive: RAM-only, unlike handle_get_config() it never re-reads flash.
+void handle_get_relay_number(struct web_conn *c);
+
 void handle_get_eeprom(struct web_conn *c);
 void handle_post_eeprom(struct web_conn *c, const char *body, int content_length);
 

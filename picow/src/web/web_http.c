@@ -14,11 +14,15 @@
 #include "net/net_hal.h"
 #include "storage/flash_eeprom.h"
 
-static struct web_conn web_conns[WEB_MAX_CONNS];
+// Allocated only while the config server is running (see web_config_listen /
+// web_config_stop): ~21KB across the two slots would otherwise sit unused in
+// SRAM for the entire time the Game Boy is being used.
+static struct web_conn *web_conns = NULL;
 struct mobile_user *web_mobile = NULL;
 static struct tcp_pcb *web_listen_pcb = NULL;
 
 static struct web_conn *web_find_free_slot(void){
+    if (!web_conns) return NULL;
     for (int i = 0; i < WEB_MAX_CONNS; i++){
         if (!web_conns[i].in_use) return &web_conns[i];
     }
@@ -276,6 +280,8 @@ static void web_dispatch(struct web_conn *c, bool is_get, bool is_post, const ch
         web_send_response(c, 200, "OK", "text/html", WEB_CONFIG_HTML);
     } else if (is_get && strcmp(path, "/api/config") == 0){
         handle_get_config(c);
+    } else if (is_get && strcmp(path, "/api/relay_number") == 0){
+        handle_get_relay_number(c);
     } else if (is_get && strcmp(path, "/api/eeprom") == 0){
         handle_get_eeprom(c);
     } else if (is_post && strcmp(path, "/api/config") == 0){
@@ -395,7 +401,9 @@ static err_t web_accept_cb(void *arg, struct tcp_pcb *newpcb, err_t err){
 // (hotspot fallback) modes. Returns the listen pcb, or NULL on failure.
 static struct tcp_pcb *web_config_listen(struct mobile_user *mobile){
     web_mobile = mobile;
-    memset(web_conns, 0, sizeof(web_conns));
+    if (!web_conns) web_conns = malloc(WEB_MAX_CONNS * sizeof(struct web_conn));
+    if (!web_conns) return NULL;
+    memset(web_conns, 0, WEB_MAX_CONNS * sizeof(struct web_conn));
 
     struct tcp_pcb *pcb = tcp_new();
     if (!pcb) return NULL;
@@ -425,8 +433,12 @@ void web_config_stop(void){
     tcp_close(web_listen_pcb);
     web_listen_pcb = NULL;
 
-    for (int i = 0; i < WEB_MAX_CONNS; i++){
-        if (web_conns[i].in_use) web_close_conn(&web_conns[i]);
+    if (web_conns){
+        for (int i = 0; i < WEB_MAX_CONNS; i++){
+            if (web_conns[i].in_use) web_close_conn(&web_conns[i]);
+        }
+        free(web_conns);
+        web_conns = NULL;
     }
 }
 

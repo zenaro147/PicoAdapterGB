@@ -79,7 +79,7 @@ const char WEB_CONFIG_HTML[] =
 "}"
 "async function pollRelayNumber(){"
 "try{"
-"const r=await fetch('/api/config');"
+"const r=await fetch('/api/relay_number');"
 "const j=await r.json();"
 "updateRelayNumberDisplay(j);"
 "}catch(err){"

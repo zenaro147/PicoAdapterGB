@@ -89,6 +89,26 @@ void handle_get_config(struct web_conn *c){
     handle_get_config_impl(c);
 }
 
+void handle_get_relay_number(struct web_conn *c){
+    struct mobile_user *mobile = web_mobile;
+
+    struct mobile_addr relay = {.type = MOBILE_ADDRTYPE_NONE};
+    mobile_config_get_relay(mobile->adapter, &relay);
+
+    char relaystr[60] = {0};
+    web_format_addr_ip_only(&relay, relaystr, sizeof(relaystr));
+
+    char relay_number_esc[MOBILE_MAX_NUMBER_SIZE + 1] = {0};
+    web_json_escape(mobile->number_user, relay_number_esc, sizeof(relay_number_esc));
+
+    char body[128];
+    snprintf(body, sizeof(body),
+        "{\"relay\":\"%s\",\"relay_number\":\"%s\"}",
+        relaystr, relay_number_esc);
+
+    web_send_response(c, 200, "OK", "application/json", body);
+}
+
 void handle_post_config(struct web_conn *c, const char *body){
     struct mobile_user *mobile = web_mobile;
     char field[128];

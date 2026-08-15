@@ -25,7 +25,9 @@
     #define PICO_ADAPTER_PINOUT "REON"
 #endif
 
-#define PICO_ADAPTER_SOFTWARE "1.5.6-beta"
+#ifndef PICO_ADAPTER_SOFTWARE
+    #define PICO_ADAPTER_SOFTWARE "NO-VERSION"
+#endif
 
 //#define DEBUG_SIGNAL_PINS
 

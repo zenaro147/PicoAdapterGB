@@ -16,6 +16,9 @@ cmake_minimum_required(VERSION 3.12)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
+set(PICO_ADAPTER_SOFTWARE "1.5.6-beta" CACHE STRING "Firmware version shown by the adapter")
+add_compile_definitions(PICO_ADAPTER_SOFTWARE=\"${PICO_ADAPTER_SOFTWARE}\")
+
 #set(LIBMOBILE_ENABLE_NO32BIT ON)
 set(ADAPTER "REON" CACHE STRING "The adapter pinout to build for, options are: 'REON', 'STACKSMASHING'.")
 set_property(CACHE ADAPTER PROPERTY STRINGS "REON;STACKSMASHING")

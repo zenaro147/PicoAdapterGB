@@ -9,11 +9,11 @@
 #include <string.h>
 
 #include "pico/stdlib.h"
-#include "pico/multicore.h"
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
 
 #include "globals.h"
+#include "mobile_data.h"
 
 #include "storage/flash_eeprom.h"
 #include "net/net_hal.h"
@@ -33,15 +33,9 @@ bool speed_240_MHz = false;
 #define WIFI_HOTSPOT_PASS "magb!123"
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Shared between the Game Boy ISR on core0 and the web shutdown watchdog on
-// core1. It must remain volatile so release builds do not cache stale values
-// across the two cores.
-volatile bool link_cable_data_received = false;
-
-// Set by core1 the instant the Game Boy starts any communication, so the web
-// server can be torn down immediately and never re-enabled until reboot.
-static volatile bool web_should_stop = false;
 static bool web_alive = false;
+static bool web_shutdown_pending = false;
+static uint64_t web_shutdown_deadline = 0;
 
 struct mobile_user *mobile = NULL;
 
@@ -58,25 +52,6 @@ void TIME_SENSITIVE(link_cable_ISR)(void) {
     }
     linkcable_flush();
     linkcable_send(data);
-    if (!link_cable_data_received) {
-        link_cable_data_received = true;
-    }
-}
-
-// Runs on core1 only while the web config server is alive. Watches for the
-// Game Boy's first byte transfer and signals core0 (the sole owner of
-// cyw43/lwIP) to tear the server down immediately. Never restarts itself.
-// Must stay resident in RAM: core0 disables flash XIP while saving config
-// (SaveConfig/flash_range_program), which would crash core1 if it were still
-// fetching instructions from flash at that moment.
-static void TIME_SENSITIVE(core1_web_killswitch)(void){
-    while (!link_cable_data_received) {
-        tight_loop_contents();
-    }
-    web_should_stop = true;
-    while (true) {
-        tight_loop_contents();
-    }
 }
 
 static void mobile_validate_relay(void){
@@ -177,12 +152,8 @@ void main(){
 
     mobile_user_reset_runtime_state(mobile);
 
-    // Reset the shared cross-core gate before starting the web server. The
-    // shutdown watchdog on core1 waits for the Game Boy ISR on core0 to set
-    // link_cable_data_received; this reset keeps the startup state explicit.
-    link_cable_data_received = false;
-    web_should_stop = false;
     web_alive = true;
+    web_shutdown_pending = false;
 
     // The web setup UI is reachable from boot until the Game Boy starts
     // talking; core1 watches for that and signals core0 (the sole lwIP
@@ -190,22 +161,56 @@ void main(){
     web_config_start(mobile);
 
     DEBUG_PRINT_FUNCTION("Web Setup available at http://%s/", net_wifi_ip_string());
-    multicore_launch_core1(core1_web_killswitch);
 
+    DEBUG_PRINT_FUNCTION("Initializing Game Boy link cable...");
     linkcable_init(link_cable_ISR);
+    DEBUG_PRINT_FUNCTION("Game Boy link cable initialized.");
 
+    DEBUG_PRINT_FUNCTION("Starting libmobile...");
     mobile_start(mobile->adapter);
+    DEBUG_PRINT_FUNCTION("libmobile started.");
 
     mobile_validate_relay();
 
+    bool first_main_loop = true;
+    bool first_mobile_loop = true;
     while (true) {
-        // Mobile Adapter Main Loop
-        mobile_loop(mobile->adapter);
-        net_poll();
+        bool gameboy_session_active = mobile->adapter->commands.session_started;
 
-        if (web_alive && web_should_stop) {
+        // During setup, service the web server first so a background relay
+        // lookup cannot make the configuration page appear frozen. Once the
+        // Game Boy starts a session, mobile_loop gets priority on every pass.
+        if (!gameboy_session_active) net_poll();
+
+        if (first_mobile_loop) {
+            DEBUG_PRINT_FUNCTION("Entering first mobile loop...");
+            first_mobile_loop = false;
+        }
+        mobile_loop(mobile->adapter);
+        if (!gameboy_session_active && mobile->adapter->commands.session_started) {
+            DEBUG_PRINT_FUNCTION("Start session processed by libmobile.");
+        }
+
+        // lwIP remains necessary for relay/P2P sockets after a session starts.
+        net_poll();
+        web_config_service_pending_actions();
+        if (first_main_loop) {
+            DEBUG_PRINT_FUNCTION("Web/network polling is active.");
+            first_main_loop = false;
+        }
+
+        if (web_alive && mobile->adapter->commands.session_started && !web_shutdown_pending) {
+            // Let the Start Session response and the following handshake finish
+            // before closing the unrelated HTTP connections.
+            web_shutdown_pending = true;
+            web_shutdown_deadline = time_us_64() + MS(1000);
+            DEBUG_PRINT_FUNCTION("Game Boy session started; delaying Web Setup shutdown.");
+        }
+
+        if (web_alive && web_shutdown_pending && time_us_64() >= web_shutdown_deadline) {
             web_config_stop();
             web_alive = false;
+            web_shutdown_pending = false;
             DEBUG_PRINT_FUNCTION("Game Boy communication detected, Web Setup server stopped.");
             DEBUG_PRINT_FUNCTION("WiFi status: %s", net_wifi_status_string());
         }

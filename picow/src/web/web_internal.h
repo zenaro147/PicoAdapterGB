@@ -27,11 +27,14 @@ struct web_conn {
     int resp_len;
     int resp_sent;
     bool response_ready;
+    bool close_pending;
 };
 
 // Set once by web_config_start()/web_config_run_blocking(); every route
 // handler operates on this single adapter instance.
 extern struct mobile_user *web_mobile;
+
+void web_config_request_save_reboot(void);
 
 void web_send_response(struct web_conn *c, int status, const char *status_text,
     const char *content_type, const char *body);

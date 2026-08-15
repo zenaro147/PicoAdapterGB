@@ -36,11 +36,11 @@ The built-in web interface lets you configure:
 - unmetered mode
 - redirect mail behavior
 
-It also shows, read-only, the relay phone number the adapter was assigned by the relay server. This field updates automatically:
+It also shows, read-only, the relay phone number the adapter was assigned by the relay server. The value is read once when the page loads:
 
 - if no relay server is configured, it shows "No relay server configured"
-- while the number is still being fetched, it shows "(fetching...)" and refreshes every few seconds
-- if the relay server can't be reached after several attempts, it shows "Not available (could not reach the relay server)"
+- if the number has already been obtained, it shows the assigned number
+- if the relay server is offline or the number has not been obtained yet, it shows "Not available"
 
 The page is designed to be used from a laptop, phone, or tablet connected to the adapter's Wi-Fi network.
 
@@ -48,7 +48,7 @@ The page is designed to be used from a laptop, phone, or tablet connected to the
 
 The configuration server is intentionally stopped as soon as the Game Boy starts communication. This prevents the setup page from staying active while the adapter is being used in normal operation.
 
-The firmware launches a small watchdog task on the second core that listens for the first Game Boy traffic and then triggers the web server shutdown.
+The main firmware loop stops the web server after libmobile has processed the valid Start Session command. This keeps the web server from racing the first Game Boy protocol exchange.
 
 ## Save and reboot
 

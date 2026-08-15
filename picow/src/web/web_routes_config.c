@@ -114,6 +114,8 @@ void handle_post_config(struct web_conn *c, const char *body){
     char field[128];
     bool needSave = false;
 
+    DEBUG_PRINT_FUNCTION("Web config POST received.");
+
     if (web_form_get(body, "wifi_ssid", field, sizeof(field)) && field[0]
         && strlen(field) < SSID_LENGHT){
         memset(mobile->wifiSSID, 0, sizeof(mobile->wifiSSID));
@@ -196,10 +198,13 @@ void handle_post_config(struct web_conn *c, const char *body){
 
     if (needSave){
         mobile_config_save(mobile->adapter);
-        struct saved_data_pointers ptrs;
-        InitSavedPointers(&ptrs, mobile);
-        SaveConfig(&ptrs);
     }
 
     web_send_response(c, 200, "OK", "application/json", "{\"status\":\"ok\"}");
+    if (needSave) {
+        DEBUG_PRINT_FUNCTION("Web config POST accepted; scheduling flash save.");
+        web_config_request_save_reboot();
+    } else {
+        DEBUG_PRINT_FUNCTION("Web config POST contained no changes.");
+    }
 }

@@ -22,7 +22,7 @@ static user_time_t time_last_config_edit = 0;
 
 static void impl_debug_log(void *user, const char *line){
     (void)user;
-    fprintf(stderr, "%s\n", line);
+    printf("%s\n", line);
 }
 
 static void impl_serial_disable(void *user) {

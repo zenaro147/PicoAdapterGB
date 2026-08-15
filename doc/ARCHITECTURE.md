@@ -71,7 +71,7 @@ graph TD
     web_routes_impl --> web_internal[web/web_internal.h]
 ```
 
-- `main.c` only ever includes `net/net_hal.h`, `web/web_server.h`, `core/adapter_bridge.h`, `storage/flash_eeprom.h` and `pio/linkcable.h`. It has no knowledge of cyw43/lwIP or of libmobile's callback signatures.
+- `main.c` only ever includes `net/net_hal.h`, `web/web_server.h`, `core/adapter_bridge.h`, `storage/flash_eeprom.h` and `pio/linkcable.h`. It has no knowledge of cyw43/lwIP or of libmobile's callback signatures. Web shutdown is decided on core0 after `mobile_loop()` accepts the Start Session command; it is not a cross-core watchdog path.
 - `core/adapter_bridge.c` is the only place that implements the `mobile_impl_*()` callbacks and registers them via `mobile_def_*()`. It depends on `net/picow/socket_impl.h` for the actual socket operations.
 - `net/net_hal.h` is the seam for a future backend swap. Everything under `net/picow/` implements it using cyw43 + lwIP; a hypothetical `net/esp32/` backend would implement the same six functions.
 - `web/` is a self-contained HTTP server: `web_http.c` owns connection lifecycle and request parsing and knows nothing about what each route does; `web_routes_*.c` files know about libmobile config and flash persistence, but not about TCP/HTTP framing (they call into `web_internal.h` helpers for that).

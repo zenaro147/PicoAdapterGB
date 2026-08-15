@@ -13,6 +13,7 @@
 
 #include "net/net_hal.h"
 #include "storage/flash_eeprom.h"
+#include "hardware/watchdog.h"
 
 // Allocated only while the config server is running (see web_config_listen /
 // web_config_stop): ~21KB across the two slots would otherwise sit unused in
@@ -20,6 +21,10 @@
 static struct web_conn *web_conns = NULL;
 struct mobile_user *web_mobile = NULL;
 static struct tcp_pcb *web_listen_pcb = NULL;
+static volatile bool web_save_reboot_pending = false;
+static bool web_reboot_waiting = false;
+static uint64_t web_reboot_deadline = 0;
+static uint64_t web_save_not_before = 0;
 
 static struct web_conn *web_find_free_slot(void){
     if (!web_conns) return NULL;
@@ -35,10 +40,27 @@ static void web_close_conn(struct web_conn *c){
         tcp_recv(c->pcb, NULL);
         tcp_sent(c->pcb, NULL);
         tcp_err(c->pcb, NULL);
-        if (tcp_close(c->pcb) != ERR_OK) tcp_abort(c->pcb);
+        err_t close_err = tcp_close(c->pcb);
+        if (close_err != ERR_OK) {
+            tcp_abort(c->pcb);
+        }
     }
     c->pcb = NULL;
     c->in_use = false;
+    c->close_pending = false;
+}
+
+static void web_request_close(struct web_conn *c){
+    if (c) c->close_pending = true;
+}
+
+static void web_service_pending_closes(void){
+    if (!web_conns) return;
+    for (int i = 0; i < WEB_MAX_CONNS; i++){
+        if (web_conns[i].in_use && web_conns[i].close_pending) {
+            web_close_conn(&web_conns[i]);
+        }
+    }
 }
 
 static void web_flush(struct web_conn *c){
@@ -338,7 +360,8 @@ static err_t web_sent_cb(void *arg, struct tcp_pcb *pcb, u16_t len){
     struct web_conn *c = (struct web_conn *)arg;
     if (!c) return ERR_OK;
     web_flush(c);
-    if (c->response_ready && c->resp_sent >= c->resp_len) web_close_conn(c);
+    // The response carries Connection: close. Let the browser send FIN first
+    // so the server does not become the active closer and create TIME_WAIT.
     return ERR_OK;
 }
 
@@ -359,7 +382,7 @@ static err_t web_recv_cb(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t e
         return ERR_OK;
     }
     if (!p){
-        web_close_conn(c);
+        web_request_close(c);
         return ERR_OK;
     }
 
@@ -434,12 +457,44 @@ void web_config_stop(void){
     web_listen_pcb = NULL;
 
     if (web_conns){
+        web_service_pending_closes();
         for (int i = 0; i < WEB_MAX_CONNS; i++){
             if (web_conns[i].in_use) web_close_conn(&web_conns[i]);
         }
         free(web_conns);
         web_conns = NULL;
     }
+}
+
+void web_config_request_save_reboot(void){
+    web_save_reboot_pending = true;
+    web_save_not_before = time_us_64() + MS(500);
+}
+
+void web_config_service_pending_actions(void){
+    web_service_pending_closes();
+
+    if (web_reboot_waiting){
+        if (time_us_64() < web_reboot_deadline) return;
+
+        DEBUG_PRINT_FUNCTION("Reboot delay complete. Resetting device...");
+        watchdog_enable(WEB_REBOOT_DELAY_MS, 0);
+        watchdog_update();
+        while (true) tight_loop_contents();
+    }
+
+    if (!web_save_reboot_pending || !web_mobile || time_us_64() < web_save_not_before) return;
+
+    web_save_reboot_pending = false;
+    DEBUG_PRINT_FUNCTION("Web Save & Reboot requested. Saving configuration...");
+
+    struct saved_data_pointers save_ptrs;
+    InitSavedPointers(&save_ptrs, web_mobile);
+    SaveConfig(&save_ptrs);
+    DEBUG_PRINT_FUNCTION("Configuration saved. Waiting for HTTP response to finish...");
+
+    web_reboot_waiting = true;
+    web_reboot_deadline = time_us_64() + MS(1000);
 }
 
 // Used only for the hotspot config fallback, where nothing else is running.
@@ -450,5 +505,6 @@ void web_config_run_blocking(struct mobile_user *mobile){
 
     while (true){
         net_poll();
+        web_config_service_pending_actions();
     }
 }

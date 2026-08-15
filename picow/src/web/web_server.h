@@ -10,6 +10,10 @@ void web_config_start(struct mobile_user *mobile);
 // Tears down the server. Safe to call once; it never restarts by itself.
 void web_config_stop(void);
 
+// Completes a Save & Reboot requested by the web route from the owning loop,
+// after the HTTP callback has returned.
+void web_config_service_pending_actions(void);
+
 // Hotspot-fallback mode: blocks forever, polling the network stack itself.
 // There's no valid network to fall back to, so the only way out is the user
 // rebooting the device from the web page.

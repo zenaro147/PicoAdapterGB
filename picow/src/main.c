@@ -32,6 +32,11 @@ bool speed_240_MHz = false;
 
 //Wi-Fi Controllers
 bool isConnectedWiFi = false;
+#define WIFI_CONNECT_MAX_ATTEMPTS 5
+#define WIFI_CONNECT_TIMEOUT_MS 5000
+#define WIFI_CONNECT_RETRY_DELAY_MS 1000
+#define WIFI_DEFAULT_SSID "WiFi_Network"
+#define WIFI_DEFAULT_PASS "P@$$w0rd"
 
 //Control Flash Write
 bool haveConfigToWrite = false;
@@ -222,19 +227,31 @@ static const char *wifi_link_status_str(int status){
 
 bool PicoW_Connect_WiFi(char *ssid, char *psk, uint32_t timeout){
 
+    if (strcmp(ssid, WIFI_DEFAULT_SSID) == 0 && strcmp(psk, WIFI_DEFAULT_PASS) == 0) {
+        DEBUG_PRINT_FUNCTION("Wi-Fi credentials are still the defaults; skipping onnection attempts.");
+        return false;
+    }
+
     cyw43_pm_value(CYW43_NO_POWERSAVE_MODE,200,1,1,10);
     cyw43_arch_enable_sta_mode();
     
     //printf("Connecting to Wi-Fi... SSID: %s -- Password: %s [end line]\n", ssid, psk);
-    int errorcode = cyw43_arch_wifi_connect_timeout_ms(ssid, psk, CYW43_AUTH_WPA2_AES_PSK, timeout);
-    if (errorcode != 0) {
-        DEBUG_PRINT_FUNCTION("Failed to connect. Error: %i", errorcode);
-        return false;
-    } else {
-        DEBUG_PRINT_FUNCTION("Device IP: %s", ip4addr_ntoa(netif_ip4_addr(netif_list)));
-        DEBUG_PRINT_FUNCTION("Connected.");
+    for (unsigned attempt = 1; attempt <= WIFI_CONNECT_MAX_ATTEMPTS; attempt++) {
+        int errorcode = cyw43_arch_wifi_connect_timeout_ms(
+            ssid, psk, CYW43_AUTH_WPA2_AES_PSK, timeout);
+        if (errorcode == 0) {
+            DEBUG_PRINT_FUNCTION("Device IP: %s", ip4addr_ntoa(netif_ip4_addr(netif_list)));
+            DEBUG_PRINT_FUNCTION("Connected on attempt %u.", attempt);
+            return true;
+        }
+
+        DEBUG_PRINT_FUNCTION("Wi-Fi connection attempt %u/%u failed. Error: %i",
+            attempt, WIFI_CONNECT_MAX_ATTEMPTS, errorcode);
+        if (attempt < WIFI_CONNECT_MAX_ATTEMPTS) {
+            sleep_ms(WIFI_CONNECT_RETRY_DELAY_MS);
+        }
     }
-    return true;
+    return false;
 }
 
 // Runs on core1 only while the web config server is alive. Watches for the
@@ -318,9 +335,10 @@ void main(){
     
     //Libmobile Variables
     mobile = malloc(sizeof(struct mobile_user));
+    memset(mobile, 0, sizeof(*mobile));
     memset(mobile->config_eeprom,0x00,sizeof(mobile->config_eeprom));
-    strcpy(mobile->wifiSSID, "WiFi_Network");
-    strcpy(mobile->wifiPASS, "P@$$w0rd");
+        strcpy(mobile->wifiSSID, WIFI_DEFAULT_SSID);
+        strcpy(mobile->wifiPASS, WIFI_DEFAULT_PASS);
 
     InitSave();
     struct saved_data_pointers ptrs;
@@ -349,7 +367,7 @@ void main(){
 
     printf("-------------------------\nSoftware Version:\nLibmobile: %i.%i.%i\nPicoAdapterGB: %s-%s %s\n-------------------------\n",mobile_version_major,mobile_version_minor,mobile_version_patch,PICO_ADAPTER_HARDWARE,PICO_ADAPTER_PINOUT,PICO_ADAPTER_SOFTWARE);
 
-    isConnectedWiFi = PicoW_Connect_WiFi(mobile->wifiSSID, mobile->wifiPASS, MS(60));
+    isConnectedWiFi = PicoW_Connect_WiFi(mobile->wifiSSID, mobile->wifiPASS, WIFI_CONNECT_TIMEOUT_MS);
 
     if (!isConnectedWiFi) {
         // No usable WiFi: fall back to our own hotspot so the device can still
@@ -365,87 +383,85 @@ void main(){
         return; // unreachable: web_config_run_blocking never returns
     }
     
-    {
-        mobile->action = MOBILE_ACTION_NONE;
-        mobile->number_user[0] = '\0';
-        mobile->number_peer[0] = '\0';
-        mobile->currentReqSocket = -1;
-        for (int i = 0; i < MOBILE_MAX_TIMERS; i++) mobile->picow_clock_latch[i] = 0;
-        for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
-            mobile->socket[i].tcp_pcb = NULL;
-            mobile->socket[i].udp_pcb = NULL;
-            mobile->socket[i].sock_addr = -1;
-            mobile->socket[i].sock_type = SOCK_NONE;
-            memset(mobile->socket[i].udp_remote_srv,0x00,sizeof(mobile->socket[i].udp_remote_srv));
-            mobile->socket[i].udp_remote_port = 0;
-            mobile->socket[i].client_status = false;
-            mobile->socket[i].inside_callback = false;
-            mobile->socket[i].pending_close = false;
-            mobile->socket[i].socket_status = 0;
-            memset(mobile->socket[i].buffer_rx,0x00,sizeof(mobile->socket[i].buffer_rx));
-            //memset(mobile->socket[i].buffer_tx,0x00,sizeof(mobile->socket[i].buffer_tx));
-            mobile->socket[i].buffer_rx_len = 0;
-            mobile->socket[i].buffer_tx_len = 0;
-        } 
-        mobile->automatic_save = true;
-        mobile->force_save = false;
+    mobile->action = MOBILE_ACTION_NONE;
+    mobile->number_user[0] = '\0';
+    mobile->number_peer[0] = '\0';
+    mobile->currentReqSocket = -1;
+    for (int i = 0; i < MOBILE_MAX_TIMERS; i++) mobile->picow_clock_latch[i] = 0;
+    for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
+        mobile->socket[i].tcp_pcb = NULL;
+        mobile->socket[i].udp_pcb = NULL;
+        mobile->socket[i].sock_addr = -1;
+        mobile->socket[i].sock_type = SOCK_NONE;
+        memset(mobile->socket[i].udp_remote_srv,0x00,sizeof(mobile->socket[i].udp_remote_srv));
+        mobile->socket[i].udp_remote_port = 0;
+        mobile->socket[i].client_status = false;
+        mobile->socket[i].inside_callback = false;
+        mobile->socket[i].pending_close = false;
+        mobile->socket[i].socket_status = 0;
+        memset(mobile->socket[i].buffer_rx,0x00,sizeof(mobile->socket[i].buffer_rx));
+        //memset(mobile->socket[i].buffer_tx,0x00,sizeof(mobile->socket[i].buffer_tx));
+        mobile->socket[i].buffer_rx_len = 0;
+        mobile->socket[i].buffer_tx_len = 0;
+    } 
+    mobile->automatic_save = true;
+    mobile->force_save = false;
 
-        // Reset the shared cross-core gate before starting the web server. The
-        // shutdown watchdog on core1 waits for the Game Boy ISR on core0 to set
-        // link_cable_data_received; this reset keeps the startup state explicit.
-        link_cable_data_received = false;
-        web_should_stop = false;
-        web_alive = true;
+    // Reset the shared cross-core gate before starting the web server. The
+    // shutdown watchdog on core1 waits for the Game Boy ISR on core0 to set
+    // link_cable_data_received; this reset keeps the startup state explicit.
+    link_cable_data_received = false;
+    web_should_stop = false;
+    web_alive = true;
 
-        // The web setup UI is reachable from boot until the Game Boy starts
-        // talking; core1 watches for that and signals core0 (the sole lwIP
-        // owner) to tear it down. It never comes back until reboot.
-        web_config_start(mobile);
+    // The web setup UI is reachable from boot until the Game Boy starts
+    // talking; core1 watches for that and signals core0 (the sole lwIP
+    // owner) to tear it down. It never comes back until reboot.
+    web_config_start(mobile);
+    
+    DEBUG_PRINT_FUNCTION("Web Setup available at http://%s/", ip4addr_ntoa(netif_ip4_addr(netif_list)));
+    multicore_launch_core1(core1_web_killswitch);
+
+    linkcable_init(link_cable_ISR);
+
+    mobile_start(mobile->adapter);
+
+    mobile_validate_relay();
+
+    while (true) {
+        // Mobile Adapter Main Loop
+        mobile_loop(mobile->adapter);
+        cyw43_arch_poll();
+
+        if (web_alive && web_should_stop) {
+            web_config_stop();
+            web_alive = false;
+            DEBUG_PRINT_FUNCTION("Game Boy communication detected, Web Setup server stopped.");
+            DEBUG_PRINT_FUNCTION("WiFi status: %s", wifi_link_status_str(cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA)));
+        }
         
-        DEBUG_PRINT_FUNCTION("Web Setup available at http://%s/", ip4addr_ntoa(netif_ip4_addr(netif_list)));
-        multicore_launch_core1(core1_web_killswitch);
-
-        linkcable_init(link_cable_ISR);
-
-        mobile_start(mobile->adapter);
-
-        mobile_validate_relay();
-
-        while (true) {
-            // Mobile Adapter Main Loop
-            mobile_loop(mobile->adapter);
-            cyw43_arch_poll();
-
-            if (web_alive && web_should_stop) {
-                web_config_stop();
-                web_alive = false;
-                DEBUG_PRINT_FUNCTION("Game Boy communication detected, Web Setup server stopped.");
-                DEBUG_PRINT_FUNCTION("WiFi status: %s", wifi_link_status_str(cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA)));
+        for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
+            // if(mobile->socket[i].tcp_pcb || mobile->socket[i].udp_pcb){                    
+            //     cyw43_arch_poll();
+            //     check_and_reconnect_wifi(mobile->wifiSSID, mobile->wifiPASS, MS(60));
+            //     break;
+            // }
+            if (mobile->socket[i].pending_close) {
+                socket_impl_close_commands(&mobile->socket[i]);
             }
-            
-            for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
-                // if(mobile->socket[i].tcp_pcb || mobile->socket[i].udp_pcb){                    
-                //     cyw43_arch_poll();
-                //     check_and_reconnect_wifi(mobile->wifiSSID, mobile->wifiPASS, MS(60));
-                //     break;
-                // }
-                if (mobile->socket[i].pending_close) {
-                    socket_impl_close_commands(&mobile->socket[i]);
-                }
-            }
+        }
 
-            // Check if there is any new config to write on Flash
-            if((haveConfigToWrite && mobile->automatic_save) || mobile->force_save) {
-                bool can_disable_irqs = can_disable_linkcable_handler();
-                user_time_t curr_time_last_config_edit = time_last_config_edit;
-                if(((TIME_FUNCTION - curr_time_last_config_edit) >= CONFIG_LAST_EDIT_TIMEOUT) && can_disable_irqs) {
-                    struct saved_data_pointers ptrs;
-                    InitSavedPointers(&ptrs, mobile);
-                    SaveConfig(&ptrs);
-                    haveConfigToWrite = false;
-                    mobile->force_save = false;
-                    LED_OFF;                    
-                }
+        // Check if there is any new config to write on Flash
+        if((haveConfigToWrite && mobile->automatic_save) || mobile->force_save) {
+            bool can_disable_irqs = can_disable_linkcable_handler();
+            user_time_t curr_time_last_config_edit = time_last_config_edit;
+            if(((TIME_FUNCTION - curr_time_last_config_edit) >= CONFIG_LAST_EDIT_TIMEOUT) && can_disable_irqs) {
+                struct saved_data_pointers ptrs;
+                InitSavedPointers(&ptrs, mobile);
+                SaveConfig(&ptrs);
+                haveConfigToWrite = false;
+                mobile->force_save = false;
+                LED_OFF;                    
             }
         }
     }

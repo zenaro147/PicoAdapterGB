@@ -28,7 +28,7 @@ elseif(ADAPTER STREQUAL "STACKSMASHING")
     pico_generate_pio_header(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} ${CMAKE_CURRENT_LIST_DIR}/src/pio/linkcable_sm.pio)
 endif()
 
-target_include_directories(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} PRIVATE /.. ${CMAKE_CURRENT_LIST_DIR})
+target_include_directories(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} PRIVATE /.. ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/src)
  
 # Pull in our pico_stdlib which pulls in commonly used features
 target_link_libraries(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} libmobile_static pico_stdlib pico_multicore hardware_pio hardware_flash hardware_watchdog pico_cyw43_arch_lwip_poll)

@@ -106,7 +106,7 @@ static void mobile_user_reset_runtime_state(struct mobile_user *m){
         m->socket[i].udp_pcb = NULL;
         m->socket[i].sock_addr = -1;
         m->socket[i].sock_type = SOCK_NONE;
-        memset(m->socket[i].udp_remote_srv, 0x00, sizeof(m->socket[i].udp_remote_srv));
+        memset(m->socket[i].udp_remote_ip, 0x00, sizeof(m->socket[i].udp_remote_ip));
         m->socket[i].udp_remote_port = 0;
         m->socket[i].client_status = false;
         m->socket[i].inside_callback = false;

@@ -53,20 +53,31 @@ static void web_flush(struct web_conn *c){
 void web_send_response(struct web_conn *c, int status, const char *status_text,
                         const char *content_type, const char *body){
     size_t full_body_len = strlen(body);
-    size_t header_len = snprintf(c->resp_buf, WEB_RESP_BUF_SIZE,
-        "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nConnection: close\r\n\r\n",
-        status, status_text, content_type);
-    if (header_len >= WEB_RESP_BUF_SIZE) header_len = WEB_RESP_BUF_SIZE - 1;
-    size_t max_body = WEB_RESP_BUF_SIZE - header_len;
-    size_t body_len = full_body_len;
-    if (body_len > max_body) body_len = max_body;
 
-    size_t header_with_len_len = snprintf(c->resp_buf, WEB_RESP_BUF_SIZE,
+    // Build the header separately first so its real length (including the
+    // Content-Length digits) is known before deciding how much of the body
+    // fits, instead of estimating from a shorter header without it.
+    char header[128];
+    int header_len = snprintf(header, sizeof(header),
         "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %zu\r\nConnection: close\r\n\r\n",
-        status, status_text, content_type, body_len);
-    if (header_with_len_len >= WEB_RESP_BUF_SIZE) header_with_len_len = WEB_RESP_BUF_SIZE - 1;
-    memcpy(c->resp_buf + header_with_len_len, body, body_len);
-    c->resp_len = (int)(header_with_len_len + body_len);
+        status, status_text, content_type, full_body_len);
+    if (header_len < 0) header_len = 0;
+    if ((size_t)header_len >= sizeof(header)) header_len = sizeof(header) - 1;
+
+    size_t max_body = (size_t)header_len < WEB_RESP_BUF_SIZE ? WEB_RESP_BUF_SIZE - (size_t)header_len : 0;
+    size_t body_len = full_body_len > max_body ? max_body : full_body_len;
+    if (body_len != full_body_len){
+        // Truncated: Content-Length must reflect what's actually sent.
+        header_len = snprintf(header, sizeof(header),
+            "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %zu\r\nConnection: close\r\n\r\n",
+            status, status_text, content_type, body_len);
+        if (header_len < 0) header_len = 0;
+        if ((size_t)header_len >= sizeof(header)) header_len = sizeof(header) - 1;
+    }
+
+    memcpy(c->resp_buf, header, (size_t)header_len);
+    memcpy(c->resp_buf + header_len, body, body_len);
+    c->resp_len = header_len + (int)body_len;
     c->resp_sent = 0;
     c->response_ready = true;
     web_flush(c);

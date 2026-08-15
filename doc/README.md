@@ -17,6 +17,8 @@ This project combines:
 - `doc/` — project documentation
 - `PicoAdapter_PCB/` — board and schematic files
 
+See [doc/ARCHITECTURE.md](ARCHITECTURE.md) for the detailed `picow/src/` module breakdown (network abstraction, adapter glue code, web server, storage) and how they depend on each other.
+
 ## Recommended hardware
 
 - Raspberry Pi Pico W or Pico 2 W

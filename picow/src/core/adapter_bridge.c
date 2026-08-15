@@ -39,22 +39,15 @@ static void impl_serial_enable(void *user, bool mode_32bit) {
 
 static bool impl_config_read(void *user, void *dest, const uintptr_t offset, const size_t size) {
     struct mobile_user *mobile = (struct mobile_user *)user;
-    for (size_t i = 0; i < size; i++){
-        ((char *)dest)[i] = (char)mobile->config_eeprom[offset + i];
-    }
+    memcpy(dest, mobile->config_eeprom + offset, size);
     return true;
 }
 
 static bool impl_config_write(void *user, const void *src, const uintptr_t offset, const size_t size) {
     struct mobile_user *mobile = (struct mobile_user *)user;
-    const uint8_t *src_8 = (const uint8_t *)src;
-    bool this_edited_config = false;
-    for (size_t i = 0; i < size; i++) {
-        if (mobile->config_eeprom[offset + i] != src_8[i])
-            this_edited_config = true;
-        mobile->config_eeprom[offset + i] = src_8[i];
-    }
+    bool this_edited_config = memcmp(mobile->config_eeprom + offset, src, size) != 0;
     if (this_edited_config) {
+        memcpy(mobile->config_eeprom + offset, src, size);
         LED_ON;
         have_config_to_write = true;
         time_last_config_edit = TIME_FUNCTION;

@@ -88,7 +88,7 @@ void socket_impl_close(struct socket_impl *state){
         }
         state->sock_addr = -1;
         state->sock_type = SOCK_NONE;
-        memset(state->udp_remote_srv,0x00,sizeof(state->udp_remote_srv));
+        memset(state->udp_remote_ip,0x00,sizeof(state->udp_remote_ip));
         state->udp_remote_port = 0;
         state->client_status = false;
         state->inside_callback = false;
@@ -295,24 +295,9 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
     if(state->buffer_rx_len > 0){
         if (addr && state->sock_type == SOCK_UDP){
             struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
-            struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
-            unsigned char ip[MOBILE_INET_PTON_MAXLEN];
-            int rc = mobile_inet_pton(MOBILE_INET_PTON_ANY, state->udp_remote_srv, ip);
-
-            switch (rc) {
-                case MOBILE_INET_PTON_IPV4:
-                    addr4->type = MOBILE_ADDRTYPE_IPV4;
-                    addr4->port = state->udp_remote_port;
-                    memcpy(addr4->host, ip, sizeof(addr4->host));
-                    break;
-                case MOBILE_INET_PTON_IPV6:
-                    addr6->type = MOBILE_ADDRTYPE_IPV6;
-                    addr6->port = state->udp_remote_port;
-                    memcpy(addr6->host, ip, sizeof(addr6->host));
-                    break;
-                default:
-                    break;
-            }
+            addr4->type = MOBILE_ADDRTYPE_IPV4;
+            addr4->port = state->udp_remote_port;
+            memcpy(addr4->host, state->udp_remote_ip, sizeof(addr4->host));
         }
         
         uint16_t tmpsize = state->buffer_rx_len - state->buffer_rx_read_pos;
@@ -407,7 +392,7 @@ void socket_impl_close_commands(struct socket_impl *state){
     }
     state->sock_addr = -1;
     state->sock_type = SOCK_NONE;
-    memset(state->udp_remote_srv,0x00,sizeof(state->udp_remote_srv));
+    memset(state->udp_remote_ip,0x00,sizeof(state->udp_remote_ip));
     state->udp_remote_port = 0;
     state->client_status = false;
     state->inside_callback = false;

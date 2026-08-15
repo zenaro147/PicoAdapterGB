@@ -36,6 +36,12 @@ The built-in web interface lets you configure:
 - unmetered mode
 - redirect mail behavior
 
+It also shows, read-only, the relay phone number the adapter was assigned by the relay server. This field updates automatically:
+
+- if no relay server is configured, it shows "No relay server configured"
+- while the number is still being fetched, it shows "(fetching...)" and refreshes every few seconds
+- if the relay server can't be reached after several attempts, it shows "Not available (could not reach the relay server)"
+
 The page is designed to be used from a laptop, phone, or tablet connected to the adapter's Wi-Fi network.
 
 ## Web shutdown behavior
@@ -49,6 +55,16 @@ The firmware launches a small watchdog task on the second core that listens for 
 The configuration form includes a single action called `Save & Reboot`.
 
 When you save the configuration, the firmware persists the settings and reboots to apply them.
+
+## EEPROM backup and restore
+
+The web page also lets you download and upload the raw 512-byte Mobile Adapter GB EEPROM image (`eeprom.bin`):
+
+- `Download eeprom.bin` always saves the full 512 bytes currently in memory.
+- `Upload eeprom.bin` only accepts a file that is exactly 512 bytes and starts with the `MA` signature (the original adapter's config block); otherwise it's rejected.
+- By default, uploading only restores that original adapter config block (offsets `0x00`-`0xBF`), leaving the current Wi-Fi/DNS/relay settings untouched.
+- Checking "Overwrite libmobile config too" also restores the DNS/relay/device/etc. block (offsets `0x100`-`0x15F`), which must additionally start with the `LM` signature. The page updates those fields immediately, decoded from the uploaded file in the browser.
+- An upload only changes what's held in memory. Nothing is written to flash until you press `Save & Reboot`.
 
 ## Serial fallback
 

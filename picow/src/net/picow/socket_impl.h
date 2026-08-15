@@ -18,6 +18,7 @@ struct socket_impl {
     uint8_t buffer_rx[BUFF_SIZE];
     int buffer_rx_len;
     int buffer_tx_len;
+    uint16_t buffer_rx_read_pos; // per-socket read cursor into buffer_rx
 	union{
 		struct tcp_pcb *tcp_pcb;
         struct udp_pcb *udp_pcb;

@@ -56,6 +56,9 @@ static void handle_get_config_impl(struct web_conn *c){
     web_json_escape(mobile->wifiSSID, wifi_ssid_esc, sizeof(wifi_ssid_esc));
     web_json_escape(mobile->wifiPASS, wifi_pass_esc, sizeof(wifi_pass_esc));
 
+    char relay_number_esc[MOBILE_MAX_NUMBER_SIZE + 1] = {0};
+    web_json_escape(mobile->number_user, relay_number_esc, sizeof(relay_number_esc));
+
     char body[768];
     snprintf(body, sizeof(body),
         "{"
@@ -66,6 +69,7 @@ static void handle_get_config_impl(struct web_conn *c){
         "\"dns_port\":%d,"
         "\"relay\":\"%s\","
         "\"relay_token\":\"%s\","
+        "\"relay_number\":\"%s\","
         "\"p2p_port\":%u,"
         "\"device\":\"%s\","
         "\"unmetered\":%s,"
@@ -73,7 +77,7 @@ static void handle_get_config_impl(struct web_conn *c){
         "\"libmobile_version\":\"%u.%u.%u\","
         "\"firmware_version\":\"%s\""
         "}",
-        wifi_ssid_esc, wifi_pass_esc, dns1str, dns2str, dns_port, relaystr, token_hex, p2p_port,
+        wifi_ssid_esc, wifi_pass_esc, dns1str, dns2str, dns_port, relaystr, token_hex, relay_number_esc, p2p_port,
         device_str, unmetered ? "true" : "false", redirect_mail ? "true" : "false",
         mobile_version_major, mobile_version_minor, mobile_version_patch,
         PICO_ADAPTER_SOFTWARE);

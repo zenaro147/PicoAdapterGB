@@ -315,7 +315,34 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete bleeding-edge --yes --cleanup-tag || true
+          release_notes="Automated bleeding-edge build from develop.
+
+          Commit: ${GITHUB_SHA}
+
+          Included builds:
+          - Pico W / REON
+          - Pico W / STACKSMASHING
+          - Pico 2 W / REON
+          - Pico 2 W / STACKSMASHING"
+
+          if gh release view bleeding-edge >/dev/null 2>&1; then
+            echo "Bleeding Edge release exists. Updating assets and notes..."
+
+            gh release view bleeding-edge --json assets --jq '.assets[].name' | while read -r asset_name; do
+              [ -n "${asset_name}" ] || continue
+              gh release delete-asset bleeding-edge "${asset_name}" --yes
+            done
+
+            gh release upload bleeding-edge release/*.uf2
+            gh release edit bleeding-edge \
+              --title "PicoAdapterGB Bleeding Edge" \
+              --draft=false \
+              --prerelease \
+              --notes "${release_notes}"
+
+            echo "Bleeding Edge release updated successfully."
+            exit 0
+          fi
 
           for attempt in 1 2 3 4 5; do
             echo "Creating Bleeding Edge release (attempt $attempt/5)..."
@@ -324,15 +351,7 @@ jobs:
               --target develop \
               --title "PicoAdapterGB Bleeding Edge" \
               --prerelease \
-              --notes "Automated bleeding-edge build from develop.
-
-          Commit: ${GITHUB_SHA}
-
-          Included builds:
-          - Pico W / REON
-          - Pico W / STACKSMASHING
-          - Pico 2 W / REON
-          - Pico 2 W / STACKSMASHING" \
+              --notes "${release_notes}" \
               release/*.uf2; then
               echo "Bleeding Edge release created successfully."
               exit 0

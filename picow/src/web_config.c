@@ -16,8 +16,10 @@
 
 #define WEB_MAX_CONNS      2
 #define WEB_REQ_BUF_SIZE   1536
-#define WEB_RESP_BUF_SIZE  4096
+#define WEB_RESP_BUF_SIZE  8192
 #define WEB_REBOOT_DELAY_MS 300
+#define EEPROM_FILE_SIZE 512
+#define EEPROM_ORIGINAL_CONFIG_SIZE 0xC0
 
 struct web_conn {
     struct tcp_pcb *pcb;
@@ -69,8 +71,9 @@ static const char WEB_CONFIG_HTML[] =
 "<label><input type=\"checkbox\" id=\"unmetered\"> Unmetered (Pokemon Crystal)</label>"
 "<label><input type=\"checkbox\" id=\"redirect_mail\"> Redirect SMTP to alt port</label>"
 "</fieldset>"
-"<fieldset><legend>Mobile Adapter EEPROM (.bin) (Not implemented yet)</legend>"
+"<fieldset><legend>Mobile Adapter EEPROM (.bin)</legend>"
 "<label>Upload eeprom.bin<input type=\"file\" id=\"eeprom_file\" accept=\".bin\"></label>"
+"<label><input type=\"checkbox\" id=\"eeprom_replace_libmobile\"> Overwrite custom server config too? (like DNS and Relay info)</label>"
 "<button type=\"button\" id=\"eeprom_upload\">Upload eeprom.bin</button>"
 "<button type=\"button\" id=\"eeprom_dump\">Download eeprom.bin</button>"
 "</fieldset>"
@@ -81,11 +84,22 @@ static const char WEB_CONFIG_HTML[] =
 "<div id=\"ver\"></div>"
 "<script>"
 "async function load(){"
-"const r=await fetch('/api/config');const j=await r.json();"
+"console.log('[web] loading config');"
+"try{"
+"const r=await fetch('/api/config');"
+"console.log('[web] config response status',r.status,'content-type',r.headers.get('content-type'));"
+"const text=await r.text();"
+"console.log('[web] config raw body',text);"
+"const j=JSON.parse(text);"
 "wifi_ssid.value=j.wifi_ssid;wifi_pass.value=j.wifi_pass;dns1.value=j.dns1;dns2.value=j.dns2;dns_port.value=j.dns_port;"
 "relay.value=j.relay;relay_token.value=j.relay_token;p2p_port.value=j.p2p_port;"
 "device.value=j.device;unmetered.checked=j.unmetered;redirect_mail.checked=j.redirect_mail;"
 "ver.textContent='libmobile '+j.libmobile_version+' / '+j.firmware_version;"
+"msg.textContent='Loaded current config.';"
+"}catch(err){"
+"console.error('[web] load config failed',err);"
+"msg.textContent='Failed to load current config. Check browser console.';"
+"}"
 "}"
 "function fields(){"
 "const p=new URLSearchParams();"
@@ -100,10 +114,19 @@ static const char WEB_CONFIG_HTML[] =
 "cfg.addEventListener('submit',async function(e){"
 "e.preventDefault();"
 "if(!confirm('Save and reboot the adapter now?'))return;"
+"console.log('[web] posting config',fields().toString());"
+"try{"
 "const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:fields().toString()});"
-"await r.json();"
+"const txt=await r.text();"
+"console.log('[web] config POST status',r.status,'body',txt);"
+"const j=txt?JSON.parse(txt):{};"
+"if(!r.ok){throw new Error(j.error||'config save failed');}"
 "await fetch('/api/reboot',{method:'POST'});"
 "msg.textContent='Saved. Rebooting...';"
+"}catch(err){"
+"console.error('[web] config save failed',err);"
+"msg.textContent='Save failed. Check browser console.';"
+"}"
 "});"
 "fmt.addEventListener('click',async function(){"
 "if(!confirm('Format the EEPROM config? This resets adapter settings.'))return;"
@@ -111,11 +134,70 @@ static const char WEB_CONFIG_HTML[] =
 "msg.textContent='Formatted.';"
 "load();"
 "});"
-"eeprom_upload.addEventListener('click',function(){"
-"alert('Not implemented yet.');"
+"function decodeLibmobileBlock(buf){"
+"const b=new Uint8Array(buf),base=0x100;"
+"if(b[base]!==0x4C||b[base+1]!==0x4D)return null;"
+"function fmtAddr(type,hostOff,portOff){"
+"if(type===1)return b[base+hostOff]+'.'+b[base+hostOff+1]+'.'+b[base+hostOff+2]+'.'+b[base+hostOff+3];"
+"if(type===2){const p=[];for(let i=0;i<16;i+=2)p.push(((b[base+hostOff+i]<<8)|b[base+hostOff+i+1]).toString(16).padStart(4,'0'));return p.join(':');}"
+"return '';"
+"}"
+"const deviceRaw=b[base+0x05];"
+"const deviceMap={8:'BLUE',9:'YELLOW',10:'GREEN',11:'RED'};"
+"const dns1Type=b[base+0x06],dns2Type=b[base+0x07],relayType=b[base+0x0a];"
+"const dnsPort=(dns1Type)?(b[base+0x1a]|(b[base+0x1b]<<8)):(dns2Type?(b[base+0x1c]|(b[base+0x1d]<<8)):53);"
+"let relayToken='';"
+"if(b[base+0x0b])for(let i=0;i<16;i++)relayToken+=b[base+0x50+i].toString(16).padStart(2,'0').toUpperCase();"
+"return{"
+"device:deviceMap[deviceRaw&0x7f]||'BLUE',"
+"unmetered:(deviceRaw&0x80)!==0,"
+"p2p_port:b[base+0x08]|(b[base+0x09]<<8),"
+"redirect_mail:b[base+0x0c]!==0,"
+"dns1:fmtAddr(dns1Type,0x20,0x1a),dns2:fmtAddr(dns2Type,0x30,0x1c),dns_port:dnsPort,"
+"relay:fmtAddr(relayType,0x40,0x1e),relay_token:relayToken"
+"};"
+"}"
+"eeprom_upload.addEventListener('click',async function(){"
+"const file=eeprom_file.files[0];"
+"if(!file){alert('Select a .bin file first.');return;}"
+"const buf=await file.arrayBuffer();"
+"if(buf.byteLength!==512){alert('Expected 512 bytes, got '+buf.byteLength+'.');return;}"
+"const replace=eeprom_replace_libmobile.checked;"
+"console.log('[web] uploading EEPROM',buf.byteLength,'replaceLibmobile',replace);"
+"try{"
+"const r=await fetch('/api/eeprom',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Eeprom-Replace-Libmobile':replace?'1':'0'},body:buf});"
+"const text=await r.text();"
+"console.log('[web] EEPROM upload status',r.status,'body',text);"
+"const j=text?JSON.parse(text):{};"
+"if(j.status!=='ok'){msg.textContent='Upload failed: '+(j.error||'unknown error');return;}"
+"if(replace){"
+"const decoded=decodeLibmobileBlock(buf);"
+"if(decoded){"
+"dns1.value=decoded.dns1;dns2.value=decoded.dns2;dns_port.value=decoded.dns_port;"
+"relay.value=decoded.relay;relay_token.value=decoded.relay_token;p2p_port.value=decoded.p2p_port;"
+"device.value=decoded.device;unmetered.checked=decoded.unmetered;redirect_mail.checked=decoded.redirect_mail;"
+"}"
+"}"
+"msg.textContent='EEPROM loaded into memory (not saved yet). Click \"Save & Reboot\" to write it to flash.';"
+"}catch(err){"
+"console.error('[web] EEPROM upload failed',err);"
+"msg.textContent='EEPROM upload failed. Check browser console.';"
+"}"
 "});"
-"eeprom_dump.addEventListener('click',function(){"
-"alert('Not implemented yet.');"
+"eeprom_dump.addEventListener('click',async function(){"
+"console.log('[web] downloading EEPROM');"
+"try{"
+"const r=await fetch('/api/eeprom');"
+"console.log('[web] EEPROM download status',r.status,'content-type',r.headers.get('content-type'));"
+"if(!r.ok){alert('Download failed.');return;}"
+"const blob=await r.blob();"
+"const url=URL.createObjectURL(blob);"
+"const a=document.createElement('a');a.href=url;a.download='eeprom.bin';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);"
+"console.log('[web] EEPROM download blob size',blob.size);"
+"}catch(err){"
+"console.error('[web] EEPROM download failed',err);"
+"alert('EEPROM download failed. Check browser console.');"
+"}"
 "});"
 "load();"
 "</script>"
@@ -155,14 +237,66 @@ static void web_flush(struct web_conn *c){
 
 static void web_send_response(struct web_conn *c, int status, const char *status_text,
                                const char *content_type, const char *body){
-    int body_len = strlen(body);
-    c->resp_len = snprintf(c->resp_buf, WEB_RESP_BUF_SIZE,
-        "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s",
-        status, status_text, content_type, body_len, body);
-    if (c->resp_len > WEB_RESP_BUF_SIZE) c->resp_len = WEB_RESP_BUF_SIZE;
+    size_t full_body_len = strlen(body);
+    size_t header_len = snprintf(c->resp_buf, WEB_RESP_BUF_SIZE,
+        "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nConnection: close\r\n\r\n",
+        status, status_text, content_type);
+    if (header_len >= WEB_RESP_BUF_SIZE) header_len = WEB_RESP_BUF_SIZE - 1;
+    size_t max_body = WEB_RESP_BUF_SIZE - header_len;
+    size_t body_len = full_body_len;
+    if (body_len > max_body) body_len = max_body;
+
+    size_t header_with_len_len = snprintf(c->resp_buf, WEB_RESP_BUF_SIZE,
+        "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %zu\r\nConnection: close\r\n\r\n",
+        status, status_text, content_type, body_len);
+    if (header_with_len_len >= WEB_RESP_BUF_SIZE) header_with_len_len = WEB_RESP_BUF_SIZE - 1;
+    memcpy(c->resp_buf + header_with_len_len, body, body_len);
+    c->resp_len = (int)(header_with_len_len + body_len);
     c->resp_sent = 0;
     c->response_ready = true;
     web_flush(c);
+}
+
+static void web_send_raw_response(struct web_conn *c, int status, const char *status_text,
+                                  const char *content_type, const void *body, size_t body_len){
+    size_t max_body = WEB_RESP_BUF_SIZE - 256;
+    if (body_len > max_body) body_len = max_body;
+
+    size_t header_len = snprintf(c->resp_buf, WEB_RESP_BUF_SIZE,
+        "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %zu\r\nConnection: close\r\n\r\n",
+        status, status_text, content_type, body_len);
+    if (header_len >= WEB_RESP_BUF_SIZE) header_len = WEB_RESP_BUF_SIZE - 1;
+    memcpy(c->resp_buf + header_len, body, body_len);
+    c->resp_len = (int)(header_len + body_len);
+    c->resp_sent = 0;
+    c->response_ready = true;
+    web_flush(c);
+}
+
+static void web_json_escape(const char *src, char *dst, size_t dstsize){
+    size_t j = 0;
+    if (!src) {
+        dst[0] = '\0';
+        return;
+    }
+    for (size_t i = 0; src[i] && j + 2 < dstsize; i++){
+        unsigned char ch = (unsigned char)src[i];
+        switch (ch){
+            case '\\': dst[j++] = '\\'; dst[j++] = '\\'; break;
+            case '"': dst[j++] = '\\'; dst[j++] = '"'; break;
+            case '\n': dst[j++] = '\\'; dst[j++] = 'n'; break;
+            case '\r': dst[j++] = '\\'; dst[j++] = 'r'; break;
+            case '\t': dst[j++] = '\\'; dst[j++] = 't'; break;
+            default:
+                if (ch < 0x20) {
+                    j += snprintf(dst + j, dstsize - j, "\\u%04x", ch);
+                } else {
+                    dst[j++] = (char)ch;
+                }
+                break;
+        }
+    }
+    dst[j] = '\0';
 }
 
 static const char *stristr(const char *hay, const char *needle){
@@ -256,8 +390,22 @@ static void format_addr_ip_only(struct mobile_addr *src, char *dest, size_t dest
     }
 }
 
+static void web_reload_saved_config(struct mobile_user *mobile){
+    if (!mobile) return;
+
+    memset(mobile->wifiSSID, 0, sizeof(mobile->wifiSSID));
+    memset(mobile->wifiPASS, 0, sizeof(mobile->wifiPASS));
+
+    struct saved_data_pointers ptrs;
+    InitSavedPointers(&ptrs, mobile);
+    ReadConfig(&ptrs);
+    mobile_config_load(mobile->adapter);
+}
+
 static void handle_get_config(struct web_conn *c){
     struct mobile_user *mobile = web_mobile;
+    if (mobile) web_reload_saved_config(mobile);
+
     struct mobile_addr dns1 = {.type = MOBILE_ADDRTYPE_NONE};
     struct mobile_addr dns2 = {.type = MOBILE_ADDRTYPE_NONE};
     struct mobile_addr relay = {.type = MOBILE_ADDRTYPE_NONE};
@@ -297,6 +445,11 @@ static void handle_get_config(struct web_conn *c){
         default:                    device_str = "BLUE";   break;
     }
 
+    char wifi_ssid_esc[SSID_LENGHT] = {0};
+    char wifi_pass_esc[PASS_LENGHT] = {0};
+    web_json_escape(mobile->wifiSSID, wifi_ssid_esc, sizeof(wifi_ssid_esc));
+    web_json_escape(mobile->wifiPASS, wifi_pass_esc, sizeof(wifi_pass_esc));
+
     char body[768];
     snprintf(body, sizeof(body),
         "{"
@@ -314,7 +467,7 @@ static void handle_get_config(struct web_conn *c){
         "\"libmobile_version\":\"%u.%u.%u\","
         "\"firmware_version\":\"%s\""
         "}",
-        mobile->wifiSSID, mobile->wifiPASS, dns1str, dns2str, dns_port, relaystr, token_hex, p2p_port,
+        wifi_ssid_esc, wifi_pass_esc, dns1str, dns2str, dns_port, relaystr, token_hex, p2p_port,
         device_str, unmetered ? "true" : "false", redirect_mail ? "true" : "false",
         mobile_version_major, mobile_version_minor, mobile_version_patch,
         PICO_ADAPTER_SOFTWARE);
@@ -496,13 +649,123 @@ static void handle_post_reboot(struct web_conn *c){
     while(1);
 }
 
-static void web_dispatch(struct web_conn *c, bool is_get, bool is_post, const char *path, const char *body){
+static void handle_get_eeprom(struct web_conn *c){
+    struct mobile_user *mobile = web_mobile;
+    web_send_raw_response(c, 200, "OK", "application/octet-stream",
+        mobile->config_eeprom, sizeof(mobile->config_eeprom));
+}
+
+// Mirrors config_library_load()'s layout (private to libmobile/config.c) so an
+// uploaded LM block can be reflected into the live adapter->config, keeping it
+// consistent with the raw bytes for a later explicit Save & Reboot.
+static enum mobile_addrtype web_addrtype_from_byte(uint8_t v){
+    switch (v){
+        case MOBILE_ADDRTYPE_IPV4: return MOBILE_ADDRTYPE_IPV4;
+        case MOBILE_ADDRTYPE_IPV6: return MOBILE_ADDRTYPE_IPV6;
+        default: return MOBILE_ADDRTYPE_NONE;
+    }
+}
+
+static void web_decode_uploaded_addr(struct mobile_addr *addr, uint8_t type_byte, const uint8_t *host, const uint8_t *port_bytes){
+    addr->type = web_addrtype_from_byte(type_byte);
+    if (addr->type == MOBILE_ADDRTYPE_IPV4){
+        struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
+        addr4->port = port_bytes[0] | (port_bytes[1] << 8);
+        memcpy(addr4->host, host, sizeof(addr4->host));
+    } else if (addr->type == MOBILE_ADDRTYPE_IPV6){
+        struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
+        addr6->port = port_bytes[0] | (port_bytes[1] << 8);
+        memcpy(addr6->host, host, sizeof(addr6->host));
+    }
+}
+
+static void web_apply_uploaded_libmobile_block(struct mobile_user *mobile, const uint8_t *data){
+    const uint8_t *lm = data + 0x100;
+
+    // Bit 0x80 of the device byte is MOBILE_CONFIG_DEVICE_UNMETERED (config.h).
+    unsigned char device_raw = lm[0x05];
+    mobile_config_set_device(mobile->adapter,
+        (enum mobile_adapter_device)(device_raw & ~0x80), (device_raw & 0x80) != 0);
+
+    struct mobile_addr dns1 = {.type = MOBILE_ADDRTYPE_NONE};
+    struct mobile_addr dns2 = {.type = MOBILE_ADDRTYPE_NONE};
+    struct mobile_addr relay = {.type = MOBILE_ADDRTYPE_NONE};
+    web_decode_uploaded_addr(&dns1, lm[0x06], lm + 0x20, lm + 0x1a);
+    web_decode_uploaded_addr(&dns2, lm[0x07], lm + 0x30, lm + 0x1c);
+    web_decode_uploaded_addr(&relay, lm[0x0a], lm + 0x40, lm + 0x1e);
+    mobile_config_set_dns(mobile->adapter, &dns1, MOBILE_DNS1);
+    mobile_config_set_dns(mobile->adapter, &dns2, MOBILE_DNS2);
+    mobile_config_set_relay(mobile->adapter, &relay);
+
+    unsigned p2p_port = lm[0x08] | (lm[0x09] << 8);
+    if (p2p_port) mobile_config_set_p2p_port(mobile->adapter, p2p_port);
+
+    mobile_config_set_alt_mail(mobile->adapter, lm[0x0c] != 0);
+    mobile_config_set_relay_token(mobile->adapter, lm[0x0b] ? lm + 0x50 : NULL);
+}
+
+// Only updates RAM (config_eeprom + the live adapter->config). Nothing is
+// written to flash here; the user must press "Save & Reboot" to persist it.
+static void handle_post_eeprom(struct web_conn *c, const char *body, int content_length){
+    struct mobile_user *mobile = web_mobile;
+
+    if (content_length != EEPROM_FILE_SIZE){
+        web_send_response(c, 400, "Bad Request", "application/json",
+            "{\"status\":\"error\",\"error\":\"EEPROM uploads must be exactly 512 bytes\"}");
+        return;
+    }
+
+    const char *header = stristr(c->req_buf, "X-Eeprom-Replace-Libmobile:");
+    bool replace_libmobile = false;
+    if (header){
+        char value[8] = {0};
+        const char *value_p = header + strlen("X-Eeprom-Replace-Libmobile:");
+        size_t i = 0;
+        while (*value_p && *value_p != '\r' && *value_p != '\n' && i + 1 < sizeof(value)){
+            value[i++] = *value_p++;
+        }
+        value[i] = '\0';
+        replace_libmobile = (strcmp(value, "1") == 0 || strcmp(value, "true") == 0);
+    }
+
+    const uint8_t *data = (const uint8_t *)body;
+    if (data[0] != 'M' || data[1] != 'A'){
+        web_send_response(c, 400, "Bad Request", "application/json",
+            "{\"status\":\"error\",\"error\":\"Invalid EEPROM: missing MA signature at offset 0x00\"}");
+        return;
+    }
+    if (replace_libmobile && (data[0x100] != 'L' || data[0x101] != 'M')){
+        web_send_response(c, 400, "Bad Request", "application/json",
+            "{\"status\":\"error\",\"error\":\"Invalid EEPROM: missing LM signature at offset 0x100\"}");
+        return;
+    }
+
+    if (replace_libmobile){
+        memcpy(mobile->config_eeprom, data, sizeof(mobile->config_eeprom));
+        web_apply_uploaded_libmobile_block(mobile, data);
+    } else {
+        if (content_length < EEPROM_ORIGINAL_CONFIG_SIZE) {
+            web_send_response(c, 400, "Bad Request", "application/json",
+                "{\"status\":\"error\",\"error\":\"Payload too short for the original adapter config\"}");
+            return;
+        }
+        memcpy(mobile->config_eeprom, data, EEPROM_ORIGINAL_CONFIG_SIZE);
+    }
+
+    web_send_response(c, 200, "OK", "application/json", "{\"status\":\"ok\"}");
+}
+
+static void web_dispatch(struct web_conn *c, bool is_get, bool is_post, const char *path, const char *body, int content_length){
     if (is_get && strcmp(path, "/") == 0){
         web_send_response(c, 200, "OK", "text/html", WEB_CONFIG_HTML);
     } else if (is_get && strcmp(path, "/api/config") == 0){
         handle_get_config(c);
+    } else if (is_get && strcmp(path, "/api/eeprom") == 0){
+        handle_get_eeprom(c);
     } else if (is_post && strcmp(path, "/api/config") == 0){
         handle_post_config(c, body);
+    } else if (is_post && strcmp(path, "/api/eeprom") == 0){
+        handle_post_eeprom(c, body, content_length);
     } else if (is_post && strcmp(path, "/api/format") == 0){
         handle_post_format(c);
     } else if (is_post && strcmp(path, "/api/reboot") == 0){
@@ -545,7 +808,7 @@ static void web_process(struct web_conn *c){
     char *body = c->req_buf + header_len;
     body[content_length] = '\0';
 
-    web_dispatch(c, is_get, is_post, path, body);
+    web_dispatch(c, is_get, is_post, path, body, content_length);
 }
 
 static err_t web_sent_cb(void *arg, struct tcp_pcb *pcb, u16_t len){

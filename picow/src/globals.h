@@ -1,7 +1,13 @@
 #pragma once
 
 #include <mobile.h>
-#include "socket_impl.h"
+// NOTE: struct mobile_user embeds struct socket_impl directly, which ties
+// mobile_user to the current cyw43/lwIP backend. A future ESP32 backend
+// would need this to become an opaque per-connection handle instead.
+#include "net/picow/socket_impl.h"
+// LED_* macros below need cyw43_arch_gpio_put(); keep this header
+// self-sufficient instead of relying on whoever includes it first.
+#include "pico/cyw43_arch.h"
 
 #ifdef BOARD_PICO2W
     #define PICO_ADAPTER_HARDWARE "Pico2W"

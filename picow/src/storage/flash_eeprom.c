@@ -247,8 +247,10 @@ void ReadConfig(struct saved_data_pointers* save_ptrs) {
     DEBUG_PRINT_FUNCTION("Done.");
 }
 
-// Setup the save in the proper position, with the logic to choose where to save
-void SaveConfig(struct saved_data_pointers* save_ptrs) {
+// Setup the save in the proper position, with the logic to choose where to save.
+// Returns true if the new data was verified on flash, false on double failure.
+bool SaveConfig(struct saved_data_pointers* save_ptrs) {
+    LED_ON;
     uint8_t new_mirror = (save_mirror + 1) % NUM_MIRRORS;
     uint8_t position_increase = 0;
     if(new_mirror == 0)
@@ -280,4 +282,5 @@ void SaveConfig(struct saved_data_pointers* save_ptrs) {
         save_position = new_position;
         save_progressive_value = new_progressive_value;
     }
+    return success;
 }

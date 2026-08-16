@@ -13,6 +13,7 @@
 #include "net/net_hal.h"
 #include "web/web_server.h"
 #include "core/adapter_bridge.h"
+#include "core/led_status.h"
 #include "pio/linkcable.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,22 +47,6 @@ void TIME_SENSITIVE(link_cable_ISR)(void) {
     }
     linkcable_flush();
     linkcable_send(data);
-}
-
-static void mobile_validate_relay(void){
-    struct mobile_addr relay = {0};
-    mobile_config_get_relay(mobile->adapter, &relay);
-    if (relay.type != MOBILE_ADDRTYPE_NONE){
-        for (int i = 0; i < 3; i++){
-            LED_ON;
-            busy_wait_us(MS(150));
-            LED_OFF;
-            busy_wait_us(MS(150));
-        }
-        LED_ON;
-    } else {
-        LED_OFF;
-    }
 }
 
 static void mobile_user_reset_runtime_state(struct mobile_user *m){
@@ -100,7 +85,7 @@ void main(){
     stdio_init_all();
     printf("Booting...\n");
     net_init();
-    LED_ON;
+    led_status_boot_start();
     busy_wait_us(SEC(5));
 
     #ifdef DEBUG_SIGNAL_PINS
@@ -134,6 +119,16 @@ void main(){
     bool isConnectedWiFi = net_wifi_connect(mobile->wifiSSID, mobile->wifiPASS, WIFI_CONNECT_TIMEOUT_MS);
 
     if (!isConnectedWiFi) {
+        // Wi-Fi not configured yet (still the defaults) isn't an error: it's
+        // the expected first-boot state, so no error code is signaled for it.
+        bool wifi_not_configured =
+            strcmp(mobile->wifiSSID, WIFI_DEFAULT_SSID) == 0 &&
+            strcmp(mobile->wifiPASS, WIFI_DEFAULT_PASS) == 0;
+        if (!wifi_not_configured) {
+            led_status_report_error(net_wifi_last_connect_was_badauth()
+                ? LED_ERROR_WIFI_BADAUTH : LED_ERROR_WIFI_CONNECT_FAILED);
+        }
+
         // No usable WiFi: fall back to our own hotspot so the device can still
         // be reached and configured. There's nothing useful to continue with,
         // so this blocks forever; only a reboot (from the web page) gets out.
@@ -164,7 +159,9 @@ void main(){
     mobile_start(mobile->adapter);
     DEBUG_PRINT_FUNCTION("libmobile started.");
 
-    mobile_validate_relay();
+    // Normal boot is complete: hand the LED over to the runtime "config to
+    // save" indicator (impl_config_write() / the auto-save block below).
+    led_status_boot_done();
 
     bool first_main_loop = true;
     bool first_mobile_loop = true;
@@ -218,10 +215,15 @@ void main(){
             if (((TIME_FUNCTION - curr_time_last_config_edit) >= CONFIG_LAST_EDIT_TIMEOUT) && can_disable_irqs) {
                 struct saved_data_pointers save_ptrs;
                 InitSavedPointers(&save_ptrs, mobile);
-                SaveConfig(&save_ptrs);
+                if (SaveConfig(&save_ptrs)) {
+                    LED_OFF;
+                } else {
+                    // Leave the LED on (see led_status_report_error) instead of
+                    // clearing it, since the config still isn't safely on flash.
+                    led_status_report_error(LED_ERROR_FLASH_SAVE_FAILED);
+                }
                 adapter_bridge_clear_pending_config_write();
                 mobile->force_save = false;
-                LED_OFF;
             }
         }
     }

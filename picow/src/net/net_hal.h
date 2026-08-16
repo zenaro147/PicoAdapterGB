@@ -18,6 +18,12 @@ bool net_init(void);
 // (caller should then fall back to net_wifi_start_ap()).
 bool net_wifi_connect(const char *ssid, const char *psk, uint32_t timeout_ms);
 
+// True if the last net_wifi_connect() failure was due to a rejected
+// password, as opposed to a generic/timeout failure (no network found,
+// router unreachable, etc.). Only meaningful right after net_wifi_connect()
+// returns false.
+bool net_wifi_last_connect_was_badauth(void);
+
 // Starts an access point with the given credentials, for first-time setup.
 void net_wifi_start_ap(const char *ssid, const char *psk);
 

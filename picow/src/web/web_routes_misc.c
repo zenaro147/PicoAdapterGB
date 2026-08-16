@@ -7,6 +7,7 @@
 #include "hardware/watchdog.h"
 
 #include "storage/flash_eeprom.h"
+#include "core/led_status.h"
 
 void handle_post_format(struct web_conn *c){
     struct mobile_user *mobile = web_mobile;
@@ -28,7 +29,9 @@ void handle_post_format(struct web_conn *c){
 
     struct saved_data_pointers ptrs;
     InitSavedPointers(&ptrs, mobile);
-    SaveConfig(&ptrs);
+    if (!SaveConfig(&ptrs)) {
+        led_status_report_error(LED_ERROR_FLASH_SAVE_FAILED);
+    }
 
     web_send_response(c, 200, "OK", "application/json", "{\"status\":\"ok\"}");
 }

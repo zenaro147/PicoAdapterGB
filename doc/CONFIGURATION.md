@@ -66,6 +66,21 @@ The web page also lets you download and upload the raw 512-byte Mobile Adapter G
 - Checking "Overwrite libmobile config too" also restores the DNS/relay/device/etc. block (offsets `0x100`-`0x15F`), which must additionally start with the `LM` signature. The page updates those fields immediately, decoded from the uploaded file in the browser.
 - An upload only changes what's held in memory. Nothing is written to flash until you press `Save & Reboot`.
 
+## LED status
+
+The adapter has a single LED, wired to the Wi-Fi chip rather than the RP2040 itself, so it's only used for a simple boot/error indicator (not a general-purpose status light):
+
+- **Solid on** from the moment the device powers on, for the whole boot sequence.
+- **Solid off** once boot has fully finished: either the adapter reached normal operation, or the fallback setup hotspot is up and serving its page.
+- **Blink code, then solid on again**: signals a real error partway through boot, before boot continues. Count the blinks (repeated 3 times, with a pause between each repetition):
+  - **1 blink** — couldn't join the saved Wi-Fi network (generic failure: out of range, router unreachable, etc.); falling back to the setup hotspot.
+  - **2 blinks** — the saved Wi-Fi network rejected the password; falling back to the setup hotspot.
+  - **3 blinks** — the configuration failed to save to flash.
+
+Blink codes only ever represent errors. Normal/expected states (e.g. no Wi-Fi configured yet on first boot, or waiting for the Game Boy) are not signaled through the LED.
+
+Separately, while the device is running normally, the LED turning on again means there's a configuration change pending to be written to flash (see [doc/wiki/7-IMPORTANT NOTES.md](wiki/7-IMPORTANT%20NOTES.md)); wait for it to turn off before doing anything else on the Game Boy.
+
 ## Serial fallback
 
 The serial console is no longer the normal configuration path for the device.

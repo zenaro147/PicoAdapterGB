@@ -15,11 +15,14 @@
 #define WIFI_DEFAULT_SSID "WiFi_Network"
 #define WIFI_DEFAULT_PASS "P@$$w0rd"
 
+static int last_connect_errorcode = 0;
+
 bool net_init(void){
     return cyw43_arch_init() == 0;
 }
 
 bool net_wifi_connect(const char *ssid, const char *psk, uint32_t timeout_ms){
+    last_connect_errorcode = 0;
     if (strcmp(ssid, WIFI_DEFAULT_SSID) == 0 && strcmp(psk, WIFI_DEFAULT_PASS) == 0) {
         DEBUG_PRINT_FUNCTION("Wi-Fi credentials are still the defaults; skipping connection attempts.");
         return false;
@@ -31,6 +34,7 @@ bool net_wifi_connect(const char *ssid, const char *psk, uint32_t timeout_ms){
     for (unsigned attempt = 1; attempt <= WIFI_CONNECT_MAX_ATTEMPTS; attempt++) {
         int errorcode = cyw43_arch_wifi_connect_timeout_ms(
             (char *)ssid, (char *)psk, CYW43_AUTH_WPA2_AES_PSK, timeout_ms);
+        last_connect_errorcode = errorcode;
         if (errorcode == 0) {
             DEBUG_PRINT_FUNCTION("Device IP: %s", net_wifi_ip_string());
             DEBUG_PRINT_FUNCTION("Connected on attempt %u.", attempt);
@@ -44,6 +48,10 @@ bool net_wifi_connect(const char *ssid, const char *psk, uint32_t timeout_ms){
         }
     }
     return false;
+}
+
+bool net_wifi_last_connect_was_badauth(void){
+    return last_connect_errorcode == PICO_ERROR_BADAUTH;
 }
 
 void net_wifi_start_ap(const char *ssid, const char *psk){

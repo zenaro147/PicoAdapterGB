@@ -13,6 +13,7 @@
 
 #include "net/net_hal.h"
 #include "storage/flash_eeprom.h"
+#include "core/led_status.h"
 #include "hardware/watchdog.h"
 
 // Allocated only while the config server is running (see web_config_listen /
@@ -490,7 +491,9 @@ void web_config_service_pending_actions(void){
 
     struct saved_data_pointers save_ptrs;
     InitSavedPointers(&save_ptrs, web_mobile);
-    SaveConfig(&save_ptrs);
+    if (!SaveConfig(&save_ptrs)) {
+        led_status_report_error(LED_ERROR_FLASH_SAVE_FAILED);
+    }
     DEBUG_PRINT_FUNCTION("Configuration saved. Waiting for HTTP response to finish...");
 
     web_reboot_waiting = true;
@@ -502,6 +505,10 @@ void web_config_service_pending_actions(void){
 // the only way out is the user rebooting via the web page (hardware watchdog).
 void web_config_run_blocking(struct mobile_user *mobile){
     if (!web_config_listen(mobile)) return;
+
+    // The fallback hotspot's own "boot" is complete now that its setup page
+    // is reachable; hand the LED to the runtime "config to save" indicator.
+    led_status_boot_done();
 
     while (true){
         net_poll();

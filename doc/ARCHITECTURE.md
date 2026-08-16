@@ -17,9 +17,10 @@ picow/src/
 ├── globals.h                 # shared constants, struct mobile_user, LED/time macros
 │
 ├── core/
-│   └── adapter_bridge.c/.h   # every mobile_impl_*() callback used by libmobile
-│                             # (serial enable/disable, config read/write, timers,
-│                             # socket open/close/connect/send/recv, number updates)
+│   ├── adapter_bridge.c/.h   # every mobile_impl_*() callback used by libmobile
+│   │                         # (serial enable/disable, config read/write, timers,
+│   │                         # socket open/close/connect/send/recv, number updates)
+│   └── led_status.c/.h       # boot/error LED indicator (see doc/CONFIGURATION.md)
 │
 ├── net/
 │   ├── net_hal.h             # board-agnostic network interface (net_init, net_wifi_*,

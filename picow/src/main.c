@@ -22,8 +22,6 @@ bool speed_240_MHz = false;
 //#define DEBUG_SIGNAL_PINS
 #define CONFIG_LAST_EDIT_TIMEOUT SEC(1)
 #define WIFI_CONNECT_TIMEOUT_MS 5000
-#define WIFI_DEFAULT_SSID "WiFi_Network"
-#define WIFI_DEFAULT_PASS "P@$$w0rd"
 #define WIFI_HOTSPOT_SSID "PicoAdapterGB"
 #define WIFI_HOTSPOT_PASS "magb!123"
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -100,8 +98,6 @@ void main(){
 
     mobile = malloc(sizeof(struct mobile_user));
     memset(mobile, 0, sizeof(*mobile));
-    strcpy(mobile->wifiSSID, WIFI_DEFAULT_SSID);
-    strcpy(mobile->wifiPASS, WIFI_DEFAULT_PASS);
 
     InitSave();
     struct saved_data_pointers ptrs;
@@ -122,8 +118,8 @@ void main(){
         // Wi-Fi not configured yet (still the defaults) isn't an error: it's
         // the expected first-boot state, so no error code is signaled for it.
         bool wifi_not_configured =
-            strcmp(mobile->wifiSSID, WIFI_DEFAULT_SSID) == 0 &&
-            strcmp(mobile->wifiPASS, WIFI_DEFAULT_PASS) == 0;
+            mobile->wifiSSID[0] == '\0' &&
+            mobile->wifiPASS[0] == '\0';
         if (!wifi_not_configured) {
             led_status_report_error(net_wifi_last_connect_was_badauth()
                 ? LED_ERROR_WIFI_BADAUTH : LED_ERROR_WIFI_CONNECT_FAILED);

@@ -39,7 +39,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     pico_enable_stdio_usb(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} 0)
     pico_enable_stdio_uart(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} 1)
 else()
-    pico_enable_stdio_usb(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} 0)
+    pico_enable_stdio_usb(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} 1)
     pico_enable_stdio_uart(${PROJECT_NAME}${ProjBoardType}${ProjOutputType} 0)
 endif()
 

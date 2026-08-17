@@ -21,7 +21,7 @@ bool net_init(void){
 
 bool net_wifi_connect(const char *ssid, const char *psk, uint32_t timeout_ms){
     last_connect_errorcode = 0;
-    if (ssid[0] == '\0' && psk[0] == '\0') {
+    if ((strcmp(ssid, WIFI_DEFAULT_SSID) == 0 && strcmp(psk, WIFI_DEFAULT_PASS) == 0) || (ssid[0] == '\0' && psk[0] == '\0')) {
         DEBUG_PRINT_FUNCTION("Wi-Fi credentials are still the defaults; skipping connection attempts.");
         return false;
     }

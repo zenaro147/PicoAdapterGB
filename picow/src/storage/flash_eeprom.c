@@ -131,6 +131,8 @@ static bool save_single_config(uint8_t mirror, uint16_t position, uint16_t progr
     }
     else {
         prepare_data_unit(NULL, tmp_data.config_eeprom, EEPROM_SIZE, save_key_strings[KEY_CONFIG_INDEX], tmp_data.config_key);
+        prepare_data_unit((uint8_t*)WIFI_DEFAULT_SSID, tmp_data.wifiSSID, SSID_LENGHT, save_key_strings[KEY_WIFISSID_INDEX], tmp_data.config_wifissid_key);
+        prepare_data_unit((uint8_t*)WIFI_DEFAULT_PASS, tmp_data.wifiPASS, PASS_LENGHT, save_key_strings[KEY_WIFIPASS_INDEX], tmp_data.config_wifipass_key);
     }
     
     memcpy(tmp_data.unused, unused_data, FLASH_DATA_SIZE - FINAL_FLASH_MIN_SIZE);
@@ -179,7 +181,6 @@ void InitSave(void) {
         save_position = 0;
         save_progressive_value = 0;
         save_single_config(save_mirror, save_position, save_progressive_value, NULL);
-        return;
     }
 
     // Get the latest valid save

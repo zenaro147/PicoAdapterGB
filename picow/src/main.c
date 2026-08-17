@@ -118,9 +118,11 @@ void main(){
         // Wi-Fi not configured yet (still the defaults) isn't an error: it's
         // the expected first-boot state, so no error code is signaled for it.
         bool wifi_not_configured =
-            mobile->wifiSSID[0] == '\0' &&
-            mobile->wifiPASS[0] == '\0';
-        if (!wifi_not_configured) {
+            (strcmp(mobile->wifiSSID, WIFI_DEFAULT_SSID) == 0 &&
+            strcmp(mobile->wifiPASS, WIFI_DEFAULT_PASS) == 0) ||
+            (mobile->wifiSSID[0] == '\0' &&
+            mobile->wifiPASS[0] == '\0');
+        if (wifi_not_configured) {
             led_status_report_error(net_wifi_last_connect_was_badauth()
                 ? LED_ERROR_WIFI_BADAUTH : LED_ERROR_WIFI_CONNECT_FAILED);
         }

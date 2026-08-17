@@ -29,6 +29,9 @@
     #define PICO_ADAPTER_SOFTWARE "NO-VERSION"
 #endif
 
+#define WIFI_DEFAULT_SSID "WiFi_Network"
+#define WIFI_DEFAULT_PASS "P@$$w0rd"
+
 //#define DEBUG_SIGNAL_PINS
 
 // WIFI SSID AND PASSWORD LENGHT

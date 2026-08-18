@@ -1,7 +1,7 @@
 First of all, get the latest release for your setup (the UF2 file)
 
 * [**Latest Stable Release**](https://github.com/zenaro147/PicoAdapterGB/releases/latest)
-* [**Latest Stable Release**](https://github.com/zenaro147/PicoAdapterGB/releases/latest)
+* [**Latest Beta Release**](https://github.com/zenaror/PicoAdapterGB/releases?q=beta-)
 * [**Latest Bleeding Edge**](https://github.com/zenaror/PicoAdapterGB/releases/tag/bleeding-edge)
 
 After that, connect your Pico to your computer holding the **BOOTSEL** button (or just **BOOT** in some generic boards). This should make your Pico recognized as a Storage Device on your computer called "RPI-RP2".

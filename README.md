@@ -14,7 +14,7 @@ Bleeding Edge  [![Bleeding Edge](https://img.shields.io/github/actions/workflow/
 If you still have questions, ask us here or in the **REON Team Discord** [![Discord Group](https://img.shields.io/badge/chat-on%20Discord-738ADB)](https://discord.gg/mKT4pTfUqC)
 
 ## How to build
-Refer to the [Wiki page](https://github.com/zenaro147/PicoAdapterGB/wiki) for more details on how to build one according to your setup.
+Refer to the [Wiki page](https://github.com/zenaror/PicoAdapterGB/tree/main/doc/wiki) for more details on how to build one according to your setup.
 
 ## Demo
 [![Click on the image to see the full video](https://github.com/zenaro147/PicoAdapterGB/blob/main/doc/demoPreview.gif)](https://youtu.be/YvNsaXxCjOU)<br> 

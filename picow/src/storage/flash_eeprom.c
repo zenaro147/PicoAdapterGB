@@ -131,6 +131,8 @@ static bool save_single_config(uint8_t mirror, uint16_t position, uint16_t progr
     }
     else {
         prepare_data_unit(NULL, tmp_data.config_eeprom, EEPROM_SIZE, save_key_strings[KEY_CONFIG_INDEX], tmp_data.config_key);
+        prepare_data_unit((uint8_t*)WIFI_DEFAULT_SSID, tmp_data.wifiSSID, SSID_LENGHT, save_key_strings[KEY_WIFISSID_INDEX], tmp_data.config_wifissid_key);
+        prepare_data_unit((uint8_t*)WIFI_DEFAULT_PASS, tmp_data.wifiPASS, PASS_LENGHT, save_key_strings[KEY_WIFIPASS_INDEX], tmp_data.config_wifipass_key);
     }
     
     memcpy(tmp_data.unused, unused_data, FLASH_DATA_SIZE - FINAL_FLASH_MIN_SIZE);
@@ -179,7 +181,6 @@ void InitSave(void) {
         save_position = 0;
         save_progressive_value = 0;
         save_single_config(save_mirror, save_position, save_progressive_value, NULL);
-        return;
     }
 
     // Get the latest valid save
@@ -247,8 +248,10 @@ void ReadConfig(struct saved_data_pointers* save_ptrs) {
     DEBUG_PRINT_FUNCTION("Done.");
 }
 
-// Setup the save in the proper position, with the logic to choose where to save
-void SaveConfig(struct saved_data_pointers* save_ptrs) {
+// Setup the save in the proper position, with the logic to choose where to save.
+// Returns true if the new data was verified on flash, false on double failure.
+bool SaveConfig(struct saved_data_pointers* save_ptrs) {
+    LED_ON;
     uint8_t new_mirror = (save_mirror + 1) % NUM_MIRRORS;
     uint8_t position_increase = 0;
     if(new_mirror == 0)
@@ -280,4 +283,5 @@ void SaveConfig(struct saved_data_pointers* save_ptrs) {
         save_position = new_position;
         save_progressive_value = new_progressive_value;
     }
+    return success;
 }

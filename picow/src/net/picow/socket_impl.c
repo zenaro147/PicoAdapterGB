@@ -6,11 +6,11 @@
 
 #include <string.h>
 
-uint16_t buffrx_lastpos = 0;
-
 bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport, void *user){    
 
     if (state->tcp_pcb != NULL || state->udp_pcb != NULL) return false;
+
+    state->buffer_rx_read_pos = 0;
 
     switch (addrtype) {
         case MOBILE_ADDRTYPE_IPV4:
@@ -88,7 +88,7 @@ void socket_impl_close(struct socket_impl *state){
         }
         state->sock_addr = -1;
         state->sock_type = SOCK_NONE;
-        memset(state->udp_remote_srv,0x00,sizeof(state->udp_remote_srv));
+        memset(state->udp_remote_ip,0x00,sizeof(state->udp_remote_ip));
         state->udp_remote_port = 0;
         state->client_status = false;
         state->inside_callback = false;
@@ -98,6 +98,7 @@ void socket_impl_close(struct socket_impl *state){
         //memset(state->buffer_tx,0x00,sizeof(state->buffer_tx));
         state->buffer_rx_len = 0;
         state->buffer_tx_len = 0;
+        state->buffer_rx_read_pos = 0;
         // printf("Socket Closed.\n");
     }
 
@@ -185,7 +186,7 @@ int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *add
 int socket_impl_send(struct socket_impl *state, const void *data, const unsigned size, const struct mobile_addr *addr){
     //Check if everything is OK to send
     if( 
-        (state->sock_type == SOCK_TCP && (state->tcp_pcb->state == CLOSED || !state->tcp_pcb)) || 
+        (state->sock_type == SOCK_TCP && (!state->tcp_pcb || state->tcp_pcb->state != ESTABLISHED)) || 
         (state->sock_type == SOCK_UDP && (!state->udp_pcb && !addr) ||
         (addr && (addr->type == MOBILE_ADDRTYPE_IPV4 && state->sock_addr == IPADDR_TYPE_V6) || 
         (addr->type == MOBILE_ADDRTYPE_IPV6 && state->sock_addr == IPADDR_TYPE_V4)))){
@@ -208,7 +209,7 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
             if (addr->type == MOBILE_ADDRTYPE_IPV4) {
                 const struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
                 sprintf(srv_ip, "%u.%u.%u.%u", addr4->host[0], addr4->host[1], addr4->host[2], addr4->host[3]);
-                ip4addr_aton(srv_ip, &state->tcp_pcb->remote_ip);
+                ip4addr_aton(srv_ip, &state->udp_pcb->remote_ip);
                 state->udp_pcb->remote_port=addr4->port;
             } else if (addr->type == MOBILE_ADDRTYPE_IPV6) {
                 const struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
@@ -243,41 +244,46 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
 }
 
 int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struct mobile_addr *addr){
+    // "Is the connection still alive?" check: must run before touching the
+    // rx buffer, regardless of whether data is still pending, otherwise this
+    // would fall through to memcpy(NULL, ...) below.
+    if(!data){
+        if(state->sock_type != SOCK_TCP) return 0;
+        // PCB already closed by socket_recv_tcp (remote FIN received)
+        if (state->tcp_pcb == NULL) {
+            return -2;
+        }
+        // CLOSED      = 0,
+        // LISTEN      = 1,
+        // SYN_SENT    = 2,
+        // SYN_RCVD    = 3,
+        // ESTABLISHED = 4,
+        // FIN_WAIT_1  = 5,
+        // FIN_WAIT_2  = 6,
+        // CLOSE_WAIT  = 7,
+        // CLOSING     = 8,
+        // LAST_ACK    = 9,
+        // TIME_WAIT   = 10
+        switch (state->tcp_pcb->state){
+            case ESTABLISHED:
+            case LISTEN:
+            case SYN_SENT:
+            case SYN_RCVD:
+                return 0;
+                break;
+            case CLOSED:
+            case CLOSING:
+            case CLOSE_WAIT:
+                return -2;
+                break;
+            default:
+                return -1;
+                break;
+        }
+    }
+
     //If the socket is a TCP and don't have any buff, check if it's disconnected to return an error
     if(state->sock_type == SOCK_TCP && state->buffer_rx_len <= 0){
-        if(!data){
-            // PCB already closed by socket_recv_tcp (remote FIN received)
-            if (state->tcp_pcb == NULL) {
-                return -2;
-            }
-            // CLOSED      = 0,
-            // LISTEN      = 1,
-            // SYN_SENT    = 2,
-            // SYN_RCVD    = 3,
-            // ESTABLISHED = 4,
-            // FIN_WAIT_1  = 5,
-            // FIN_WAIT_2  = 6,
-            // CLOSE_WAIT  = 7,
-            // CLOSING     = 8,
-            // LAST_ACK    = 9,
-            // TIME_WAIT   = 10
-            switch (state->tcp_pcb->state){
-                case ESTABLISHED:
-                case LISTEN:
-                case SYN_SENT:
-                case SYN_RCVD:
-                    return 0;
-                    break;
-                case CLOSED:
-                case CLOSING:
-                case CLOSE_WAIT:
-                    return -2;
-                    break;
-                default:
-                    return -1;
-                    break;
-            }
-        }
         if((!state->tcp_pcb || state->tcp_pcb->state == CLOSED)){
             return -2;
         }     
@@ -289,27 +295,12 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
     if(state->buffer_rx_len > 0){
         if (addr && state->sock_type == SOCK_UDP){
             struct mobile_addr4 *addr4 = (struct mobile_addr4 *)addr;
-            struct mobile_addr6 *addr6 = (struct mobile_addr6 *)addr;
-            unsigned char ip[MOBILE_INET_PTON_MAXLEN];
-            int rc = mobile_inet_pton(MOBILE_INET_PTON_ANY, state->udp_remote_srv, ip);
-
-            switch (rc) {
-                case MOBILE_INET_PTON_IPV4:
-                    addr4->type = MOBILE_ADDRTYPE_IPV4;
-                    addr4->port = state->udp_remote_port;
-                    memcpy(addr4->host, ip, sizeof(addr4->host));
-                    break;
-                case MOBILE_INET_PTON_IPV6:
-                    addr6->type = MOBILE_ADDRTYPE_IPV6;
-                    addr6->port = state->udp_remote_port;
-                    memcpy(addr6->host, ip, sizeof(addr6->host));
-                    break;
-                default:
-                    break;
-            }
+            addr4->type = MOBILE_ADDRTYPE_IPV4;
+            addr4->port = state->udp_remote_port;
+            memcpy(addr4->host, state->udp_remote_ip, sizeof(addr4->host));
         }
         
-        uint16_t tmpsize = state->buffer_rx_len - buffrx_lastpos;
+        uint16_t tmpsize = state->buffer_rx_len - state->buffer_rx_read_pos;
         if(tmpsize > MOBILE_MAX_TRANSFER_SIZE){
             recvd_buff = MOBILE_MAX_TRANSFER_SIZE;
         }else{
@@ -318,10 +309,10 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
         if (recvd_buff > size) recvd_buff = size;
 
         // printf("copied %d bytes\n",recvd_buff);
-        memcpy(data,state->buffer_rx + buffrx_lastpos,recvd_buff);
-        buffrx_lastpos = buffrx_lastpos + recvd_buff;
-        if(buffrx_lastpos >= state->buffer_rx_len){
-            buffrx_lastpos = 0;
+        memcpy(data,state->buffer_rx + state->buffer_rx_read_pos,recvd_buff);
+        state->buffer_rx_read_pos = state->buffer_rx_read_pos + recvd_buff;
+        if(state->buffer_rx_read_pos >= state->buffer_rx_len){
+            state->buffer_rx_read_pos = 0;
             state->buffer_rx_len = 0;
         } 
     }else if(state->buffer_rx_len <= 0){
@@ -401,7 +392,7 @@ void socket_impl_close_commands(struct socket_impl *state){
     }
     state->sock_addr = -1;
     state->sock_type = SOCK_NONE;
-    memset(state->udp_remote_srv,0x00,sizeof(state->udp_remote_srv));
+    memset(state->udp_remote_ip,0x00,sizeof(state->udp_remote_ip));
     state->udp_remote_port = 0;
     state->client_status = false;
     state->inside_callback = false;
@@ -411,5 +402,6 @@ void socket_impl_close_commands(struct socket_impl *state){
     //memset(state->buffer_tx,0x00,sizeof(state->buffer_tx));
     state->buffer_rx_len = 0;
     state->buffer_tx_len = 0;
+    state->buffer_rx_read_pos = 0;
     // printf("Socket Closed.\n");
 }

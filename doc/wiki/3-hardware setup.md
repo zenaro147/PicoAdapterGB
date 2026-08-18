@@ -3,6 +3,7 @@ Different from Arduino that operates in 5V like the GameBoy, the Pico operates i
 Connect the Game Boy serial pins to the Pico pins following this scheme:
 
 ![Link Cable view](https://github.com/zenaro147/NeoGB-Printer/blob/master/Supplementary_images/LinkCable.jpg)
+
 ```
  ___________
 |  6  4  2  |

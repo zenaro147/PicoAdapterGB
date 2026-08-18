@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.12)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
-set(PICO_ADAPTER_SOFTWARE "2.0.0-beta" CACHE STRING "Firmware version shown by the adapter")
+set(PICO_ADAPTER_SOFTWARE "2.0.0" CACHE STRING "Firmware version shown by the adapter")
 add_compile_definitions(PICO_ADAPTER_SOFTWARE=\"${PICO_ADAPTER_SOFTWARE}\")
 
 #set(LIBMOBILE_ENABLE_NO32BIT ON)

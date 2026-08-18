@@ -21,6 +21,19 @@ cmake -S . -B build \
   -DCMAKE_BUILD_TYPE=Release
 ```
 
+The firmware version shown in boot logs and the web interface defaults to
+`1.5.6-beta`. It can be overridden at configure time:
+
+```bash
+cmake -S . -B build \
+  -DPICO_BOARD=pico_w \
+  -DADAPTER=REON \
+  '-DPICO_ADAPTER_SOFTWARE=custom-build-name'
+```
+
+The bleeding-edge workflow sets this automatically to `bleeding-edge` plus
+the full commit SHA used for the build.
+
 Common variants:
 
 ```bash

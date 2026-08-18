@@ -1,6 +1,6 @@
 # Configuring the device
 
-The recommended configuration method for the Pico W build is the built-in web setup interface.
+The configuration method for the Pico W build is the built-in web setup interface.
 
 ## Web configuration flow
 
@@ -42,7 +42,7 @@ This is the current behavior of the firmware used in the `picow` target.
 
 ## Serial fallback
 
-The serial console is no longer the normal configuration path for the device.
+The serial console is no longer available to configure the device.
 
 It is kept only as a troubleshooting fallback for:
 
@@ -51,15 +51,13 @@ It is kept only as a troubleshooting fallback for:
 - checking logs and state during debugging
 - confirming the Pico is initializing correctly
 
-This is not the recommended way to configure the device in normal use.
-
 ## Important notes
 
-- The main configuration flow is now the web interface.
-- The web interface is the recommended method for user-facing setup.
-- Serial remains only as a debugging tool, not a primary configuration method.
+- The configuration flow is now the web interface.
+- The web interface is the only method for user-facing setup.
+- Serial remains only as a debugging tool.
 
-## P2P / relays note
+## P2P / relay note
 
 In P2P communication, the game will only work correctly when both players use matching adapter settings, especially for the `unmetered` option. This is a known behavior of the original Mobile Adapter GB design and not a limitation specific to the web UI itself.
 

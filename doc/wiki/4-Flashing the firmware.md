@@ -5,4 +5,4 @@ Latest Stable Release  [![Release Version](https://img.shields.io/github/v/relea
 
 After that, connect your Pico to your computer holding the **BOOTSEL** button (or just **BOOT** in some generic boards). This should make your Pico recognized as a Storage Device on your computer called "RPI-RP2".
 
-Now, just copy the UF2 file to the root of this device. The Pico should reset automatically after finish the copy and start to run the program automatically. Just wait until the LED starts to blink, this indicate that the default configuration was applied and the device didn't connect to the internet.
+Now, just copy the UF2 file to the root of this device. The Pico should reset automatically after finish the copy and start to run the program automatically. The LED turns on solid as soon as it boots; if it stays solid and then turns off, it connected normally or started its own setup hotspot. If it blinks a few times first, that's an error code (see [Configuring the device](https://github.com/zenaro147/PicoAdapterGB/wiki/Configuring-the-device) for what each blink count means) before it falls back to the setup hotspot.

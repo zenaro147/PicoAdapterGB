@@ -8,7 +8,7 @@
 struct socket_impl {
     uint8_t sock_addr;
     uint8_t sock_type;
-    char udp_remote_srv[46];
+    unsigned char udp_remote_ip[4]; // raw IPv4 host bytes, set directly from lwIP (no ASCII round-trip)
     unsigned udp_remote_port;
     bool client_status;
     bool inside_callback;
@@ -18,6 +18,7 @@ struct socket_impl {
     uint8_t buffer_rx[BUFF_SIZE];
     int buffer_rx_len;
     int buffer_tx_len;
+    uint16_t buffer_rx_read_pos; // per-socket read cursor into buffer_rx
 	union{
 		struct tcp_pcb *tcp_pcb;
         struct udp_pcb *udp_pcb;

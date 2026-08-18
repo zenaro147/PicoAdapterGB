@@ -43,6 +43,7 @@ jobs:
             -DPICO_SDK_PATH="${GITHUB_WORKSPACE}/pico-sdk" \
             -DPICO_BOARD=pico_w \
             -DADAPTER=REON \
+            -DPICO_ADAPTER_SOFTWARE="bleeding-edge (${GITHUB_SHA})" \
             -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
@@ -107,6 +108,7 @@ jobs:
             -DPICO_SDK_PATH="${GITHUB_WORKSPACE}/pico-sdk" \
             -DPICO_BOARD=pico_w \
             -DADAPTER=STACKSMASHING \
+            -DPICO_ADAPTER_SOFTWARE="bleeding-edge (${GITHUB_SHA})" \
             -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
@@ -171,6 +173,7 @@ jobs:
             -DPICO_SDK_PATH="${GITHUB_WORKSPACE}/pico-sdk" \
             -DPICO_BOARD=pico2_w \
             -DADAPTER=REON \
+            -DPICO_ADAPTER_SOFTWARE="bleeding-edge (${GITHUB_SHA})" \
             -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
@@ -235,6 +238,7 @@ jobs:
             -DPICO_SDK_PATH="${GITHUB_WORKSPACE}/pico-sdk" \
             -DPICO_BOARD=pico2_w \
             -DADAPTER=STACKSMASHING \
+            -DPICO_ADAPTER_SOFTWARE="bleeding-edge (${GITHUB_SHA})" \
             -DCMAKE_BUILD_TYPE=Release
 
       - name: Build

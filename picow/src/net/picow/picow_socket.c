@@ -21,8 +21,10 @@ void socket_recv_udp(void * arg, struct udp_pcb *pcb, struct pbuf *p, const ip_a
         // port,
         // p->len);
 
-        memset(state->udp_remote_srv,0x00,sizeof(state->udp_remote_srv));
-        sprintf(state->udp_remote_srv, "%d.%d.%d.%d", addr->addr&0xff, (addr->addr>>8)&0xff, (addr->addr>>16)&0xff, addr->addr>>24);
+        state->udp_remote_ip[0] = addr->addr & 0xff;
+        state->udp_remote_ip[1] = (addr->addr >> 8) & 0xff;
+        state->udp_remote_ip[2] = (addr->addr >> 16) & 0xff;
+        state->udp_remote_ip[3] = (addr->addr >> 24) & 0xff;
         state->udp_remote_port = port;
 
         // Receive the buffer

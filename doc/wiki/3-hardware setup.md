@@ -1,4 +1,4 @@
-Different from Arduino that operates in 5V like the GameBoy, the Pico operates in 3.3V on its pins by default. You will need a [tiny bidirectionnal Level Shifter like this](https://pt.aliexpress.com/item/1005001839292815.html) to handle the communication protocol and prevent any overvoltage/undervoltage from any side. Direct connection between Game Boy and Pico pins without level shifter may work (especially for GBA games, that works in 3.3v) but we don't recommend this for long term reliability reasons.
+Different from Arduino that operates in 5V like the GameBoy, the Pico operates in 3.3V on its pins by default. You will need a [tiny bidirectionnal Level Shifter like this](https://www.aliexpress.com/item/1005007531580646.html) to handle the communication protocol and prevent any overvoltage/undervoltage from any side. Direct connection between Game Boy and Pico pins without level shifter may work (especially for GBA games, that works in 3.3v) but we don't recommend this for long term reliability reasons.
 
 Connect the Game Boy serial pins to the Pico pins following this scheme:
 

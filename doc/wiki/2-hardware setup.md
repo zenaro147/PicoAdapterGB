@@ -25,3 +25,4 @@ Connect the Game Boy serial pins to the Pico pins following this scheme:
 <sub>Pico and Pico W have the same pinout schema</sub>
 <br><br>
 **⚠If this doesn't work, try to flip around Pin2(Serial Out) and Pin3(Serial In), as the pinout markings of your link cable breakout might be the other way around.⚠**
+

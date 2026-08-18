@@ -1,6 +1,6 @@
 * During the usage, sometimes the LED should turn on. This indicates that the device need to save a new configuration (this could during the Mobile Trainer first configuration, for example). If this happens, **LET THE LED TURNS OFF BEFORE DO ANY OTHER ACTION IN GAME!**
 <br>This is a Pico limitation, since it doesn't have a real EEPROM, like Arduino boards. So the firmware basically use a small writable part of the flash memory to save these configurations.
-<br>This memory is kind of sensible if any interrupt runs during this action and can corrupt your configuration, being necessary to format this flash memory chunck and reconfigure again using the config mode (See for [Configuring the device](https://github.com/zenaro147/PicoAdapterGB/wiki/Configuring-the-device) more details)
+<br>This memory is kind of sensible if any interrupt runs during this action and can corrupt your configuration, being necessary to format this flash memory chunck and reconfigure again using the config mode (See for [Configuring the device](https://github.com/zenaror/PicoAdapterGB/blob/main/doc/wiki/4-Configuring%20the%20device.md) more details)
 
 ---------------------------------
 

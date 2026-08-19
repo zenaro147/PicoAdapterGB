@@ -8,13 +8,15 @@ This is the first standalone implementation of [Mobile Adapter GB](https://bulba
 It's possible to connect to any [REON project](https://github.com/REONTeam/reon) custom server as soon it releases.
 
 ## Development Status
-Latest Stable Release  [![Release Version](https://img.shields.io/github/v/release/zenaror/PicoAdapterGB?style=plastic)](https://github.com/zenaror/PicoAdapterGB/releases/latest/)  [![Release Date](https://img.shields.io/github/release-date/zenaror/PicoAdapterGB?style=plastic)](#)<br>
-Bleeding Edge  [![Bleeding Edge](https://img.shields.io/github/actions/workflow/status/zenaror/PicoAdapterGB/bleeding-edge.yml?branch=develop&style=plastic&label=Bleeding%20Edge)](https://github.com/zenaror/PicoAdapterGB/releases#release-bleeding-edge)
+Last Update [![Release Date](https://img.shields.io/github/release-date-pre/zenaror/PicoAdapterGB?style=plastic)](#)<br>
+* Stable Release [![Release Version](https://img.shields.io/github/v/release/zenaror/PicoAdapterGB?style=plastic)](https://github.com/zenaror/PicoAdapterGB/releases/latest/)
+* Beta Release [![Beta Version](https://img.shields.io/github/v/release/zenaror/PicoAdapterGB?include_prereleases&sort=date&filter=beta-*)](https://github.com/zenaror/PicoAdapterGB/releases?q=beta-*)
+* Bleeding Edge [![Bleeding Edge](https://img.shields.io/github/actions/workflow/status/zenaror/PicoAdapterGB/bleeding-edge.yml?branch=develop&style=plastic&label=Bleeding%20Edge)](https://github.com/zenaror/PicoAdapterGB/releases#release-bleeding-edge)
 
 If you still have questions, ask us here or in the **REON Team Discord** [![Discord Group](https://img.shields.io/badge/chat-on%20Discord-738ADB)](https://discord.gg/mKT4pTfUqC)
 
 ## How to build
-Refer to the [Wiki page](https://github.com/zenaro147/PicoAdapterGB/wiki) for more details on how to build one according to your setup.
+Refer to the [Wiki page](https://github.com/zenaror/PicoAdapterGB/tree/main/doc/wiki) for more details on how to build one according to your setup.
 
 ## Demo
 [![Click on the image to see the full video](https://github.com/zenaro147/PicoAdapterGB/blob/main/doc/demoPreview.gif)](https://youtu.be/YvNsaXxCjOU)<br> 

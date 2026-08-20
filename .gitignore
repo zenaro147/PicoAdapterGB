@@ -57,3 +57,6 @@ dkms.conf
 **/src/examples/*
 32bitsSample.sal
 .continue
+Dockerfile
+docker-compose.yml
+docker-build.sh

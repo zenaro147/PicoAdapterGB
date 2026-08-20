@@ -136,11 +136,11 @@ err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
         }
     }else{
         tcp_arg(state->tcp_pcb, NULL);
-        //tcp_poll(state->tcp_pcb, NULL, 0);
-        tcp_accept(state->tcp_pcb, NULL);
-        tcp_sent(state->tcp_pcb, NULL);
-        tcp_recv(state->tcp_pcb, NULL);
-        tcp_err(state->tcp_pcb, NULL);
+        // tcp_poll(state->tcp_pcb, NULL, 0);
+        // tcp_accept(state->tcp_pcb, NULL);
+        // tcp_sent(state->tcp_pcb, NULL);
+        // tcp_recv(state->tcp_pcb, NULL);
+        // tcp_err(state->tcp_pcb, NULL);
         err = tcp_close(state->tcp_pcb);
         if (err != ERR_OK) {
             // printf("close failed %d, calling abort\n", err);

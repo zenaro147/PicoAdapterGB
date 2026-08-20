@@ -452,8 +452,8 @@ void web_config_start(struct mobile_user *mobile){
 void web_config_stop(void){
     if (!web_listen_pcb) return;
 
-    tcp_arg(web_listen_pcb, NULL);
-    tcp_accept(web_listen_pcb, NULL);
+    // tcp_arg(web_listen_pcb, NULL);
+    // tcp_accept(web_listen_pcb, NULL);
     tcp_close(web_listen_pcb);
     web_listen_pcb = NULL;
 

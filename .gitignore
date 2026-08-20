@@ -60,3 +60,4 @@ dkms.conf
 Dockerfile
 docker-compose.yml
 docker-build.sh
+*.uf2

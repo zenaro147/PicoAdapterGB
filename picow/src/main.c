@@ -176,9 +176,6 @@ void main(){
             first_mobile_loop = false;
         }
         mobile_loop(mobile->adapter);
-        if (!gameboy_session_active && mobile->adapter->commands.session_started) {
-            DEBUG_PRINT_FUNCTION("Start session processed by libmobile.");
-        }
 
         // lwIP remains necessary for relay/P2P sockets after a session starts.
         net_poll();

@@ -38,10 +38,21 @@ static void handle_get_config_impl(struct web_conn *c){
     if (dns1.type == MOBILE_ADDRTYPE_IPV4) dns_port = dns1._addr4.port;
     else if (dns2.type == MOBILE_ADDRTYPE_IPV4) dns_port = dns2._addr4.port;
 
-    char token_hex[MOBILE_RELAY_TOKEN_SIZE * 2 + 1];
-    for (int i = 0; i < MOBILE_RELAY_TOKEN_SIZE; i++)
-        sprintf(token_hex + i * 2, "%02hhX", token[i]);
-    token_hex[MOBILE_RELAY_TOKEN_SIZE * 2] = '\0';
+    char token_hex[MOBILE_RELAY_TOKEN_SIZE * 2 + 1] = {0};
+
+    bool token_valid = false;
+
+    for (int i = 0; i < MOBILE_RELAY_TOKEN_SIZE; i++){
+        if (token[i] != 0){
+            token_valid = true;
+            break;
+        }
+    }
+
+    if (token_valid){
+        for (int i = 0; i < MOBILE_RELAY_TOKEN_SIZE; i++)
+            sprintf(token_hex + i * 2, "%02hhX", token[i]);
+    }
 
     const char *device_str = "BLUE";
     switch (device){

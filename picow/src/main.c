@@ -133,7 +133,8 @@ void main(){
         DEBUG_PRINT_FUNCTION("Could not connect to WiFi. Starting hotspot \"%s\"...", WIFI_HOTSPOT_SSID);
         net_wifi_start_ap(WIFI_HOTSPOT_SSID, WIFI_HOTSPOT_PASS);
         DEBUG_PRINT_FUNCTION("Hotspot up. Connect to \"%s\" and open http://192.168.4.1/", WIFI_HOTSPOT_SSID);
-        web_config_run_blocking(mobile);
+
+        web_config_run_blocking(mobile_snapshot);
         return; // unreachable: web_config_run_blocking never returns
     }
 
@@ -141,13 +142,6 @@ void main(){
 
     web_alive = true;
     web_shutdown_pending = false;
-
-    // The web setup UI is reachable from boot until the Game Boy starts
-    // talking; core1 watches for that and signals core0 (the sole lwIP
-    // owner) to tear it down. It never comes back until reboot.
-    web_config_start(mobile);
-
-    DEBUG_PRINT_FUNCTION("Web Setup available at http://%s/", net_wifi_ip_string());
 
     DEBUG_PRINT_FUNCTION("Initializing Game Boy link cable...");
     linkcable_init(link_cable_ISR);
@@ -157,9 +151,12 @@ void main(){
     mobile_start(mobile->adapter);
     DEBUG_PRINT_FUNCTION("libmobile started.");
 
-    // Normal boot is complete: hand the LED over to the runtime "config to
-    // save" indicator (impl_config_write() / the auto-save block below).
-    led_status_boot_done();
+    // The web setup UI is reachable from boot until the Game Boy starts
+    // talking; core1 watches for that and signals core0 (the sole lwIP
+    // owner) to tear it down. It never comes back until reboot.
+    web_config_start(mobile_snapshot);
+
+    DEBUG_PRINT_FUNCTION("Web Setup available at http://%s/", net_wifi_ip_string());
 
     bool first_main_loop = true;
     bool first_mobile_loop = true;
@@ -172,6 +169,9 @@ void main(){
         if (!gameboy_session_active) net_poll();
 
         if (first_mobile_loop) {
+            // Normal boot is complete: hand the LED over to the runtime "config to
+            // save" indicator (impl_config_write() / the auto-save block below).
+            led_status_boot_done();
             DEBUG_PRINT_FUNCTION("Entering first mobile loop...");
             first_mobile_loop = false;
         }

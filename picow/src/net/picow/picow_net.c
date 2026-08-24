@@ -32,6 +32,7 @@ bool net_wifi_connect(const char *ssid, const char *psk, uint32_t timeout_ms){
     for (unsigned attempt = 1; attempt <= WIFI_CONNECT_MAX_ATTEMPTS; attempt++) {
         int errorcode = cyw43_arch_wifi_connect_timeout_ms(
             (char *)ssid, (char *)psk, CYW43_AUTH_WPA2_AES_PSK, timeout_ms);
+        sleep_ms(1000);
         last_connect_errorcode = errorcode;
         if (errorcode == 0) {
             DEBUG_PRINT_FUNCTION("Device IP: %s", net_wifi_ip_string());

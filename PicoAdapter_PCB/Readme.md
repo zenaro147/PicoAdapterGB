@@ -9,4 +9,4 @@
 | Bidirectional Level Shifter | [AliExpress](https://www.aliexpress.com/item/1972791896.html) |
 
 A simple PCB design using EasyEDA to work with this projects by me:
-* [PicoAdapterGB](https://github.com/zenaro147/PicoAdapterGB)
+* [PicoAdapterGB](https://github.com/zenaror/PicoAdapterGB)

@@ -2,7 +2,7 @@ Different from Arduino that operates in 5V like the GameBoy, the Pico operates i
 
 Connect the Game Boy serial pins to the Pico pins following this scheme:
 
-![Link Cable view](https://github.com/zenaro147/NeoGB-Printer/blob/master/Supplementary_images/LinkCable.jpg)
+![Link Cable view](https://github.com/zenaror/NeoGB-Printer/blob/master/Supplementary_images/LinkCable.jpg)
 
 ```
  ___________
@@ -21,7 +21,7 @@ Connect the Game Boy serial pins to the Pico pins following this scheme:
 |            |      LV     |  +3.3V  | +3.3 volts from Pico (3v3 Out) |
 |            |      HV     |   N/A   | I recommend to let this pin unconnected. Also, it's possible to use P1 from Link Cable, but DO AT YOUR OWN RISK (some aftermarket cables have P1 and P4 connected each other. If this is your case, use P4 instead) |
 
-![Schematic](https://raw.githubusercontent.com/zenaro147/PicoAdapterGB/master/doc/PicoWSetup.JPG)<br>
+![Schematic](https://raw.githubusercontent.com/zenaror/PicoAdapterGB/master/doc/PicoWSetup.JPG)<br>
 <sub>Pico and Pico W have the same pinout schema</sub>
 <br><br>
 **⚠If this doesn't work, try to flip around Pin2(Serial Out) and Pin3(Serial In), as the pinout markings of your link cable breakout might be the other way around.⚠**

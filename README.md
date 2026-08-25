@@ -19,7 +19,7 @@ If you still have questions, ask us here or in the **REON Team Discord** [![Disc
 Refer to the [Wiki page](https://github.com/zenaror/PicoAdapterGB/tree/main/doc/wiki) for more details on how to build one according to your setup.
 
 ## Demo
-[![Click on the image to see the full video](https://github.com/zenaro147/PicoAdapterGB/blob/main/doc/demoPreview.gif)](https://youtu.be/YvNsaXxCjOU)<br> 
+[![Click on the image to see the full video](https://github.com/zenaror/PicoAdapterGB/blob/main/doc/demoPreview.gif)](https://youtu.be/YvNsaXxCjOU)<br> 
 <sub>Click on the image to watch the full video</sub>
 
 ## Current implementations

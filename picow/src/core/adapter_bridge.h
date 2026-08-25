@@ -7,6 +7,13 @@
 // libmobile glue code.
 void adapter_bridge_register_callbacks(struct mobile_adapter *adapter);
 
+// Wires up only debug_log/config_read/config_write onto a standalone adapter
+// that is never started or looped (see web/web_http.c's config snapshot).
+// Its config_write never raises the pending-flash-write flag or LED_ON, so
+// editing the snapshot can't be mistaken by main()'s autosave loop for a
+// change to the live adapter.
+void adapter_bridge_register_snapshot_callbacks(struct mobile_adapter *adapter);
+
 // Set by the serial_enable callback so the Game Boy ISR knows which transfer
 // width (8 vs 32 bit) to use. Read from the time-sensitive ISR in main.c.
 extern bool isLinkCable32;

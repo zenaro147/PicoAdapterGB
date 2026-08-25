@@ -14,6 +14,7 @@
 #include "net/net_hal.h"
 #include "storage/flash_eeprom.h"
 #include "core/led_status.h"
+#include "core/adapter_bridge.h"
 #include "hardware/watchdog.h"
 
 // Allocated only while the config server is running (see web_config_listen /
@@ -21,6 +22,7 @@
 // SRAM for the entire time the Game Boy is being used.
 static struct web_conn *web_conns = NULL;
 struct mobile_user *web_mobile = NULL;
+struct mobile_user *web_mobile_snapshot = NULL;
 static struct tcp_pcb *web_listen_pcb = NULL;
 static volatile bool web_save_reboot_pending = false;
 static bool web_reboot_waiting = false;
@@ -286,16 +288,33 @@ void web_set_addr_port(struct mobile_addr *dest, unsigned port) {
     }
 }
 
-void web_reload_saved_config(struct mobile_user *mobile){
+// Tears down the standalone snapshot adapter (see web_snapshot_create()).
+// Safe to call when no snapshot exists.
+static void web_snapshot_destroy(void){
+    if (!web_mobile_snapshot) return;
+    free(web_mobile_snapshot->adapter);
+    free(web_mobile_snapshot);
+    web_mobile_snapshot = NULL;
+}
+
+// Takes a fresh copy of *mobile - config_eeprom, Wi-Fi credentials, etc. -
+// and gives it its own standalone struct mobile_adapter, so every config
+// read/write route can operate on the copy without ever touching the live
+// adapter mobile_loop() is driving. The copy's adapter is deliberately never
+// started/looped: it only exists so mobile_config_get_*/set_*() have
+// somewhere to read and write that isn't the live adapter's in-progress
+// state (see adapter_bridge_register_snapshot_callbacks()).
+static void web_snapshot_create(struct mobile_user *mobile){
+    web_snapshot_destroy();
     if (!mobile) return;
 
-    memset(mobile->wifiSSID, 0, sizeof(mobile->wifiSSID));
-    memset(mobile->wifiPASS, 0, sizeof(mobile->wifiPASS));
+    web_mobile_snapshot = malloc(sizeof(struct mobile_user));
+    if (!web_mobile_snapshot) return;
 
-    struct saved_data_pointers ptrs;
-    InitSavedPointers(&ptrs, mobile);
-    ReadConfig(&ptrs);
-    mobile_config_load(mobile->adapter);
+    *web_mobile_snapshot = *mobile;
+    web_mobile_snapshot->adapter = mobile_new(web_mobile_snapshot);
+    adapter_bridge_register_snapshot_callbacks(web_mobile_snapshot->adapter);
+    mobile_config_load(web_mobile_snapshot->adapter);
 }
 
 static void web_dispatch(struct web_conn *c, bool is_get, bool is_post, const char *path, const char *body, int content_length){
@@ -425,6 +444,7 @@ static err_t web_accept_cb(void *arg, struct tcp_pcb *newpcb, err_t err){
 // (hotspot fallback) modes. Returns the listen pcb, or NULL on failure.
 static struct tcp_pcb *web_config_listen(struct mobile_user *mobile){
     web_mobile = mobile;
+    web_snapshot_create(mobile);
     if (!web_conns) web_conns = malloc(WEB_MAX_CONNS * sizeof(struct web_conn));
     if (!web_conns) return NULL;
     memset(web_conns, 0, WEB_MAX_CONNS * sizeof(struct web_conn));
@@ -465,6 +485,9 @@ void web_config_stop(void){
         free(web_conns);
         web_conns = NULL;
     }
+
+    // The config snapshot only exists for the lifetime of the web UI.
+    web_snapshot_destroy();
 }
 
 void web_config_request_save_reboot(void){
@@ -484,13 +507,16 @@ void web_config_service_pending_actions(void){
         while (true) tight_loop_contents();
     }
 
-    if (!web_save_reboot_pending || !web_mobile || time_us_64() < web_save_not_before) return;
+    if (!web_save_reboot_pending || !web_mobile_snapshot || time_us_64() < web_save_not_before) return;
 
     web_save_reboot_pending = false;
     DEBUG_PRINT_FUNCTION("Web Save & Reboot requested. Saving configuration...");
 
+    // Persist the snapshot the web UI has been editing, not the live
+    // web_mobile: the live adapter's config is only supposed to change on the
+    // next boot, when it re-reads this same flash data.
     struct saved_data_pointers save_ptrs;
-    InitSavedPointers(&save_ptrs, web_mobile);
+    InitSavedPointers(&save_ptrs, web_mobile_snapshot);
     if (!SaveConfig(&save_ptrs)) {
         led_status_report_error(LED_ERROR_FLASH_SAVE_FAILED);
     }

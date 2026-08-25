@@ -9,8 +9,13 @@
 #include "storage/flash_eeprom.h"
 
 static void handle_get_config_impl(struct web_conn *c){
-    struct mobile_user *mobile = web_mobile;
-    if (mobile) web_reload_saved_config(mobile);
+    // Everything editable comes from the snapshot, so a page reload always
+    // shows what the web UI last wrote (including still-unsaved edits) -
+    // never the live adapter's in-progress state.
+    struct mobile_user *mobile = web_mobile_snapshot;
+    // The relay-assigned number is the one exception: only a live relay
+    // session can ever obtain one, so it's read from the live adapter.
+    struct mobile_user *live = web_mobile;
 
     struct mobile_addr dns1 = {.type = MOBILE_ADDRTYPE_NONE};
     struct mobile_addr dns2 = {.type = MOBILE_ADDRTYPE_NONE};
@@ -68,7 +73,7 @@ static void handle_get_config_impl(struct web_conn *c){
     web_json_escape(mobile->wifiPASS, wifi_pass_esc, sizeof(wifi_pass_esc));
 
     char relay_number_esc[MOBILE_MAX_NUMBER_SIZE + 1] = {0};
-    web_json_escape(mobile->number_user, relay_number_esc, sizeof(relay_number_esc));
+    web_json_escape(live->number_user, relay_number_esc, sizeof(relay_number_esc));
 
     char body[768];
     snprintf(body, sizeof(body),
@@ -121,7 +126,9 @@ void handle_get_relay_number(struct web_conn *c){
 }
 
 void handle_post_config(struct web_conn *c, const char *body){
-    struct mobile_user *mobile = web_mobile;
+    // Edits go to the snapshot only; the live adapter never sees them until
+    // Save & Reboot persists the snapshot to flash and the device reboots.
+    struct mobile_user *mobile = web_mobile_snapshot;
     char field[128];
     bool needSave = false;
 

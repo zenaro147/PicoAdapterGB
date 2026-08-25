@@ -165,6 +165,23 @@ bool net_wifi_connect(const char *ssid, const char *psk, uint32_t timeout_ms){
 connection_attempt_failed:
 
         if (attempt < WIFI_CONNECT_MAX_ATTEMPTS) {
+            /*
+             * We gave up on this attempt, but the CYW43439 doesn't know
+             * that: it can still be mid-handshake (association/EAPOL) for
+             * the join we just abandoned. Starting a new
+             * cyw43_arch_wifi_connect_async() on top of that leaves the
+             * chip's own join state machine waiting on a handshake that
+             * will never resume, which can wedge it so the next join
+             * request never gets a response - hanging inside
+             * cyw43_arch_poll() with no further retries, timeouts included.
+             * Explicitly disassociate first so the retry starts clean.
+             */
+            cyw43_wifi_leave(&cyw43_state, CYW43_ITF_STA);
+            for (int i = 0; i < 10; i++) {
+                cyw43_arch_poll();
+                sleep_ms(10);
+            }
+
             sleep_ms(WIFI_CONNECT_RETRY_DELAY_MS);
         }
     }

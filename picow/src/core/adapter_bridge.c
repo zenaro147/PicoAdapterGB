@@ -55,6 +55,16 @@ static bool impl_config_write(void *user, const void *src, const uintptr_t offse
     return true;
 }
 
+// Same as impl_config_write(), minus the pending-write/LED signaling: used
+// only by the web UI's config snapshot, whose edits must stay invisible to
+// main()'s "flush the live adapter's config to flash" loop until an explicit
+// Save & Reboot copies the snapshot's bytes over.
+static bool impl_config_write_snapshot(void *user, const void *src, const uintptr_t offset, const size_t size) {
+    struct mobile_user *mobile = (struct mobile_user *)user;
+    memcpy(mobile->config_eeprom + offset, src, size);
+    return true;
+}
+
 static void impl_time_latch(void *user, unsigned timer) {
     struct mobile_user *mobile = (struct mobile_user *)user;
     mobile->picow_clock_latch[timer] = time_us_64();
@@ -143,6 +153,12 @@ void adapter_bridge_register_callbacks(struct mobile_adapter *adapter){
     mobile_def_sock_send(adapter, impl_sock_send);
     mobile_def_sock_recv(adapter, impl_sock_recv);
     mobile_def_update_number(adapter, impl_update_number);
+}
+
+void adapter_bridge_register_snapshot_callbacks(struct mobile_adapter *adapter){
+    mobile_def_debug_log(adapter, impl_debug_log);
+    mobile_def_config_read(adapter, impl_config_read);
+    mobile_def_config_write(adapter, impl_config_write_snapshot);
 }
 
 bool adapter_bridge_has_pending_config_write(void){

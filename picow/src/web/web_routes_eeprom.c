@@ -8,7 +8,7 @@
 #include "storage/flash_eeprom.h"
 
 void handle_get_eeprom(struct web_conn *c){
-    struct mobile_user *mobile = web_mobile;
+    struct mobile_user *mobile = web_mobile_snapshot;
     web_send_raw_response(c, 200, "OK", "application/octet-stream",
         mobile->config_eeprom, sizeof(mobile->config_eeprom));
 }
@@ -35,8 +35,8 @@ static void web_decode_uploaded_addr(struct mobile_addr *addr, uint8_t type_byte
 }
 
 // Mirrors config_library_load()'s layout (private to libmobile/config.c) so an
-// uploaded LM block can be reflected into the live adapter->config, keeping it
-// consistent with the raw bytes for a later explicit Save & Reboot.
+// uploaded LM block can be reflected into the snapshot's adapter->config,
+// keeping it consistent with the raw bytes for a later explicit Save & Reboot.
 static void web_apply_uploaded_libmobile_block(struct mobile_user *mobile, const uint8_t *data){
     const uint8_t *lm = data + 0x100;
 
@@ -62,10 +62,11 @@ static void web_apply_uploaded_libmobile_block(struct mobile_user *mobile, const
     mobile_config_set_relay_token(mobile->adapter, lm[0x0b] ? lm + 0x50 : NULL);
 }
 
-// Only updates RAM (config_eeprom + the live adapter->config). Nothing is
-// written to flash here; the user must press "Save & Reboot" to persist it.
+// Only updates the snapshot (config_eeprom + its standalone adapter->config),
+// never the live adapter. Nothing is written to flash here; the user must
+// press "Save & Reboot" to persist it.
 void handle_post_eeprom(struct web_conn *c, const char *body, int content_length){
-    struct mobile_user *mobile = web_mobile;
+    struct mobile_user *mobile = web_mobile_snapshot;
 
     if (content_length != EEPROM_FILE_SIZE){
         web_send_response(c, 400, "Bad Request", "application/json",

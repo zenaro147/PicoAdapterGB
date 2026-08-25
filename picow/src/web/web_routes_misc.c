@@ -10,7 +10,9 @@
 #include "core/led_status.h"
 
 void handle_post_format(struct web_conn *c){
-    struct mobile_user *mobile = web_mobile;
+    // Reset the snapshot, then flash it immediately: the live adapter only
+    // picks this up on the next boot, same as every other config write here.
+    struct mobile_user *mobile = web_mobile_snapshot;
     memset(mobile->config_eeprom, 0x00, sizeof(mobile->config_eeprom));
 
     mobile_config_set_dns(mobile->adapter, &(struct mobile_addr){.type = MOBILE_ADDRTYPE_NONE}, MOBILE_DNS1);

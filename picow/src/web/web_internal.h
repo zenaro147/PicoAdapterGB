@@ -30,9 +30,22 @@ struct web_conn {
     bool close_pending;
 };
 
-// Set once by web_config_start()/web_config_run_blocking(); every route
-// handler operates on this single adapter instance.
+// Set once by web_config_start()/web_config_run_blocking(): the live adapter
+// instance the Game Boy actually talks to. Route handlers must not call
+// mobile_config_set_*()/mobile_config_save() on this one - only read it, and
+// only for state the snapshot can never have (e.g. the relay-assigned number
+// in web_mobile->number_user, which only a live relay session can obtain).
 extern struct mobile_user *web_mobile;
+
+// A copy of *web_mobile taken when the web UI starts (see web_config_listen()
+// in web_http.c), with its own standalone struct mobile_adapter that is never
+// started/looped. Every config read/write route operates on this instead of
+// web_mobile, so editing settings in the browser can't affect the live
+// adapter's in-progress relay/DNS/session behavior. Save & Reboot is the only
+// place that copies the snapshot's bytes out to flash; the live adapter picks
+// them up fresh on the next boot. Freed and recreated whenever the web server
+// (re)starts - it only exists for the lifetime of the web UI.
+extern struct mobile_user *web_mobile_snapshot;
 
 void web_config_request_save_reboot(void);
 
@@ -48,7 +61,3 @@ bool web_parse_hex(unsigned char *buf, char *str, unsigned size);
 void web_format_addr_ip_only(struct mobile_addr *src, char *dest, size_t destsize);
 int web_parse_addr(struct mobile_addr *dest, char *argv);
 void web_set_addr_port(struct mobile_addr *dest, unsigned port);
-
-// Re-reads the persisted Wi-Fi credentials from flash into RAM. Does not
-// touch the libmobile config, which already lives entirely in RAM/EEPROM.
-void web_reload_saved_config(struct mobile_user *mobile);

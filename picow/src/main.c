@@ -31,6 +31,7 @@ static bool web_shutdown_pending = false;
 static uint64_t web_shutdown_deadline = 0;
 
 struct mobile_user *mobile = NULL;
+struct mobile_user *mobile_snapshot = NULL;
 
 //////////////////////////
 // LINK CABLE FUNCTIONS //

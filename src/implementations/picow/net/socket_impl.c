@@ -6,6 +6,33 @@
 
 #include <string.h>
 
+// Static storage for every connection's handle: MOBILE_MAX_CONNECTIONS is a
+// small libmobile-defined constant (currently 2), so this avoids heap
+// allocation/fragmentation for state that lives for the whole program.
+static struct socket_impl socket_storage[MOBILE_MAX_CONNECTIONS];
+
+void socket_hal_bind(struct mobile_user *mobile){
+    for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
+        mobile->socket[i] = &socket_storage[i];
+    }
+}
+
+void socket_hal_reset(struct socket_impl *state){
+    state->tcp_pcb = NULL; // clears the tcp_pcb/udp_pcb union
+    state->sock_addr = -1;
+    state->sock_type = SOCK_NONE;
+    memset(state->udp_remote_ip, 0x00, sizeof(state->udp_remote_ip));
+    state->udp_remote_port = 0;
+    state->client_status = false;
+    state->inside_callback = false;
+    state->pending_close = false;
+    state->socket_status = 0;
+    memset(state->buffer_rx, 0x00, sizeof(state->buffer_rx));
+    state->buffer_rx_len = 0;
+    state->buffer_tx_len = 0;
+    state->buffer_rx_read_pos = 0;
+}
+
 bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport, void *user){    
 
     if (state->tcp_pcb != NULL || state->udp_pcb != NULL) return false;

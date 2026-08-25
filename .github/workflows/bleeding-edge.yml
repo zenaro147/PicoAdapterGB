@@ -48,16 +48,16 @@ jobs:
 
       - name: Build
         run: |
-          cmake --build build --target PicoAdapterGB_PicoW --parallel
+          cmake --build build --target PicoAdapterGB_PicoW_REON --parallel
 
       - name: Verify
         run: |
-          test -f build/release/REON/PicoW/PicoAdapterGB_PicoW.uf2
+          test -f build/release/REON/PicoW/PicoAdapterGB_PicoW_REON.uf2
 
       - name: Prepare artifact
         run: |
           mkdir -p artifact
-          cp build/release/REON/PicoW/PicoAdapterGB_PicoW.uf2 artifact/PicoAdapterGB-REON-PicoW.uf2
+          cp build/release/REON/PicoW/PicoAdapterGB_PicoW_REON.uf2 artifact/PicoAdapterGB_PicoW_REON.uf2
 
           printf '%s\n' \
             'PicoAdapterGB Bleeding Edge' \
@@ -122,7 +122,7 @@ jobs:
       - name: Prepare artifact
         run: |
           mkdir -p artifact
-          cp build/release/SmBoard/PicoW/PicoAdapterGB_PicoW_SmBoard.uf2 artifact/PicoAdapterGB-STACKSMASHING-PicoW.uf2
+          cp build/release/SmBoard/PicoW/PicoAdapterGB_PicoW_SmBoard.uf2 artifact/PicoAdapterGB_PicoW_SmBoard.uf2
 
           printf '%s\n' \
             'PicoAdapterGB Bleeding Edge' \
@@ -178,16 +178,16 @@ jobs:
 
       - name: Build
         run: |
-          cmake --build build --target PicoAdapterGB_Pico2W --parallel
+          cmake --build build --target PicoAdapterGB_Pico2W_REON --parallel
 
       - name: Verify
         run: |
-          test -f build/release/REON/Pico2W/PicoAdapterGB_Pico2W.uf2
+          test -f build/release/REON/Pico2W/PicoAdapterGB_Pico2W_REON.uf2
 
       - name: Prepare artifact
         run: |
           mkdir -p artifact
-          cp build/release/REON/Pico2W/PicoAdapterGB_Pico2W.uf2 artifact/PicoAdapterGB-REON-Pico2W.uf2
+          cp build/release/REON/Pico2W/PicoAdapterGB_Pico2W_REON.uf2 artifact/PicoAdapterGB_Pico2W_REON.uf2
 
           printf '%s\n' \
             'PicoAdapterGB Bleeding Edge' \
@@ -252,7 +252,7 @@ jobs:
       - name: Prepare artifact
         run: |
           mkdir -p artifact
-          cp build/release/SmBoard/Pico2W/PicoAdapterGB_Pico2W_SmBoard.uf2 artifact/PicoAdapterGB-STACKSMASHING-Pico2W.uf2
+          cp build/release/SmBoard/Pico2W/PicoAdapterGB_Pico2W_SmBoard.uf2 artifact/PicoAdapterGB_Pico2W_SmBoard.uf2
 
           printf '%s\n' \
             'PicoAdapterGB Bleeding Edge' \
@@ -301,17 +301,17 @@ jobs:
         run: |
           mkdir -p release
 
-          cp artifacts/PicoAdapterGB-bleeding-edge-PicoW-REON/PicoAdapterGB-REON-PicoW.uf2 \
-            release/PicoAdapterGB-REON-PicoW.uf2
+          cp artifacts/PicoAdapterGB-bleeding-edge-PicoW-REON/PicoAdapterGB_PicoW_REON.uf2 \
+            release/PicoAdapterGB_PicoW_REON.uf2
 
-          cp artifacts/PicoAdapterGB-bleeding-edge-PicoW-STACKSMASHING/PicoAdapterGB-STACKSMASHING-PicoW.uf2 \
-            release/PicoAdapterGB-STACKSMASHING-PicoW.uf2
+          cp artifacts/PicoAdapterGB-bleeding-edge-PicoW-STACKSMASHING/PicoAdapterGB_PicoW_SmBoard.uf2 \
+            release/PicoAdapterGB_PicoW_SmBoard.uf2
 
-          cp artifacts/PicoAdapterGB-bleeding-edge-Pico2W-REON/PicoAdapterGB-REON-Pico2W.uf2 \
-            release/PicoAdapterGB-REON-Pico2W.uf2
+          cp artifacts/PicoAdapterGB-bleeding-edge-Pico2W-REON/PicoAdapterGB_Pico2W_REON.uf2 \
+            release/PicoAdapterGB_Pico2W_REON.uf2
 
-          cp artifacts/PicoAdapterGB-bleeding-edge-Pico2W-STACKSMASHING/PicoAdapterGB-STACKSMASHING-Pico2W.uf2 \
-            release/PicoAdapterGB-STACKSMASHING-Pico2W.uf2
+          cp artifacts/PicoAdapterGB-bleeding-edge-Pico2W-STACKSMASHING/PicoAdapterGB_Pico2W_SmBoard.uf2 \
+            release/PicoAdapterGB_Pico2W_SmBoard.uf2
 
           ls -lh release
 

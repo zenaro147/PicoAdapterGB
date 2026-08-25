@@ -8,7 +8,8 @@
 void adapter_bridge_register_callbacks(struct mobile_adapter *adapter);
 
 // Wires up only debug_log/config_read/config_write onto a standalone adapter
-// that is never started or looped (see web/web_http.c's config snapshot).
+// that is never started or looped (see the picow implementation's web
+// module's config snapshot, src/implementations/picow/web/web_http.c).
 // Its config_write never raises the pending-flash-write flag or LED_ON, so
 // editing the snapshot can't be mistaken by main()'s autosave loop for a
 // change to the live adapter.

@@ -4,11 +4,13 @@
 
 struct mobile_user;
 
-// Board-agnostic network control surface. main.c and the rest of the adapter
-// glue code must only depend on this header, never on cyw43/lwIP directly.
-// Porting to a different transport (e.g. a plain Pico + ESP32 over UART/SPI)
-// only requires a new backend implementing these functions, selected at
-// build time (see net/picow/ for the current cyw43+lwIP backend).
+// Board-agnostic network control surface. main.c and the rest of the core
+// glue code must only depend on this header (and net/socket_hal.h for
+// per-connection socket operations), never on cyw43/lwIP or any other
+// backend's types directly. Porting to a different transport (e.g. a plain
+// Pico + ESP32 over UART/SPI) only requires a new backend implementing these
+// functions, selected at build time via PICOADAPTER_IMPLEMENTATION (see
+// src/implementations/picow/net/ for the current cyw43+lwIP backend).
 
 // One-time hardware/stack bring-up. Must be called before any other net_*().
 bool net_init(void);

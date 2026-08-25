@@ -12,12 +12,13 @@ This project combines:
 
 ## Project layout
 
-- `picow/` — Pico W firmware implementation
+- `src/` — core firmware: Game Boy link cable (PIO), libmobile glue, storage, and the network/LED interfaces every board target implements
+- `src/implementations/picow/` — Pico W / Pico 2 W backend (cyw43 + lwIP), including the optional web setup UI
 - `dependences/libmobile/` — local copy of the libmobile protocol implementation
 - `doc/` — project documentation
 - `PicoAdapter_PCB/` — board and schematic files
 
-See [doc/ARCHITECTURE.md](ARCHITECTURE.md) for the detailed `picow/src/` module breakdown (network abstraction, adapter glue code, web server, storage) and how they depend on each other.
+See [doc/ARCHITECTURE.md](ARCHITECTURE.md) for the detailed module breakdown (network abstraction, adapter glue code, web server, storage) and how they depend on each other.
 
 ## Recommended hardware
 
@@ -28,7 +29,7 @@ See [doc/ARCHITECTURE.md](ARCHITECTURE.md) for the detailed `picow/src/` module 
 
 ## Firmware overview
 
-The current recommended firmware target is the Pico W implementation under `picow/`.
+The current recommended firmware target is the `picow` implementation (`src/implementations/picow/`), selected by default via `PICOADAPTER_IMPLEMENTATION=picow`.
 
 On boot, the device:
 
@@ -41,9 +42,10 @@ On boot, the device:
 
 ## Supported options
 
-The build is configured through CMake options:
+The build is configured through three independent CMake options:
 
 - `PICO_BOARD` — `pico_w` or `pico2_w`
+- `PICOADAPTER_IMPLEMENTATION` — `picow` (default; the only one that exists today)
 - `ADAPTER` — `REON` or `STACKSMASHING`
 
 These are defined in the top-level `CMakeLists.txt`.

@@ -8,7 +8,7 @@
 
 #include "linkcable.h"
 #include "../globals.h"
-#include "../sync.h"
+#include "core/sync.h"
 
 //#define FAST_ALIGNMENT
 //#define DEBUG_TIMEFRAMES

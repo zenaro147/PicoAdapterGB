@@ -11,10 +11,20 @@
 
 #include "storage/flash_eeprom.h"
 #include "net/net_hal.h"
-#include "web/web_server.h"
+#include "net/socket_hal.h"
 #include "core/adapter_bridge.h"
 #include "core/led_status.h"
 #include "pio/linkcable.h"
+
+// Web setup UI is optional: not every implementation provides one (e.g. a
+// future 4G/modem backend has nothing for a browser to talk to). Set by the
+// selected implementation's CMakeLists.txt when it links a web/ module that
+// implements this contract (web_config_start/stop/run_blocking/
+// service_pending_actions). main.c never falls back to a dummy web backend;
+// it simply skips every web_config_*() call when this isn't defined.
+#ifdef PICOADAPTER_HAS_WEB
+#include "web/web_server.h"
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool speed_240_MHz = false;
@@ -26,9 +36,11 @@ bool speed_240_MHz = false;
 #define WIFI_HOTSPOT_PASS "magb!123"
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifdef PICOADAPTER_HAS_WEB
 static bool web_alive = false;
 static bool web_shutdown_pending = false;
 static uint64_t web_shutdown_deadline = 0;
+#endif
 
 struct mobile_user *mobile = NULL;
 
@@ -52,22 +64,10 @@ static void mobile_user_reset_runtime_state(struct mobile_user *m){
     m->number_user[0] = '\0';
     m->number_peer[0] = '\0';
     m->currentReqSocket = -1;
-    for (int i = 0; i < MOBILE_MAX_TIMERS; i++) m->picow_clock_latch[i] = 0;
-    for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
-        m->socket[i].tcp_pcb = NULL;
-        m->socket[i].udp_pcb = NULL;
-        m->socket[i].sock_addr = -1;
-        m->socket[i].sock_type = SOCK_NONE;
-        memset(m->socket[i].udp_remote_ip, 0x00, sizeof(m->socket[i].udp_remote_ip));
-        m->socket[i].udp_remote_port = 0;
-        m->socket[i].client_status = false;
-        m->socket[i].inside_callback = false;
-        m->socket[i].pending_close = false;
-        m->socket[i].socket_status = 0;
-        memset(m->socket[i].buffer_rx, 0x00, sizeof(m->socket[i].buffer_rx));
-        m->socket[i].buffer_rx_len = 0;
-        m->socket[i].buffer_tx_len = 0;
-    }
+    for (int i = 0; i < MOBILE_MAX_TIMERS; i++) m->clock_latch[i] = 0;
+    // Concrete per-connection state is owned by the selected implementation
+    // (see net/socket_hal.h); this only asks it to reset each handle.
+    for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++) socket_hal_reset(m->socket[i]);
     m->automatic_save = true;
     m->force_save = false;
 }
@@ -98,6 +98,10 @@ void main(){
 
     mobile = malloc(sizeof(struct mobile_user));
     memset(mobile, 0, sizeof(*mobile));
+    // Wires up mobile->socket[] with implementation-owned handles. Must run
+    // before adapter_bridge_register_callbacks(), since a Game Boy session
+    // could in principle ask for a socket as soon as libmobile is started.
+    socket_hal_bind(mobile);
 
     InitSave();
     struct saved_data_pointers ptrs;
@@ -127,6 +131,7 @@ void main(){
                 ? LED_ERROR_WIFI_BADAUTH : LED_ERROR_WIFI_CONNECT_FAILED);
         }
 
+#ifdef PICOADAPTER_HAS_WEB
         // No usable WiFi: fall back to our own hotspot so the device can still
         // be reached and configured. There's nothing useful to continue with,
         // so this blocks forever; only a reboot (from the web page) gets out.
@@ -136,12 +141,20 @@ void main(){
 
         web_config_run_blocking(mobile);
         return; // unreachable: web_config_run_blocking never returns
+#else
+        // No web setup UI in this build: nothing a user could reach to fix
+        // Wi-Fi credentials, so there's nothing useful left to do.
+        DEBUG_PRINT_FUNCTION("Could not connect to WiFi and this build has no web setup UI.");
+        return;
+#endif
     }
 
     mobile_user_reset_runtime_state(mobile);
 
+#ifdef PICOADAPTER_HAS_WEB
     web_alive = true;
     web_shutdown_pending = false;
+#endif
 
     DEBUG_PRINT_FUNCTION("Initializing Game Boy link cable...");
     linkcable_init(link_cable_ISR);
@@ -151,12 +164,13 @@ void main(){
     mobile_start(mobile->adapter);
     DEBUG_PRINT_FUNCTION("libmobile started.");
 
+#ifdef PICOADAPTER_HAS_WEB
     // The web setup UI is reachable from boot until the Game Boy starts
-    // talking; core1 watches for that and signals core0 (the sole lwIP
-    // owner) to tear it down. It never comes back until reboot.
+    // talking; the main loop watches for that below and tears it down.
+    // It never comes back until reboot.
     web_config_start(mobile);
-
     DEBUG_PRINT_FUNCTION("Web Setup available at http://%s/", net_wifi_ip_string());
+#endif
 
     bool first_main_loop = true;
     bool first_mobile_loop = true;
@@ -179,12 +193,15 @@ void main(){
 
         // lwIP remains necessary for relay/P2P sockets after a session starts.
         net_poll();
+#ifdef PICOADAPTER_HAS_WEB
         web_config_service_pending_actions();
+#endif
         if (first_main_loop) {
             DEBUG_PRINT_FUNCTION("Web/network polling is active.");
             first_main_loop = false;
         }
 
+#ifdef PICOADAPTER_HAS_WEB
         if (web_alive && mobile->adapter->commands.session_started && !web_shutdown_pending) {
             // Let the Start Session response and the following handshake finish
             // before closing the unrelated HTTP connections.
@@ -200,6 +217,7 @@ void main(){
             DEBUG_PRINT_FUNCTION("Game Boy communication detected, Web Setup server stopped.");
             DEBUG_PRINT_FUNCTION("WiFi status: %s", net_wifi_status_string());
         }
+#endif
 
         net_service_pending_socket_closes(mobile);
 

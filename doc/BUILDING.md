@@ -8,17 +8,19 @@ This project is built with CMake and the Raspberry Pi Pico SDK.
 - CMake
 - Ninja or Make
 - ARM GCC toolchain
-- Pico W or Pico 2 W board support (required by the `picow` implementation)
+- Pico W or Pico 2 W board support (required by the `picow` implementation), or a
+  plain Pico/Pico 2 plus an ESP8266EX (ESP-01) running ESP-AT (required by the
+  `esp` implementation - see [src/implementations/esp/README.md](../src/implementations/esp/README.md))
 
 ## Three independent build dimensions
 
 | Variable | Selects | Current values |
 |---|---|---|
-| `PICO_BOARD` | the RP2040/RP2350 chip/board (Pico SDK's own variable) | `pico_w`, `pico2_w` |
-| `PICOADAPTER_IMPLEMENTATION` | which connectivity/hardware backend under `src/implementations/` | `picow` (default) |
+| `PICO_BOARD` | the RP2040/RP2350 chip/board (Pico SDK's own variable) | `pico_w`, `pico2_w` (picow); `pico`, `pico2` (esp) |
+| `PICOADAPTER_IMPLEMENTATION` | which connectivity/hardware backend under `src/implementations/` | `picow` (default), `esp` |
 | `ADAPTER` | the Game Boy link-cable pinout | `REON` (default), `STACKSMASHING` |
 
-These are independent: the board says what chip you have, the implementation says what connects it to the network, and the adapter says which link-cable pinout you built. `PICOADAPTER_IMPLEMENTATION=picow` additionally requires a board with cyw43 Wi-Fi support (`pico_w`/`pico2_w`); selecting it with a different board fails the configure step with a clear error instead of silently building something else.
+These are independent: the board says what chip you have, the implementation says what connects it to the network, and the adapter says which link-cable pinout you built. `PICOADAPTER_IMPLEMENTATION=picow` requires a board with cyw43 Wi-Fi support (`pico_w`/`pico2_w`); `PICOADAPTER_IMPLEMENTATION=esp` requires a plain board with no onboard Wi-Fi (`pico`/`pico2` - the ESP8266EX is external, wired over UART). Selecting an implementation with an incompatible board fails the configure step with a clear error instead of silently building something else, and an unrecognized `PICO_BOARD` value fails the same way rather than falling back to a different board's firmware.
 
 ## Configure the build
 
@@ -61,8 +63,14 @@ cmake -S . -B build -DPICO_BOARD=pico2_w -DADAPTER=REON
 # Pico 2 W + Stack smashing pinout
 cmake -S . -B build -DPICO_BOARD=pico2_w -DADAPTER=STACKSMASHING
 
-# Explicit implementation (currently a no-op, since picow is the only one)
+# Explicit implementation (currently a no-op for picow, since it's the default)
 cmake -S . -B build -DPICO_BOARD=pico_w -DADAPTER=REON -DPICOADAPTER_IMPLEMENTATION=picow
+
+# Pico + ESP8266EX (ESP-01) + REON pinout - see src/implementations/esp/README.md
+cmake -S . -B build -DPICO_BOARD=pico -DPICOADAPTER_IMPLEMENTATION=esp -DADAPTER=REON
+
+# Pico 2 + ESP8266EX (ESP-01) + Stack smashing pinout
+cmake -S . -B build -DPICO_BOARD=pico2 -DPICOADAPTER_IMPLEMENTATION=esp -DADAPTER=STACKSMASHING
 ```
 
 ## Build
@@ -95,15 +103,19 @@ Artifacts are named `PicoAdapterGB_<Board><ImplementationSuffix>_<Pinout>`, writ
 | `pico_w` | `picow` | `STACKSMASHING` | `PicoAdapterGB_PicoW_SmBoard` | `build/release/SmBoard/PicoW/` |
 | `pico2_w` | `picow` | `REON` | `PicoAdapterGB_Pico2W_REON` | `build/release/REON/Pico2W/` |
 | `pico2_w` | `picow` | `STACKSMASHING` | `PicoAdapterGB_Pico2W_SmBoard` | `build/release/SmBoard/Pico2W/` |
+| `pico` | `esp` | `REON` | `PicoAdapterGB_PicoESP_REON` | `build/release/REON/PicoESP/` |
+| `pico` | `esp` | `STACKSMASHING` | `PicoAdapterGB_PicoESP_SmBoard` | `build/release/SmBoard/PicoESP/` |
+| `pico2` | `esp` | `REON` | `PicoAdapterGB_Pico2ESP_REON` | `build/release/REON/Pico2ESP/` |
+| `pico2` | `esp` | `STACKSMASHING` | `PicoAdapterGB_Pico2ESP_SmBoard` | `build/release/SmBoard/Pico2ESP/` |
 
-The `picow` implementation contributes no extra suffix to the hardware name, since `pico_w`/`pico2_w` already imply Wi-Fi connectivity; a future implementation on a plain (non-`_w`) board would append its own label there instead (see [ARCHITECTURE.md](ARCHITECTURE.md)).
+The `picow` implementation contributes no extra suffix to the hardware name, since `pico_w`/`pico2_w` already imply Wi-Fi connectivity. The `esp` implementation runs on a plain (non-`_w`) board that says nothing about connectivity on its own, so it appends its own `ESP` suffix instead (see [ARCHITECTURE.md](ARCHITECTURE.md)).
 
 Each directory contains the usual `.uf2`/`.elf`/`.bin`/`.hex`/`.map` outputs from `pico_add_extra_outputs()`.
 
 ## Notes
 
-- `PICO_BOARD` must be one of `pico_w` or `pico2_w`. If it's not recognized, the project falls back to `pico_w` automatically.
-- `PICOADAPTER_IMPLEMENTATION` must be `picow` today. An unrecognized value fails the configure step immediately.
+- `PICO_BOARD` must be one of `pico_w`/`pico2_w` (for `picow`) or `pico`/`pico2` (for `esp`). An unrecognized value, or a board incompatible with the selected implementation, fails the configure step immediately - it never silently falls back to a different board's firmware.
+- `PICOADAPTER_IMPLEMENTATION` must be `picow` or `esp`. An unrecognized value fails the configure step immediately.
 - `ADAPTER` must be one of `REON` or `STACKSMASHING`. If it's not recognized, the project falls back to `REON`.
 - The configure step prints a summary (`Board:`, `Implementation:`, `Pinout:`) so you can confirm what's about to build.
 

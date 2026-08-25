@@ -36,19 +36,25 @@ add_compile_definitions(PICO_ADAPTER_SOFTWARE=\"${PICO_ADAPTER_SOFTWARE}\")
 set(ADAPTER "REON" CACHE STRING "The adapter pinout to build for, options are: 'REON', 'STACKSMASHING'.")
 set_property(CACHE ADAPTER PROPERTY STRINGS "REON;STACKSMASHING")
 
-set(PICOADAPTER_IMPLEMENTATION "picow" CACHE STRING "Connectivity/hardware backend under src/implementations/, options are: 'picow'.")
-set_property(CACHE PICOADAPTER_IMPLEMENTATION PROPERTY STRINGS "picow")
+set(PICOADAPTER_IMPLEMENTATION "picow" CACHE STRING "Connectivity/hardware backend under src/implementations/, options are: 'picow', 'esp'.")
+set_property(CACHE PICOADAPTER_IMPLEMENTATION PROPERTY STRINGS "picow;esp")
 
-if(NOT (PICO_BOARD MATCHES "pico_w|pico2_w"))
-    message("Unknown board '${PICO_BOARD}', using 'pico_w' instead")
-    set(PICO_BOARD pico_w CACHE STRING "Board type")
-    set(PICO_PLATFORM "rp2040")
-elseif(PICO_BOARD STREQUAL pico_w)
-    set(PICO_BOARD pico_w CACHE STRING "Board type")
+# PICO_BOARD has no safe default across implementations (picow needs pico_w/
+# pico2_w, esp needs pico/pico2), so an unrecognized value fails the configure
+# step instead of silently falling back to some other board's firmware.
+if(PICO_BOARD STREQUAL "pico_w")
     set(PICO_PLATFORM "rp2040")
 elseif(PICO_BOARD STREQUAL "pico2_w")
-    set(PICO_BOARD pico2_w CACHE STRING "Board type")
     set(PICO_PLATFORM "rp2350")
+elseif(PICO_BOARD STREQUAL "pico")
+    set(PICO_PLATFORM "rp2040")
+elseif(PICO_BOARD STREQUAL "pico2")
+    set(PICO_PLATFORM "rp2350")
+else()
+    message(FATAL_ERROR
+        "Unknown PICO_BOARD '${PICO_BOARD}'. Valid values: pico_w, pico2_w "
+        "(PICOADAPTER_IMPLEMENTATION=picow), pico, pico2 "
+        "(PICOADAPTER_IMPLEMENTATION=esp).")
 endif()
 
 message("PICO_BOARD version is ${PICO_BOARD}")
@@ -58,10 +64,10 @@ if(NOT (ADAPTER MATCHES "REON|STACKSMASHING"))
     set(ADAPTER "REON")
 endif()
 
-if(NOT (PICOADAPTER_IMPLEMENTATION MATCHES "^picow$"))
+if(NOT (PICOADAPTER_IMPLEMENTATION MATCHES "^picow$|^esp$"))
     message(FATAL_ERROR
         "Unknown PICOADAPTER_IMPLEMENTATION '${PICOADAPTER_IMPLEMENTATION}'. "
-        "Valid values: picow.")
+        "Valid values: picow, esp.")
 endif()
 
 message("Adapter pinout is ${ADAPTER}")
@@ -75,6 +81,10 @@ if(PICO_BOARD STREQUAL "pico_w")
     set(BoardLabel "PicoW")
 elseif(PICO_BOARD STREQUAL "pico2_w")
     set(BoardLabel "Pico2W")
+elseif(PICO_BOARD STREQUAL "pico")
+    set(BoardLabel "Pico")
+elseif(PICO_BOARD STREQUAL "pico2")
+    set(BoardLabel "Pico2")
 else()
     message(FATAL_ERROR "No BoardLabel mapping for PICO_BOARD '${PICO_BOARD}'.")
 endif()
@@ -96,6 +106,8 @@ add_subdirectory(dependences)
 # project never assumes a specific implementation's requirements are met.
 if(PICOADAPTER_IMPLEMENTATION STREQUAL "picow")
     add_subdirectory(src/implementations/picow)
+elseif(PICOADAPTER_IMPLEMENTATION STREQUAL "esp")
+    add_subdirectory(src/implementations/esp)
 endif()
 
 message(STATUS "====================================================")

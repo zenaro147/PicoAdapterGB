@@ -270,7 +270,271 @@ jobs:
           name: PicoAdapterGB-bleeding-edge-Pico2W-STACKSMASHING
           path: artifact
           retention-days: 14
-  
+
+  pico_esp_reon:
+    name: Pico + ESP - REON
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout PicoAdapterGB
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Checkout Pico SDK
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-sdk
+          ref: 2.3.0
+          path: pico-sdk
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DPICO_SDK_PATH="${GITHUB_WORKSPACE}/pico-sdk" \
+            -DPICO_BOARD=pico \
+            -DPICOADAPTER_IMPLEMENTATION=esp \
+            -DADAPTER=REON \
+            -DPICO_ADAPTER_SOFTWARE="bleeding-edge (${GITHUB_SHA})" \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cmake --build build --target PicoAdapterGB_PicoESP_REON --parallel
+
+      - name: Verify
+        run: |
+          test -f build/release/REON/PicoESP/PicoAdapterGB_PicoESP_REON.uf2
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p artifact
+          cp build/release/REON/PicoESP/PicoAdapterGB_PicoESP_REON.uf2 artifact/PicoAdapterGB_PicoESP_REON.uf2
+
+          printf '%s\n' \
+            'PicoAdapterGB Bleeding Edge' \
+            '' \
+            "Branch: develop" \
+            "Commit: ${GITHUB_SHA}" \
+            "Adapter: REON" \
+            "Board: pico (esp implementation)" \
+            "Pico SDK: 2.3.0" \
+            > artifact/build-info.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PicoAdapterGB-bleeding-edge-PicoESP-REON
+          path: artifact
+          retention-days: 14
+
+  pico_esp_stacksmashing:
+    name: Pico + ESP - STACKSMASHING
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout PicoAdapterGB
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Checkout Pico SDK
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-sdk
+          ref: 2.3.0
+          path: pico-sdk
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DPICO_SDK_PATH="${GITHUB_WORKSPACE}/pico-sdk" \
+            -DPICO_BOARD=pico \
+            -DPICOADAPTER_IMPLEMENTATION=esp \
+            -DADAPTER=STACKSMASHING \
+            -DPICO_ADAPTER_SOFTWARE="bleeding-edge (${GITHUB_SHA})" \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cmake --build build --target PicoAdapterGB_PicoESP_SmBoard --parallel
+
+      - name: Verify
+        run: |
+          test -f build/release/SmBoard/PicoESP/PicoAdapterGB_PicoESP_SmBoard.uf2
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p artifact
+          cp build/release/SmBoard/PicoESP/PicoAdapterGB_PicoESP_SmBoard.uf2 artifact/PicoAdapterGB_PicoESP_SmBoard.uf2
+
+          printf '%s\n' \
+            'PicoAdapterGB Bleeding Edge' \
+            '' \
+            "Branch: develop" \
+            "Commit: ${GITHUB_SHA}" \
+            "Adapter: STACKSMASHING" \
+            "Board: pico (esp implementation)" \
+            "Pico SDK: 2.3.0" \
+            > artifact/build-info.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PicoAdapterGB-bleeding-edge-PicoESP-STACKSMASHING
+          path: artifact
+          retention-days: 14
+
+  pico2_esp_reon:
+    name: Pico 2 + ESP - REON
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout PicoAdapterGB
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Checkout Pico SDK
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-sdk
+          ref: 2.3.0
+          path: pico-sdk
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DPICO_SDK_PATH="${GITHUB_WORKSPACE}/pico-sdk" \
+            -DPICO_BOARD=pico2 \
+            -DPICOADAPTER_IMPLEMENTATION=esp \
+            -DADAPTER=REON \
+            -DPICO_ADAPTER_SOFTWARE="bleeding-edge (${GITHUB_SHA})" \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cmake --build build --target PicoAdapterGB_Pico2ESP_REON --parallel
+
+      - name: Verify
+        run: |
+          test -f build/release/REON/Pico2ESP/PicoAdapterGB_Pico2ESP_REON.uf2
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p artifact
+          cp build/release/REON/Pico2ESP/PicoAdapterGB_Pico2ESP_REON.uf2 artifact/PicoAdapterGB_Pico2ESP_REON.uf2
+
+          printf '%s\n' \
+            'PicoAdapterGB Bleeding Edge' \
+            '' \
+            "Branch: develop" \
+            "Commit: ${GITHUB_SHA}" \
+            "Adapter: REON" \
+            "Board: pico2 (esp implementation)" \
+            "Pico SDK: 2.3.0" \
+            > artifact/build-info.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PicoAdapterGB-bleeding-edge-Pico2ESP-REON
+          path: artifact
+          retention-days: 14
+
+  pico2_esp_stacksmashing:
+    name: Pico 2 + ESP - STACKSMASHING
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout PicoAdapterGB
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Checkout Pico SDK
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-sdk
+          ref: 2.3.0
+          path: pico-sdk
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DPICO_SDK_PATH="${GITHUB_WORKSPACE}/pico-sdk" \
+            -DPICO_BOARD=pico2 \
+            -DPICOADAPTER_IMPLEMENTATION=esp \
+            -DADAPTER=STACKSMASHING \
+            -DPICO_ADAPTER_SOFTWARE="bleeding-edge (${GITHUB_SHA})" \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cmake --build build --target PicoAdapterGB_Pico2ESP_SmBoard --parallel
+
+      - name: Verify
+        run: |
+          test -f build/release/SmBoard/Pico2ESP/PicoAdapterGB_Pico2ESP_SmBoard.uf2
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p artifact
+          cp build/release/SmBoard/Pico2ESP/PicoAdapterGB_Pico2ESP_SmBoard.uf2 artifact/PicoAdapterGB_Pico2ESP_SmBoard.uf2
+
+          printf '%s\n' \
+            'PicoAdapterGB Bleeding Edge' \
+            '' \
+            "Branch: develop" \
+            "Commit: ${GITHUB_SHA}" \
+            "Adapter: STACKSMASHING" \
+            "Board: pico2 (esp implementation)" \
+            "Pico SDK: 2.3.0" \
+            > artifact/build-info.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PicoAdapterGB-bleeding-edge-Pico2ESP-STACKSMASHING
+          path: artifact
+          retention-days: 14
+
   publish_bleeding_edge:
     name: Publish Bleeding Edge Release
     runs-on: ubuntu-22.04
@@ -280,6 +544,10 @@ jobs:
       - pico_w_stacksmashing
       - pico2_w_reon
       - pico2_w_stacksmashing
+      - pico_esp_reon
+      - pico_esp_stacksmashing
+      - pico2_esp_reon
+      - pico2_esp_stacksmashing
 
     permissions:
       contents: write
@@ -313,6 +581,18 @@ jobs:
           cp artifacts/PicoAdapterGB-bleeding-edge-Pico2W-STACKSMASHING/PicoAdapterGB_Pico2W_SmBoard.uf2 \
             release/PicoAdapterGB_Pico2W_SmBoard.uf2
 
+          cp artifacts/PicoAdapterGB-bleeding-edge-PicoESP-REON/PicoAdapterGB_PicoESP_REON.uf2 \
+            release/PicoAdapterGB_PicoESP_REON.uf2
+
+          cp artifacts/PicoAdapterGB-bleeding-edge-PicoESP-STACKSMASHING/PicoAdapterGB_PicoESP_SmBoard.uf2 \
+            release/PicoAdapterGB_PicoESP_SmBoard.uf2
+
+          cp artifacts/PicoAdapterGB-bleeding-edge-Pico2ESP-REON/PicoAdapterGB_Pico2ESP_REON.uf2 \
+            release/PicoAdapterGB_Pico2ESP_REON.uf2
+
+          cp artifacts/PicoAdapterGB-bleeding-edge-Pico2ESP-STACKSMASHING/PicoAdapterGB_Pico2ESP_SmBoard.uf2 \
+            release/PicoAdapterGB_Pico2ESP_SmBoard.uf2
+
           ls -lh release
 
       - name: Create Bleeding Edge release
@@ -327,7 +607,11 @@ jobs:
           - Pico W / REON
           - Pico W / STACKSMASHING
           - Pico 2 W / REON
-          - Pico 2 W / STACKSMASHING"
+          - Pico 2 W / STACKSMASHING
+          - Pico + ESP8266 / REON
+          - Pico + ESP8266 / STACKSMASHING
+          - Pico 2 + ESP8266 / REON
+          - Pico 2 + ESP8266 / STACKSMASHING"
 
           if gh release view bleeding-edge >/dev/null 2>&1; then
             echo "Bleeding Edge release exists. Updating assets and notes..."

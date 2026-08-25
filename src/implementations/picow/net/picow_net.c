@@ -1,5 +1,5 @@
 // cyw43+lwIP implementation of the board-agnostic net_hal.h interface.
-#include "../net_hal.h"
+#include "net/net_hal.h"
 #include "picow_net.h"
 
 #include <string.h>
@@ -241,8 +241,8 @@ void net_poll(void){
 
 void net_service_pending_socket_closes(struct mobile_user *mobile){
     for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
-        if (mobile->socket[i].pending_close) {
-            socket_impl_close_commands(&mobile->socket[i]);
+        if (mobile->socket[i]->pending_close) {
+            socket_impl_close_commands(mobile->socket[i]);
         }
     }
 }

@@ -6,11 +6,12 @@
 
 #include "pico/cyw43_arch.h"
 #include "globals.h"
+#include "socket_impl.h"
 
 //UDP Callbacks
 void socket_recv_udp(void * arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t*addr, u16_t port){
     struct mobile_user *mobile = (struct mobile_user*)arg;
-    struct socket_impl *state = &mobile->socket[mobile->currentReqSocket];
+    struct socket_impl *state = mobile->socket[mobile->currentReqSocket];
     // printf("UDP Receiving...\n");
     if (p->tot_len > 0) {
         // printf("received UDP from IP: %d.%d.%d.%d port: %d  length: %d\n",
@@ -57,14 +58,14 @@ err_t socket_connected_tcp(void *arg, struct tcp_pcb *pcb, err_t err) {
 
 void socket_err_tcp(void *arg, err_t err){
     struct mobile_user *mobile = (struct mobile_user*)arg;
-    struct socket_impl *state = &mobile->socket[mobile->currentReqSocket];
+    struct socket_impl *state = mobile->socket[mobile->currentReqSocket];
     state->socket_status = err;
     DEBUG_PRINT_FUNCTION("TCP Generic Error %d", err);
 }
 
 err_t socket_accept_tcp(void *arg, struct tcp_pcb *pcb, err_t err){
     struct mobile_user *mobile = (struct mobile_user*)arg;
-    struct socket_impl *state = &mobile->socket[mobile->currentReqSocket];
+    struct socket_impl *state = mobile->socket[mobile->currentReqSocket];
 
     if (err != ERR_OK || pcb == NULL) {
         // printf("Failure in accept\n");
@@ -87,7 +88,7 @@ err_t socket_accept_tcp(void *arg, struct tcp_pcb *pcb, err_t err){
 
 err_t socket_sent_tcp(void *arg, struct tcp_pcb *pcb, u16_t len){
     struct mobile_user *mobile = (struct mobile_user*)arg;
-    struct socket_impl *state = &mobile->socket[mobile->currentReqSocket];
+    struct socket_impl *state = mobile->socket[mobile->currentReqSocket];
     err_t err = ERR_ABRT;
     if(state->buffer_tx_len != len){
         // printf("TCP sent %d bytes to: %s:%d. But should sent %d\n",len,ip4addr_ntoa(&pcb->remote_ip),pcb->remote_port,state->buffer_tx_len);
@@ -102,7 +103,7 @@ err_t socket_sent_tcp(void *arg, struct tcp_pcb *pcb, u16_t len){
 
 err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err){
     struct mobile_user *mobile = (struct mobile_user*)arg;
-    struct socket_impl *state = &mobile->socket[mobile->currentReqSocket];
+    struct socket_impl *state = mobile->socket[mobile->currentReqSocket];
     // printf("TCP Receiving...\n");
     state->pending_close = true;
     if(p){

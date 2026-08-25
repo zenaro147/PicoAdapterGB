@@ -25,22 +25,30 @@ endif()
 add_compile_definitions(PICO_ADAPTER_SOFTWARE=\"${PICO_ADAPTER_SOFTWARE}\")
 
 #set(LIBMOBILE_ENABLE_NO32BIT ON)
+
+####################################################################
+# Three independent build dimensions - do not collapse into one variable:
+#   PICO_BOARD                the RP2040/RP2350 chip/board (Pico SDK's own variable)
+#   PICOADAPTER_IMPLEMENTATION  which connectivity/hardware backend under src/implementations/
+#   ADAPTER                   the Game Boy link-cable pinout (REON / STACKSMASHING)
+####################################################################
+
 set(ADAPTER "REON" CACHE STRING "The adapter pinout to build for, options are: 'REON', 'STACKSMASHING'.")
 set_property(CACHE ADAPTER PROPERTY STRINGS "REON;STACKSMASHING")
+
+set(PICOADAPTER_IMPLEMENTATION "picow" CACHE STRING "Connectivity/hardware backend under src/implementations/, options are: 'picow'.")
+set_property(CACHE PICOADAPTER_IMPLEMENTATION PROPERTY STRINGS "picow")
 
 if(NOT (PICO_BOARD MATCHES "pico_w|pico2_w"))
     message("Unknown board '${PICO_BOARD}', using 'pico_w' instead")
     set(PICO_BOARD pico_w CACHE STRING "Board type")
-    set(PICO_PLATFORM "rp2040")    
-    add_compile_definitions(BOARD_PICOW)
+    set(PICO_PLATFORM "rp2040")
 elseif(PICO_BOARD STREQUAL pico_w)
     set(PICO_BOARD pico_w CACHE STRING "Board type")
     set(PICO_PLATFORM "rp2040")
-    add_compile_definitions(BOARD_PICOW)
 elseif(PICO_BOARD STREQUAL "pico2_w")
     set(PICO_BOARD pico2_w CACHE STRING "Board type")
-    set(PICO_PLATFORM "rp2350")    
-    add_compile_definitions(BOARD_PICO2W)
+    set(PICO_PLATFORM "rp2350")
 endif()
 
 message("PICO_BOARD version is ${PICO_BOARD}")
@@ -48,29 +56,51 @@ message("PICO_BOARD version is ${PICO_BOARD}")
 if(NOT (ADAPTER MATCHES "REON|STACKSMASHING"))
     message(WARNING "Unknown adapter '${ADAPTER}', using 'REON' instead")
     set(ADAPTER "REON")
-elseif(ADAPTER STREQUAL "REON")
-    if(PICO_BOARD STREQUAL "pico_w")
-        set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/release/REON/PicoW)
-    elseif(PICO_BOARD STREQUAL "pico2_w")
-        set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/release/REON/Pico2W)
-    endif()
-elseif(ADAPTER STREQUAL "STACKSMASHING")
-    if(PICO_BOARD STREQUAL "pico_w")
-        set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/release/SmBoard/PicoW)
-    elseif(PICO_BOARD STREQUAL "pico2_w")
-        set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/release/SmBoard/Pico2W)
-    endif()
+endif()
+
+if(NOT (PICOADAPTER_IMPLEMENTATION MATCHES "^picow$"))
+    message(FATAL_ERROR
+        "Unknown PICOADAPTER_IMPLEMENTATION '${PICOADAPTER_IMPLEMENTATION}'. "
+        "Valid values: picow.")
 endif()
 
 message("Adapter pinout is ${ADAPTER}")
+message("PicoAdapterGB implementation is ${PICOADAPTER_IMPLEMENTATION}")
+
+# Friendly name components shared by every implementation's CMakeLists.txt,
+# used both for PICO_ADAPTER_HARDWARE (see globals.h) and for artifact/target
+# names (e.g. PicoAdapterGB_PicoW_REON). Adding a new PICO_BOARD value here
+# only ever needs a new branch in this one mapping.
+if(PICO_BOARD STREQUAL "pico_w")
+    set(BoardLabel "PicoW")
+elseif(PICO_BOARD STREQUAL "pico2_w")
+    set(BoardLabel "Pico2W")
+else()
+    message(FATAL_ERROR "No BoardLabel mapping for PICO_BOARD '${PICO_BOARD}'.")
+endif()
+
+if(ADAPTER STREQUAL "STACKSMASHING")
+    set(PinoutLabel "SmBoard")
+else()
+    set(PinoutLabel "REON")
+endif()
 
 include(pico_sdk_import.cmake)
 project(PicoAdapterGB C CXX ASM)
 pico_sdk_init()
- 
+
 add_subdirectory(dependences)
-if (PICO_CYW43_SUPPORTED)
-    if (TARGET pico_cyw43_arch)
-        add_subdirectory(picow)
-    endif()
+
+# Each implementation's own CMakeLists.txt owns its dependencies (e.g. picow
+# needs cyw43+lwIP) and validates board compatibility itself; the root
+# project never assumes a specific implementation's requirements are met.
+if(PICOADAPTER_IMPLEMENTATION STREQUAL "picow")
+    add_subdirectory(src/implementations/picow)
 endif()
+
+message(STATUS "====================================================")
+message(STATUS " PicoAdapterGB configuration")
+message(STATUS "   Board:          ${PICO_BOARD}")
+message(STATUS "   Implementation: ${PICOADAPTER_IMPLEMENTATION}")
+message(STATUS "   Pinout:         ${ADAPTER}")
+message(STATUS "====================================================")

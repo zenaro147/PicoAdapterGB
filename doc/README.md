@@ -6,7 +6,7 @@ This project combines:
 
 - Game Boy link-cable protocol handling
 - Mobile Adapter GB logic and state machine
-- Pico W networking and Wi-Fi
+- Wi-Fi networking, either onboard (Pico W / Pico 2 W) or via an external ESP8266EX running ESP-AT (plain Pico / Pico 2)
 - Web-based configuration
 - EEPROM-backed configuration persistence
 
@@ -14,6 +14,7 @@ This project combines:
 
 - `src/` — core firmware: Game Boy link cable (PIO), libmobile glue, storage, and the network/LED interfaces every board target implements
 - `src/implementations/picow/` — Pico W / Pico 2 W backend (cyw43 + lwIP), including the optional web setup UI
+- `src/implementations/esp/` — Pico / Pico 2 + ESP8266EX (ESP-01, ESP-AT) backend, including the optional web setup UI (see its own [README.md](../src/implementations/esp/README.md))
 - `dependences/libmobile/` — local copy of the libmobile protocol implementation
 - `doc/` — project documentation
 - `PicoAdapter_PCB/` — board and schematic files
@@ -22,14 +23,14 @@ See [doc/ARCHITECTURE.md](ARCHITECTURE.md) for the detailed module breakdown (ne
 
 ## Recommended hardware
 
-- Raspberry Pi Pico W or Pico 2 W
+- Raspberry Pi Pico W or Pico 2 W (`picow` implementation), or a plain Raspberry Pi Pico / Pico 2 plus an ESP8266EX (ESP-01) running ESP-AT (`esp` implementation)
 - Bidirectional level shifter for Game Boy link-cable signals
 - Game Boy link cable
 - 5V power source capable of powering the adapter
 
 ## Firmware overview
 
-The current recommended firmware target is the `picow` implementation (`src/implementations/picow/`), selected by default via `PICOADAPTER_IMPLEMENTATION=picow`.
+The current recommended firmware target is the `picow` implementation (`src/implementations/picow/`), selected by default via `PICOADAPTER_IMPLEMENTATION=picow`. An alternative `esp` implementation (`src/implementations/esp/`) runs on a plain Pico/Pico 2 with an external ESP8266EX module for connectivity instead of the Pico W's onboard CYW43 - select it via `PICOADAPTER_IMPLEMENTATION=esp`.
 
 On boot, the device:
 
@@ -44,8 +45,8 @@ On boot, the device:
 
 The build is configured through three independent CMake options:
 
-- `PICO_BOARD` — `pico_w` or `pico2_w`
-- `PICOADAPTER_IMPLEMENTATION` — `picow` (default; the only one that exists today)
+- `PICO_BOARD` — `pico_w`/`pico2_w` (for `picow`), or `pico`/`pico2` (for `esp`)
+- `PICOADAPTER_IMPLEMENTATION` — `picow` (default) or `esp`
 - `ADAPTER` — `REON` or `STACKSMASHING`
 
 These are defined in the top-level `CMakeLists.txt`.

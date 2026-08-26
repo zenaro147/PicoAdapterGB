@@ -23,7 +23,8 @@ Refer to the [Wiki page](https://github.com/zenaror/PicoAdapterGB/tree/main/doc/
 <sub>Click on the image to watch the full video</sub>
 
 ## Current implementations
-- `picow`: A Raspberry Pi Pico W implementation using the internal WiFi connectivity. (recommended)
+- `picow`: A Raspberry Pi Pico W / Pico 2 W implementation using the internal WiFi connectivity. (recommended)
+- `esp`: A Raspberry Pi Pico / Pico 2 implementation using an external ESP8266EX (ESP-01) module running ESP-AT for WiFi connectivity. See [src/implementations/esp/README.md](src/implementations/esp/README.md).
 
 ## 3D printed shell
 * Check out the Hatch's [Thingverse Page](https://www.thingiverse.com/thing:7057318)

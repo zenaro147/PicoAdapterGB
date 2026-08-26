@@ -82,7 +82,29 @@ void main(){
 
     stdio_init_all();
     printf("Booting...\n");
-    net_init();
+    if (!net_init()) {
+        // Network hardware/module never came up - e.g. the esp
+        // implementation's ESP-AT module not responding on UART (wiring,
+        // power, or a firmware/baud rate mismatch - see
+        // src/implementations/esp/README.md). There's nothing safe to fall
+        // back to: Wi-Fi credentials might be fine, but there's no way to
+        // try them, and the setup hotspot needs working network hardware
+        // too. Halt here instead of falling through into a Wi-Fi connect
+        // attempt that's doomed to fail and would surface later as a
+        // confusing "Wi-Fi connection failed" instead of the real cause.
+        //
+        // net_init() must still run before any led_status_*() call: on
+        // picow the LED is wired through the CYW43 chip itself (see
+        // core/led_hal.h) and is only drivable once cyw43_arch_init(),
+        // called from net_init(), has actually succeeded - so if THAT is
+        // what just failed, this blink pattern may not be visible there.
+        // DEBUG_PRINT_FUNCTION is the fallback diagnostic in that case. On
+        // esp, the LED is a plain GPIO independent of ESP-AT, so it's
+        // reliable here.
+        DEBUG_PRINT_FUNCTION("Network hardware failed to initialize. Halting.");
+        led_status_boot_start();
+        while (true) led_status_report_error(LED_ERROR_NET_INIT_FAILED);
+    }
     led_status_boot_start();
     busy_wait_us(SEC(5));
 

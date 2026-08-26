@@ -29,6 +29,14 @@
 // or AT+RESTORE) before use with this firmware.
 #define ESP_UART_BAUD_RATE  115200
 
+// ESP-AT v2.3.0.0 TCP/IP-AT command doc: AT+CIPSEND's <length> is capped at
+// 2048 bytes per invocation (normal, non-passthrough mode) - a longer request
+// is rejected by the module with no bytes sent. esp_at_send() enforces this
+// itself so every caller can keep treating its return value as "bytes
+// actually accepted, possibly less than requested" (see esp_at.h) and just
+// loop, the way web_service_conns() and socket_impl.c already do.
+#define ESP_AT_MAX_SEND_LEN 2048
+
 // AT+CIPMUX=1 gives us link IDs 0-4 (5 total, confirmed in ESP-AT TCP/IP AT
 // command doc). MOBILE_MAX_CONNECTIONS (2, from libmobile) claims two fixed
 // IDs for the Mobile Adapter's own sockets; the web config server (also
@@ -47,7 +55,25 @@
 #define ESP_AT_TIMEOUT_WIFI_JOIN_MS  20000  // AT+CWJAP (association + DHCP)
 #define ESP_AT_TIMEOUT_SOCKET_MS      5000  // AT+CIPSTART
 #define ESP_AT_TIMEOUT_SEND_MS        5000  // AT+CIPSEND (prompt + SEND OK/FAIL)
-#define ESP_AT_TIMEOUT_CLOSE_MS       3000  // AT+CIPCLOSE
+#define ESP_AT_TIMEOUT_CLOSE_MS       3000  // AT+CIPCLOSE on a link that was actually connected
+// AT+CIPCLOSE on a link whose AT+CIPSTART never confirmed a connection (see
+// esp_at_close()): there's no established TCP session for the module to
+// gracefully tear down, so this doesn't need anywhere near
+// ESP_AT_TIMEOUT_CLOSE_MS - and blocking main.c's loop for the full 3s on
+// every failed connect attempt (e.g. 3 retries in a row) is what made a
+// relay-connect-retry loop look like it had hung. A few hundred ms is enough
+// for a well-behaved module to ack (or for us to stop waiting either way).
+#define ESP_AT_TIMEOUT_CLOSE_UNCONFIRMED_MS 300
+// Bounded time esp_at_close() spends draining the UART after forcibly
+// abandoning an in-flight command (see the "narrow race" note in
+// esp_at_close()), before issuing this close's own AT+CIPCLOSE. The module
+// doesn't know we gave up on that command and will still eventually send its
+// real response (SEND OK/ERROR/etc.); without this drain, that stray line
+// can arrive while a *different*, newly-issued command is in flight and get
+// misattributed to it (confirmed on hardware - see git history). This isn't
+// a full fix (the module could still reply after this window), just a
+// best-effort reduction of the window where that can happen.
+#define ESP_AT_ABANDON_DRAIN_MS       150
 
 // Boot/sync: how long to keep retrying a plain "AT" probe before giving up.
 // There's no RESET/EN line to this module (ESP-01 wiring is RX/TX/VCC/GND

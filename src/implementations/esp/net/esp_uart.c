@@ -19,6 +19,7 @@ static_assert((ESP_UART_RXBUF_SIZE & ESP_UART_RXBUF_MASK) == 0, "ESP_UART_RXBUF_
 static volatile uint8_t rx_buf[ESP_UART_RXBUF_SIZE];
 static volatile uint16_t rx_head = 0; // written by IRQ
 static volatile uint16_t rx_tail = 0; // read by esp_uart_read_byte()
+static volatile bool rx_overflow = false;
 
 static void esp_uart_irq_handler(void){
     while (uart_is_readable(ESP_UART_INSTANCE)) {
@@ -29,6 +30,7 @@ static void esp_uart_irq_handler(void){
             // slow consumer loses history instead of getting stuck unable to
             // ever see the tail end of whatever is currently arriving.
             rx_tail = (rx_tail + 1) & ESP_UART_RXBUF_MASK;
+            rx_overflow = true;
         }
         rx_buf[rx_head] = byte;
         rx_head = next_head;
@@ -57,6 +59,12 @@ bool esp_uart_read_byte(uint8_t *out){
 
 bool esp_uart_readable(void){
     return rx_tail != rx_head;
+}
+
+bool esp_uart_take_overflow(void){
+    bool v = rx_overflow;
+    rx_overflow = false;
+    return v;
 }
 
 void esp_uart_write(const uint8_t *data, size_t len){

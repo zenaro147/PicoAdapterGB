@@ -83,6 +83,12 @@ or `AT+RESTORE`).
 5. `AT+CIPRECVMODE=1` - passive receive (see "Receive model" below).
 6. `AT+CIPDINFO=0` - don't prefix `+IPD`/`+CIPRECVDATA` with the remote address; this backend doesn't rely on it (see `socket_impl_recv()`'s UDP handling).
 
+### Boot failure: module not responding
+
+`esp_at_init()` (and therefore `net_init()`, see `net/esp_net.c`) returns `false` if the module never answers the `AT` probe after `ESP_AT_SYNC_ATTEMPTS` retries, or if any command in the sequence above fails. `main.c` treats a `false` return from `net_init()` as fatal: it halts boot right there, blinking LED error code 4 (`LED_ERROR_NET_INIT_FAILED`, see `core/led_status.h`) forever instead of falling through into a Wi-Fi connect attempt that has no chance of succeeding (see `doc/CONFIGURATION.md`'s LED status section).
+
+This is deliberately a hard halt, not a fallback to the setup hotspot: the hotspot needs working network hardware too, so there's nothing safe to fall back to when the module itself isn't answering. Check wiring (GP4/GP5, see "Wiring" above), power, and that the module is actually running ESP-AT firmware at `ESP_UART_BAUD_RATE` (115200) before assuming this is a software bug.
+
 ### Full list of AT commands used
 
 ```text
@@ -169,8 +175,34 @@ assumed correct:
   `esp_at_close()` reclaims the AT "bus" for this case, but if the abandoned
   command's real response arrives on the wire just as a *new* command is
   being issued, there's a narrow window where a stray response line could be
-  misattributed to the new command instead of silently discarded. See the
-  comment in `net/esp_at.c`'s `esp_at_close()`.
+  misattributed to the new command instead of silently discarded. Confirmed
+  on real hardware during relay-connect testing (a stale `SEND OK` from an
+  abandoned handshake send showed up while a subsequent `AT+CIPSTART` retry
+  was in flight). `esp_at_close()` now drains the UART for a short bounded
+  window (`ESP_AT_ABANDON_DRAIN_MS`) after reclaiming the bus, to let such a
+  straggler arrive and be discarded before issuing its own command - this
+  narrows the window but doesn't close it entirely (the module could still
+  reply after that window). See the comment in `net/esp_at.c`'s
+  `esp_at_close()`.
+- **`esp_at_send()` is bounded-blocking, not non-blocking** (up to
+  `ESP_AT_TIMEOUT_SEND_MS` in the worst case), unlike `mobile.h`'s documented
+  `sock_send()` contract ("non-blocking... called repeatedly until all of the
+  data is sent"). This is a deliberate workaround for a bug found in the
+  pinned `dependences/libmobile` submodule: `relay.c`'s `relay_handshake_send()`
+  and `dns.c` both do `return mobile_cb_sock_send(...)` from a `bool`-returning
+  function, implicitly truncating `sock_send()`'s documented `int` return (0
+  is a valid "nothing sent *yet* this call, call again" per the contract) to
+  a boolean - a legitimate 0 is misread as failure. This broke every relay
+  connection through this backend, because a real `AT+CIPSEND` round-trip
+  (`OK`, then the `>` prompt, then `SEND OK`) can never finish on its first
+  call, unlike picow's lwIP-backed send, which usually finishes a payload as
+  small as the relay handshake synchronously and never triggers the bug. The
+  correct fix belongs in the submodule (see `CLAUDE.md`'s submodule rules);
+  fixing it there was raised and explicitly deferred in favor of this
+  backend-local workaround. Practical effect: not just the relay handshake,
+  but *any* `esp_at_send()` call - ordinary Game Boy protocol sends, and web
+  config response bytes (`web/web_http.c`) - can block the main loop for up
+  to `ESP_AT_TIMEOUT_SEND_MS`.
 - **`AT+CIPSERVER` link ID for the web UI is not reserved in advance** (ESP-AT
   auto-assigns it from whatever's free), so a specific-but-unlikely ordering
   where a mobile socket is still open on the ID the server would otherwise
@@ -190,7 +222,8 @@ assumed correct:
 | Board | `pico_w`, `pico2_w` | `pico`, `pico2` |
 | Network stack | lwIP (in-Pico) | ESP-AT (on the ESP8266; Pico only speaks AT) |
 | Socket callbacks | lwIP callbacks (event-driven) | Polled async state machine (no callback mechanism exists over a UART/AT link) |
-| `net_wifi_connect()`/`sock_connect()`/`sock_send()`/`sock_recv()` blocking behavior | Same as `esp`: connect/send/recv are non-blocking, `net_wifi_connect()` blocks | Same shape, implemented against `net/esp_at.h` instead of `cyw43_arch_poll()` |
+| `net_wifi_connect()`/`sock_connect()`/`sock_recv()` blocking behavior | `net_wifi_connect()` blocks, connect/recv are non-blocking | Same shape, implemented against `net/esp_at.h` instead of `cyw43_arch_poll()` |
+| `sock_send()` blocking behavior | Non-blocking (matches `mobile.h`'s documented contract) | Bounded-blocking (up to `ESP_AT_TIMEOUT_SEND_MS`) - deliberate workaround for a libmobile submodule bug, see "Known limitations" above |
 | LED | `cyw43_arch_gpio_put()` (LED is on the CYW43 radio) | Plain `gpio_put(PICO_DEFAULT_LED_PIN)` |
 | Web server transport | lwIP TCP callbacks | Polled against the shared `AT+CIPSERVER` slot (see above) |
 | Web server routes/HTML | `web/web_routes_*.c`, `web/web_page.c` | Byte-for-byte copies of picow's (verified to have zero lwIP dependency) - not shared, to keep the two implementations independent (see doc/ARCHITECTURE.md) |

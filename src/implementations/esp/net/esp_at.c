@@ -113,8 +113,27 @@ static void at_begin(enum at_cmd_kind kind, int link_id, uint32_t timeout_ms){
     at_busy = true;
 }
 
+// Escapes ',', '"' and '\' with a leading '\', as required by ESP-AT for
+// quoted string arguments (AT+CWJAP/AT+CWSAP SSID and password - see the
+// ESP-AT Wi-Fi AT command doc). Without this, any of those characters in a
+// password breaks the module's own command parsing - not a connectivity
+// issue, but indistinguishable from one without a packet capture. dstsize
+// must be at least 2*strlen(src)+1.
+static void at_escape_quoted(char *dst, size_t dstsize, const char *src){
+    size_t j = 0;
+    for (size_t i = 0; src[i] && j + 2 < dstsize; i++){
+        char c = src[i];
+        if (c == ',' || c == '"' || c == '\\') dst[j++] = '\\';
+        dst[j++] = c;
+    }
+    dst[j] = '\0';
+}
+
 static void at_write_line(const char *fmt, ...){
-    char buf[144];
+    // Sized for the worst case AT+CWJAP="<escaped ssid>","<escaped psk>":
+    // SSID_LENGHT/PASS_LENGHT (globals.h) each fully escaped (2x) plus the
+    // command/quote/comma overhead.
+    char buf[256];
     va_list ap;
     va_start(ap, fmt);
     int len = vsnprintf(buf, sizeof(buf), fmt, ap);
@@ -163,6 +182,18 @@ static void handle_connect_event(int id){
         links[id].rx_pending = 0;
     }
     links[id].connected = true;
+
+    // In CIPMUX=1 mode (always on for this backend - see esp_at_init()), an
+    // outbound AT+CIPSTART's "OK" only means the command was accepted; the
+    // actual TCP handshake completing is signaled by this same unsolicited
+    // "<id>,CONNECT" event, arriving separately (often after "OK", not
+    // before). This line is consumed here, before process_line() would ever
+    // reach the AT_CMD_CIPSTART case in its switch below for it, so an
+    // in-flight connect for this link must be finished from here directly -
+    // that switch case only ever sees "OK"/"ERROR" for this command kind.
+    if (at_busy && !at_done && at_kind == AT_CMD_CIPSTART && at_link == id) {
+        at_finish(true, 0);
+    }
 }
 
 static void handle_closed_event(int id){
@@ -235,14 +266,28 @@ static void process_line(const char *line){
         break;
 
     case AT_CMD_CIPSTART:
+        // Real success is the unsolicited "<id>,CONNECT" event, handled (and
+        // this command finished) directly from handle_connect_event() -
+        // that line never reaches this switch, since it's consumed by
+        // process_line()'s unsolicited-event checks above before at_busy is
+        // even looked at. A bare "CONNECT" (no link-ID prefix) only happens
+        // in CIPMUX=0 mode, which this backend never uses, but is still
+        // handled here defensively.
         if (strcmp(line, "CONNECT") == 0) { at_connect_seen = true; break; }
-        {
-            const char *rest;
-            int id = parse_link_prefix(line, &rest);
-            if (id == at_link && strcmp(rest, "CONNECT") == 0) { at_connect_seen = true; break; }
-        }
         if (line_is(line, "ALREADY CONNECTED")) { at_connect_seen = true; break; }
-        if (line_is(line, "OK")) { at_finish(at_connect_seen, 0); break; }
+        if (line_is(line, "OK")) {
+            // In CIPMUX=1 mode, "OK" only means the command was accepted -
+            // it commonly arrives before the real "<id>,CONNECT" completion
+            // event, sometimes several hundred ms before the TCP handshake
+            // actually finishes. Finishing here unconditionally used to
+            // report every connect as failed (at_connect_seen was always
+            // still false at this point) even though the module went on to
+            // connect successfully moments later. Only finish here if a bare
+            // CONNECT/ALREADY CONNECTED already arrived first; otherwise
+            // keep waiting for handle_connect_event() or a timeout/ERROR.
+            if (at_connect_seen) at_finish(true, 0);
+            break;
+        }
         if (line_is(line, "ERROR")) { at_finish(false, -1); break; }
         break;
 
@@ -439,6 +484,22 @@ void esp_at_poll(void){
     uint8_t b;
     while (esp_uart_read_byte(&b)) feed_byte(b);
 
+    if (esp_uart_take_overflow()) {
+        // The RX ring buffer dropped a byte somewhere in what was just fed
+        // to feed_byte() above (see esp_uart.h). Whatever line/length/
+        // payload framing state that left us in can't be trusted - in
+        // particular, a byte-counted CIPRECVDATA binary capture (RXP_PAYLOAD)
+        // has no way to tell a dropped byte from a real one, so it would
+        // otherwise keep counting post-drop bytes (e.g. the next unsolicited
+        // event's text) as if they were still part of the payload, completing
+        // "successfully" with silently corrupted content instead of failing.
+        // Resync on the next line and fail whatever command is in flight so
+        // the caller retries instead of trusting corrupted data.
+        rxp = RXP_LINE;
+        line_len = 0;
+        if (at_busy && !at_done) at_finish(false, -1);
+    }
+
     if (at_busy && !at_done) {
         uint64_t elapsed_ms = (time_us_64() - at_started_us) / 1000;
         if (elapsed_ms >= at_timeout_ms) {
@@ -463,8 +524,13 @@ void esp_at_poll(void){
 esp_wifi_join_result_t esp_at_wifi_join(const char *ssid, const char *psk, uint32_t timeout_ms){
     if (at_busy) return ESP_WIFI_JOIN_MODULE_ERROR;
 
+    char ssid_esc[SSID_LENGHT * 2];
+    char psk_esc[PASS_LENGHT * 2];
+    at_escape_quoted(ssid_esc, sizeof(ssid_esc), ssid);
+    at_escape_quoted(psk_esc, sizeof(psk_esc), psk);
+
     bool ok = at_run_blocking(AT_CMD_CWJAP, -1, timeout_ms,
-        "AT+CWJAP=\"%s\",\"%s\"", ssid, psk);
+        "AT+CWJAP=\"%s\",\"%s\"", ssid_esc, psk_esc);
     if (ok) return ESP_WIFI_JOIN_OK;
 
     switch (at_result_code){
@@ -478,9 +544,15 @@ esp_wifi_join_result_t esp_at_wifi_join(const char *ssid, const char *psk, uint3
 
 bool esp_at_wifi_start_ap(const char *ssid, const char *psk){
     if (at_busy) return false;
+
+    char ssid_esc[SSID_LENGHT * 2];
+    char psk_esc[PASS_LENGHT * 2];
+    at_escape_quoted(ssid_esc, sizeof(ssid_esc), ssid);
+    at_escape_quoted(psk_esc, sizeof(psk_esc), psk);
+
     // ecn=3 (WPA2_PSK), channel 1, up to 4 stations, broadcast SSID.
     return at_run_blocking(AT_CMD_PLAIN, -1, ESP_AT_TIMEOUT_BASIC_MS,
-        "AT+CWSAP=\"%s\",\"%s\",1,3,4,0", ssid, psk);
+        "AT+CWSAP=\"%s\",\"%s\",1,3,4,0", ssid_esc, psk_esc);
 }
 
 bool esp_at_wifi_is_connected(void){
@@ -627,20 +699,49 @@ bool esp_at_udp_set_remote(int link_id, const char *host, uint16_t port){
 int esp_at_send(int link_id, const void *data, unsigned size){
     if (link_id < 0 || link_id >= ESP_LINK_COUNT || size == 0) return -1;
 
-    if (at_busy) {
-        if (at_kind == AT_CMD_CIPSEND && at_link == link_id) {
-            if (!at_done) return 0; // still in progress
-            at_busy = false;
-            return at_success ? at_result_code : -1;
-        }
-        return 0; // bus busy with something else; caller retries
+    // Blocking by design, despite this function's own doc comment describing
+    // the non-blocking contract mobile.h's mobile_func_sock_send actually
+    // specifies (int: bytes sent, 0 is a valid "nothing sent *yet* this
+    // call" - the caller is supposed to call again). dependences/libmobile's
+    // relay.c (relay_handshake_send()) and dns.c both instead do
+    // `return mobile_cb_sock_send(...)` from a function returning bool,
+    // implicitly truncating that int to a bool - a legitimate 0 becomes
+    // false ("failed") instead of "call again", which broke every relay
+    // connection through this backend (confirmed on hardware: the module
+    // genuinely can't return a full AT+CIPSEND result on its first call -
+    // it always needs OK, then the '>' prompt, then SEND OK, spanning
+    // multiple polls - so this bug triggers unconditionally here, unlike on
+    // picow's lwIP-backed send, which usually finishes a small payload like
+    // the relay handshake in one synchronous call and never surfaces it).
+    // Fixing this properly belongs in the pinned libmobile submodule, not
+    // here (see CLAUDE.md's submodule rules) - reported to the user as a
+    // separate decision. Per their choice, this function instead blocks
+    // internally (bounded by ESP_AT_TIMEOUT_SEND_MS, same as before) so it
+    // never returns 0 to a caller that can't handle it - only a final byte
+    // count or -1. This applies to every esp_at_send() call, not just the
+    // relay handshake: ordinary Game Boy protocol sends and web response
+    // bytes (see web/web_http.c) can now also block the main loop for up to
+    // that long in the worst case.
+    uint64_t deadline = time_us_64() + MS(ESP_AT_TIMEOUT_SEND_MS);
+    while (at_busy) {
+        if (time_us_64() >= deadline) return -1;
+        esp_at_poll();
+        sleep_ms(5);
     }
+
+    if (size > ESP_AT_MAX_SEND_LEN) size = ESP_AT_MAX_SEND_LEN;
 
     at_begin(AT_CMD_CIPSEND, link_id, ESP_AT_TIMEOUT_SEND_MS);
     at_tx_payload = (const uint8_t *)data;
     at_tx_payload_len = size;
     at_write_line("AT+CIPSEND=%d,%u", link_id, size);
-    return 0;
+
+    while (!at_done) {
+        esp_at_poll();
+        sleep_ms(5);
+    }
+    at_busy = false;
+    return at_success ? at_result_code : -1;
 }
 
 int esp_at_recv(int link_id, void *data, unsigned size){
@@ -676,16 +777,47 @@ void esp_at_close(int link_id){
     // libmobile is allowed to cancel an in-progress connect/send by closing
     // the socket instead of ever collecting its result (see mobile.h's
     // sock_connect/sock_send docs). Reclaim the AT "bus" here so it doesn't
-    // stay wedged forever waiting for a caller that will never come back -
-    // whatever response eventually arrives for the abandoned command is
-    // simply ignored (process_line() only acts on it while at_busy is true).
-    // Sending CIPCLOSE while that response hasn't actually arrived on the
-    // wire yet is a narrow race this backend can't fully rule out without
-    // hardware in hand - see README.md's known-limitations section.
-    if (at_busy && at_link == link_id) at_busy = false;
+    // stay wedged forever waiting for a caller that will never come back.
+    // The module doesn't know we gave up on that command though, and will
+    // still eventually send its real response for it (SEND OK/ERROR/a
+    // trailing OK/etc.) - confirmed on hardware to otherwise arrive later,
+    // misattributed to whatever *new* command is in flight by then (e.g. a
+    // stray "SEND OK" from an abandoned relay handshake send showing up
+    // while a subsequent AT+CIPSTART retry is being processed). Give any
+    // such straggler a short bounded window to arrive and be silently
+    // discarded (process_line() only acts on a line while at_busy is true)
+    // before issuing this close's own command - not a full fix (the module
+    // could still reply after this window), just a best-effort reduction.
+    if (at_busy && at_link == link_id) {
+        at_busy = false;
+        uint64_t drain_deadline = time_us_64() + MS(ESP_AT_ABANDON_DRAIN_MS);
+        while (time_us_64() < drain_deadline) {
+            uint8_t b;
+            while (esp_uart_read_byte(&b)) feed_byte(b);
+            sleep_ms(5);
+        }
+    }
 
-    if (!links[link_id].connected) { esp_at_link_release(link_id); return; }
-    if (!at_busy) at_run_blocking(AT_CMD_PLAIN, link_id, ESP_AT_TIMEOUT_CLOSE_MS, "AT+CIPCLOSE=%d", link_id);
+    // Gate on in_use, not connected: a link whose AT+CIPSTART failed (or
+    // never got far enough to see a "<id>,CONNECT" event) never sets
+    // connected=true, but a real AT+CIPSTART was still sent for it - the
+    // module may still consider that link reserved/half-open until an
+    // explicit AT+CIPCLOSE, and the next attempt always reuses this same
+    // fixed link ID (see esp_config.h's ESP_LINK_MOBILE_BASE comment).
+    // Skipping CIPCLOSE here left a failed link dirty on the module's side,
+    // making every subsequent AT+CIPSTART on it fail immediately too - e.g.
+    // a relay connection retry loop that never recovers. A link that was
+    // truly never opened at all (in_use=false) still gets no AT+CIPCLOSE:
+    // sending one here would be harmless too, but there's nothing to clean
+    // up. AT+CIPCLOSE on an already-closed link is itself a documented no-op
+    // in ESP-AT, so being defensive here for the connected=true case (a real
+    // established connection) costs nothing either.
+    if (!links[link_id].in_use) { esp_at_link_release(link_id); return; }
+    if (!at_busy) {
+        uint32_t close_timeout = links[link_id].connected
+            ? ESP_AT_TIMEOUT_CLOSE_MS : ESP_AT_TIMEOUT_CLOSE_UNCONFIRMED_MS;
+        at_run_blocking(AT_CMD_PLAIN, link_id, close_timeout, "AT+CIPCLOSE=%d", link_id);
+    }
     esp_at_link_release(link_id);
 }
 

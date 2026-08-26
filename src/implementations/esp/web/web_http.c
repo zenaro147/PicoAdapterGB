@@ -363,8 +363,6 @@ static void web_process(struct web_conn *c){
 // Polling-driven connection lifecycle (see file header comment).
 // ---------------------------------------------------------------------
 
-#define WEB_RECV_CHUNK 512
-
 static void web_service_conns(void){
     if (!web_conns) return;
 
@@ -388,13 +386,12 @@ static void web_service_conns(void){
         bool remote_closed = esp_at_link_consume_closed_event(c->link_id);
 
         if (!c->response_ready){
-            uint8_t chunk[WEB_RECV_CHUNK];
             int room = WEB_REQ_BUF_SIZE - 1 - c->req_len;
             if (room > 0){
                 int want = room < WEB_RECV_CHUNK ? room : WEB_RECV_CHUNK;
-                int got = esp_at_recv(c->link_id, chunk, (unsigned)want);
+                int got = esp_at_recv(c->link_id, c->recv_chunk, (unsigned)want);
                 if (got > 0){
-                    memcpy(c->req_buf + c->req_len, chunk, (size_t)got);
+                    memcpy(c->req_buf + c->req_len, c->recv_chunk, (size_t)got);
                     c->req_len += got;
                     c->req_buf[c->req_len] = '\0';
                     web_process(c);

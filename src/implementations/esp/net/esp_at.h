@@ -86,13 +86,25 @@ bool esp_at_udp_open(int link_id, const char *host, uint16_t port, uint16_t loca
 // retarget per send()/recv() via their addr parameter).
 bool esp_at_udp_set_remote(int link_id, const char *host, uint16_t port);
 
-// Non-blocking. Returns bytes accepted (only once genuinely confirmed by the
-// module, i.e. AT+CIPSEND's own "SEND OK" - see socket_impl.c for why this
-// matters for libmobile's retry accounting), 0 if still in progress, -1 on
-// hard failure.
+// Bounded-blocking (up to ESP_AT_TIMEOUT_SEND_MS), unlike mobile.h's own
+// documented non-blocking/called-repeatedly contract for sock_send() - see
+// the comment on this function's definition in esp_at.c for why: some
+// dependences/libmobile callers (relay.c, dns.c) truncate its int return to
+// bool and misread a legitimate 0 ("nothing sent yet, call again") as
+// failure, which this backend hits unconditionally since a real AT+CIPSEND
+// round-trip can never finish on its first call. Returns bytes actually
+// sent (confirmed by the module's own "SEND OK" - see socket_impl.c for why
+// that matters for libmobile's retry accounting) on success, -1 on error or
+// timeout. Never returns 0.
 int esp_at_send(int link_id, const void *data, unsigned size);
 
 // Non-blocking. Returns bytes read (>=0, 0 if nothing pending), -1 on error.
+// A 0 return while a link genuinely has data available means the underlying
+// AT+CIPRECVDATA is still in flight (see esp_at.c) - the caller must keep
+// polling until it returns nonzero/negative, and `data` must stay valid for
+// that whole span, not just for this one call: it's the same "caller keeps
+// the buffer valid across retries" requirement esp_at_send() has (see
+// socket_impl.c), and there's no local copy of it in between.
 int esp_at_recv(int link_id, void *data, unsigned size);
 
 // Bounded-blocking (see file header). Safe to call on an already-closed link.

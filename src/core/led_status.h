@@ -14,6 +14,11 @@ enum led_error_code {
     LED_ERROR_WIFI_CONNECT_FAILED = 1, // Could not join the saved Wi-Fi network
     LED_ERROR_WIFI_BADAUTH        = 2, // Wi-Fi network rejected the password
     LED_ERROR_FLASH_SAVE_FAILED   = 3, // Configuration failed to persist to flash
+    LED_ERROR_NET_INIT_FAILED     = 4, // net_init() failed: network hardware/module
+                                        // never came up (e.g. esp implementation's
+                                        // ESP-AT module not responding on UART) -
+                                        // signaled from main() right after net_init(),
+                                        // before boot halts (see main.c)
 };
 
 // Call once, as the very first thing in main(). Turns the LED on solid.

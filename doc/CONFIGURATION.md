@@ -68,7 +68,7 @@ The web page also lets you download and upload the raw 512-byte Mobile Adapter G
 
 ## LED status
 
-The adapter has a single LED, wired to the Wi-Fi chip rather than the RP2040 itself, so it's only used for a simple boot/error indicator (not a general-purpose status light):
+The adapter has a single LED, used only as a simple boot/error indicator (not a general-purpose status light). On `picow` it's wired to the CYW43 Wi-Fi chip rather than the RP2040/RP2350 itself; on `esp` it's a plain RP2040/RP2350 GPIO (see each implementation's `led_hal_*` backend).
 
 - **Solid on** from the moment the device powers on, for the whole boot sequence.
 - **Solid off** once boot has fully finished: either the adapter reached normal operation, or the fallback setup hotspot is up and serving its page.
@@ -76,6 +76,8 @@ The adapter has a single LED, wired to the Wi-Fi chip rather than the RP2040 its
   - **1 blink** — couldn't join the saved Wi-Fi network (generic failure: out of range, router unreachable, etc.); falling back to the setup hotspot.
   - **2 blinks** — the saved Wi-Fi network rejected the password; falling back to the setup hotspot.
   - **3 blinks** — the configuration failed to save to flash.
+- **Blink code, repeating forever (boot halted)**:
+  - **4 blinks** — the network hardware/module itself failed to initialize (e.g. on `esp`, the ESP-AT module never responded on UART - check wiring, power, and that it's running ESP-AT firmware at the expected baud rate; see [src/implementations/esp/README.md](../src/implementations/esp/README.md)). Unlike the other codes, boot does not continue: there's no working network hardware to fall back to a setup hotspot with, so the device halts here until power-cycled after the problem is fixed. On `picow`, if this is caused by the CYW43 chip itself failing to initialize, the LED (which is wired through that same chip) may not be able to blink this code - if boot seems stuck with no LED activity at all and the serial log shows "Network hardware failed to initialize", that's this same condition.
 
 Blink codes only ever represent errors. Normal/expected states (e.g. no Wi-Fi configured yet on first boot, or waiting for the Game Boy) are not signaled through the LED.
 

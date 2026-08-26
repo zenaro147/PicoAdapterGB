@@ -26,6 +26,18 @@
 #define EEPROM_FILE_SIZE 512
 #define EEPROM_ORIGINAL_CONFIG_SIZE 0xC0
 
+// esp_at_recv() is asynchronous: a call that can't complete within the
+// current esp_at_poll() cycle returns 0 immediately and keeps writing into
+// its destination buffer as more UART bytes arrive across later ticks, until
+// a later call (same link, same command) returns the actual byte count (see
+// net/esp_at.h). That destination must stay valid for the whole in-flight
+// transaction - which is why it lives here, on the connection, instead of as
+// a function-local array in web_service_conns()'s stack frame: a stack array
+// only lives for one call and would already be gone (its address reused by
+// whatever else runs on the stack in between - net_poll(), mobile_loop(), ...)
+// by the time a later poll cycle actually writes the captured bytes into it.
+#define WEB_RECV_CHUNK 512
+
 struct web_conn {
     int link_id;    // ESP-AT link ID owning this HTTP connection, -1 if free
     bool in_use;
@@ -36,6 +48,7 @@ struct web_conn {
     int resp_sent;
     bool response_ready;
     bool close_pending;
+    uint8_t recv_chunk[WEB_RECV_CHUNK]; // see WEB_RECV_CHUNK comment above
 };
 
 // Set once by web_config_start()/web_config_run_blocking(): the live adapter

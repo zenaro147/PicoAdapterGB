@@ -126,6 +126,15 @@ file header comment for the implementation-level detail):
   and only ever a *length hint* (see `esp_at.c`'s `links[].rx_pending`) - the
   actual bytes only move over the wire inside a `CIPRECVDATA` response we
   requested.
+- **`AT+CIPRECVDATA` can fail with a plain `ERROR` instead of "0 bytes, OK"
+  when the remote closes the connection right around the time it's
+  requested** - confirmed on hardware against a real non-keep-alive HTTP
+  server closing right after its last bytes. `socket_impl_recv()` treats
+  this the same as the normal "remote closed" signal (`-2`, see `mobile.h`'s
+  `sock_recv` doc) whenever the link is no longer connected by the time the
+  error comes back, instead of surfacing it as a hard transport failure -
+  otherwise this showed up as a spurious "TCP connection fail" in-game for
+  what was actually a complete, successful page load.
 
 ## Link IDs and the shared server slot
 

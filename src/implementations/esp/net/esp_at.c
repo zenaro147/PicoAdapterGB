@@ -199,7 +199,14 @@ static void handle_connect_event(int id){
 static void handle_closed_event(int id){
     if (id < 0) return;
     links[id].connected = false;
-    if (links[id].in_use) links[id].remote_closed = true;
+    if (links[id].in_use) {
+        links[id].remote_closed = true;
+        // Cosmetic parity with picow's tcp_err callback ("TCP Generic
+        // Error") - the remote end closed this connection on its own
+        // (unlike esp_at_close()'s own "Socket Closed." print, which is for
+        // a close we initiated ourselves).
+        DEBUG_PRINT_FUNCTION("Remote closed connection (link %d).", id);
+    }
 }
 
 static void handle_ipd_event(const char *rest){
@@ -314,7 +321,15 @@ static void process_line(const char *line){
         // already been fully captured by the byte-level state machine below
         // (rxp == RXP_LINE again by then).
         if (line_is(line, "OK")) { at_finish(true, (int)at_rx_capture_len); break; }
-        if (line_is(line, "ERROR")) { at_finish(false, -1); break; }
+        if (line_is(line, "ERROR")) {
+            // A plain ERROR here (instead of the module just returning
+            // "0 bytes, OK") commonly means the remote closed the
+            // connection right around when this was requested - handled as
+            // the standard "remote closed" signal, not a hard failure, by
+            // socket_impl_recv() (see its comment on the rc < 0 case).
+            at_finish(false, -1);
+            break;
+        }
         break;
 
     default:
@@ -816,7 +831,16 @@ void esp_at_close(int link_id){
     if (!at_busy) {
         uint32_t close_timeout = links[link_id].connected
             ? ESP_AT_TIMEOUT_CLOSE_MS : ESP_AT_TIMEOUT_CLOSE_UNCONFIRMED_MS;
-        at_run_blocking(AT_CMD_PLAIN, link_id, close_timeout, "AT+CIPCLOSE=%d", link_id);
+        bool ok = at_run_blocking(AT_CMD_PLAIN, link_id, close_timeout, "AT+CIPCLOSE=%d", link_id);
+        // Cosmetic parity with picow's socket_impl.c (which prints this from
+        // its own tcp_close()/tcp_abort() outcome) - useful for the same
+        // reason there: seeing a close actually happen (or not) in the log
+        // when debugging a connection's lifetime.
+        if (ok) {
+            DEBUG_PRINT_FUNCTION("Socket Closed.");
+        } else {
+            DEBUG_PRINT_FUNCTION("Socket close failed (link %d, AT+CIPCLOSE error/timeout).", link_id);
+        }
     }
     esp_at_link_release(link_id);
 }

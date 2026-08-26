@@ -165,6 +165,19 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
             && esp_at_link_rx_pending(state->link_id) == 0) {
         return -2;
     }
+    if (rc < 0 && state->sock_type == SOCK_TCP && !esp_at_link_is_connected(state->link_id)) {
+        // AT+CIPRECVDATA can fail with a plain ERROR (not "0 bytes, OK")
+        // when the remote closes the connection right around the time we
+        // ask for more data - confirmed on hardware against a real
+        // non-keep-alive HTTP server closing right after its last bytes.
+        // That's an expected end of stream, not a real transport error:
+        // reinterpret it as the standard "remote closed" signal (like the
+        // rc==0 case above) rather than surfacing esp_at_recv()'s -1 and
+        // making libmobile report a hard failure to the Game Boy for what
+        // was actually a normal, complete transfer.
+        esp_at_link_consume_closed_event(state->link_id);
+        return -2;
+    }
     return rc;
 }
 

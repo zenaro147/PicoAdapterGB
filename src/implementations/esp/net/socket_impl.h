@@ -21,4 +21,9 @@ struct socket_impl {
     bool connect_in_progress;
     char remote_host[16];  // cached dotted-decimal peer, for UDP retargeting on send()
     unsigned remote_port;
+    // 0 = no P2P connect retry in progress; otherwise the absolute deadline
+    // (time_us_64()) for socket_impl_connect()'s silent connect-retry
+    // window (see its comment) - a fresh peer refusal before this opens a
+    // new link and retries instead of failing immediately.
+    uint64_t connect_deadline_us;
 };

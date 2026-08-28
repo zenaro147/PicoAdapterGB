@@ -10,8 +10,11 @@
 
 //UDP Callbacks
 void socket_recv_udp(void * arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t*addr, u16_t port){
-    struct mobile_user *mobile = (struct mobile_user*)arg;
-    struct socket_impl *state = mobile->socket[mobile->currentReqSocket];
+    // arg is the specific socket_impl this pcb belongs to (bound via
+    // udp_recv() in socket_impl_open()) - not resolved through any shared
+    // "current connection" index, which would be wrong the moment more than
+    // one connection is active (see socket_impl.h's comment on `mobile`).
+    struct socket_impl *state = (struct socket_impl*)arg;
     // printf("UDP Receiving...\n");
     if (p->tot_len > 0) {
         // printf("received UDP from IP: %d.%d.%d.%d port: %d  length: %d\n",
@@ -39,7 +42,7 @@ void socket_recv_udp(void * arg, struct udp_pcb *pcb, struct pbuf *p, const ip_a
             copiedBytes += recvsize;
             state->buffer_rx_len = recvsize;
             while (state->buffer_rx_len > 0) {
-                mobile_loop(mobile->adapter);
+                mobile_loop(state->mobile->adapter);
             }
         }
     }
@@ -57,15 +60,28 @@ err_t socket_connected_tcp(void *arg, struct tcp_pcb *pcb, err_t err) {
 }
 
 void socket_err_tcp(void *arg, err_t err){
-    struct mobile_user *mobile = (struct mobile_user*)arg;
-    struct socket_impl *state = mobile->socket[mobile->currentReqSocket];
+    // See socket_recv_udp()'s comment: arg is this pcb's own socket_impl.
+    struct socket_impl *state = (struct socket_impl*)arg;
+    // lwIP has already freed the pcb by the time tcp_err() fires (see
+    // tcp.h's tcp_err_fn doc: "the pcb has been closed"; that's also why
+    // this callback, unlike tcp_sent/tcp_recv/tcp_accept, isn't even given
+    // the pcb pointer). Clear it here so nothing downstream dereferences a
+    // dangling pointer (socket_impl_connect()/_send()/_recv() all key off
+    // tcp_pcb to decide what to do next) - a real Mobile Adapter P2P call
+    // is exactly where this matters most: relay/internet connections tend
+    // to get closed by us first, but a P2P peer can RST or abandon a
+    // connect attempt at any time, and libmobile keeps polling this same
+    // socket afterward instead of tearing it down immediately.
+    state->tcp_pcb = NULL;
     state->socket_status = err;
     DEBUG_PRINT_FUNCTION("TCP Generic Error %d", err);
 }
 
 err_t socket_accept_tcp(void *arg, struct tcp_pcb *pcb, err_t err){
-    struct mobile_user *mobile = (struct mobile_user*)arg;
-    struct socket_impl *state = mobile->socket[mobile->currentReqSocket];
+    // arg is the listening socket_impl's own state (tcp_arg() set this in
+    // socket_impl_listen()); re-registering the same arg on the accepted
+    // pcb below correctly carries it over to the live connection.
+    struct socket_impl *state = (struct socket_impl*)arg;
 
     if (err != ERR_OK || pcb == NULL) {
         // printf("Failure in accept\n");
@@ -87,8 +103,7 @@ err_t socket_accept_tcp(void *arg, struct tcp_pcb *pcb, err_t err){
 }
 
 err_t socket_sent_tcp(void *arg, struct tcp_pcb *pcb, u16_t len){
-    struct mobile_user *mobile = (struct mobile_user*)arg;
-    struct socket_impl *state = mobile->socket[mobile->currentReqSocket];
+    struct socket_impl *state = (struct socket_impl*)arg;
     err_t err = ERR_ABRT;
     if(state->buffer_tx_len != len){
         // printf("TCP sent %d bytes to: %s:%d. But should sent %d\n",len,ip4addr_ntoa(&pcb->remote_ip),pcb->remote_port,state->buffer_tx_len);
@@ -102,8 +117,7 @@ err_t socket_sent_tcp(void *arg, struct tcp_pcb *pcb, u16_t len){
 }
 
 err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err){
-    struct mobile_user *mobile = (struct mobile_user*)arg;
-    struct socket_impl *state = mobile->socket[mobile->currentReqSocket];
+    struct socket_impl *state = (struct socket_impl*)arg;
     // printf("TCP Receiving...\n");
     state->pending_close = true;
     if(p){
@@ -120,7 +134,7 @@ err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
                 copiedBytes += recvsize;
                 state->buffer_rx_len = recvsize;
                 while (state->buffer_rx_len > 0) {
-                    mobile_loop(mobile->adapter);
+                    mobile_loop(state->mobile->adapter);
                 }
             }
 
@@ -136,19 +150,26 @@ err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
             pbuf_free(p);
         }
     }else{
-        tcp_arg(state->tcp_pcb, NULL);
-        // tcp_poll(state->tcp_pcb, NULL, 0);
-        // tcp_accept(state->tcp_pcb, NULL);
-        // tcp_sent(state->tcp_pcb, NULL);
-        // tcp_recv(state->tcp_pcb, NULL);
-        // tcp_err(state->tcp_pcb, NULL);
-        err = tcp_close(state->tcp_pcb);
-        if (err != ERR_OK) {
-            // printf("close failed %d, calling abort\n", err);
-            tcp_abort(state->tcp_pcb);
+        // Use `pcb` - this callback invocation's own, always-correct
+        // pointer - not state->tcp_pcb. By the time a peer's FIN actually
+        // arrives here, our cached state->tcp_pcb may already have moved on
+        // (nulled by socket_impl_close(), or reassigned to a brand new pcb
+        // by socket_impl_connect()'s P2P retry) while lwIP is still
+        // delivering this now-stale connection's own final callback for
+        // *this* pcb specifically. Operating on state->tcp_pcb here instead
+        // could hand tcp_close()/tcp_abort() a NULL pointer (confirmed on
+        // hardware: lwIP's own "tcp_close: invalid pcb"/"tcp_abandon:
+        // invalid pcb" assertions, then a hardfault inside tcp_arg()) or,
+        // worse, silently abort a *different*, currently-live connection
+        // that had since reused the same socket_impl slot - a real "ghost
+        // socket" bug, not just a crash.
+        err_t close_err = tcp_close(pcb);
+        if (close_err != ERR_OK) {
+            // printf("close failed %d, calling abort\n", close_err);
+            tcp_abort(pcb);
             err = ERR_ABRT;
         }
-        state->tcp_pcb = NULL;
+        if (state->tcp_pcb == pcb) state->tcp_pcb = NULL;
     }
     state->pending_close = false;
     return err;

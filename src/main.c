@@ -63,7 +63,6 @@ static void mobile_user_reset_runtime_state(struct mobile_user *m){
     m->action = MOBILE_ACTION_NONE;
     m->number_user[0] = '\0';
     m->number_peer[0] = '\0';
-    m->currentReqSocket = -1;
     for (int i = 0; i < MOBILE_MAX_TIMERS; i++) m->clock_latch[i] = 0;
     // Concrete per-connection state is owned by the selected implementation
     // (see net/socket_hal.h); this only asks it to reset each handle.

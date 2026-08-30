@@ -56,6 +56,13 @@
 #define ESP_AT_TIMEOUT_SOCKET_MS      5000  // AT+CIPSTART
 #define ESP_AT_TIMEOUT_SEND_MS        5000  // AT+CIPSEND (prompt + SEND OK/FAIL)
 #define ESP_AT_TIMEOUT_CLOSE_MS       3000  // AT+CIPCLOSE on a link that was actually connected
+// How long socket_impl_connect() keeps silently retrying a P2P TCP connect
+// after an immediate refusal before finally reporting failure - mirrors
+// picow's TCP_CONNECT_RETRY_WINDOW_MS (net/socket_impl.c there) so both
+// backends give a P2P peer the same grace period to start listening.
+// Comfortably inside dependences/libmobile's own 60s command_tel_ip()
+// ceiling.
+#define ESP_TCP_CONNECT_RETRY_WINDOW_MS 20000
 // AT+CIPCLOSE on a link whose AT+CIPSTART never confirmed a connection (see
 // esp_at_close()): there's no established TCP session for the module to
 // gracefully tear down, so this doesn't need anywhere near

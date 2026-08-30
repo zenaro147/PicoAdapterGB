@@ -68,7 +68,6 @@ typedef uint64_t                user_time_t;
 struct mobile_user {
     struct mobile_adapter *adapter;
     enum mobile_action action;
-    uint8_t currentReqSocket;
     unsigned long clock_latch[MOBILE_MAX_TIMERS];
     uint8_t config_eeprom[EEPROM_SIZE];
     char wifiSSID[SSID_LENGHT];

@@ -6,6 +6,12 @@
 
 #include <string.h>
 
+// How long socket_impl_connect() keeps silently retrying a P2P TCP connect
+// after an immediate refusal (RST) before finally reporting failure - see
+// its comment. Comfortably inside dependences/libmobile's own 60s
+// command_tel_ip() ceiling.
+#define TCP_CONNECT_RETRY_WINDOW_MS 20000
+
 // Static storage for every connection's handle: MOBILE_MAX_CONNECTIONS is a
 // small libmobile-defined constant (currently 2), so this avoids heap
 // allocation/fragmentation for state that lives for the whole program.
@@ -13,6 +19,7 @@ static struct socket_impl socket_storage[MOBILE_MAX_CONNECTIONS];
 
 void socket_hal_bind(struct mobile_user *mobile){
     for (int i = 0; i < MOBILE_MAX_CONNECTIONS; i++){
+        socket_storage[i].mobile = mobile;
         mobile->socket[i] = &socket_storage[i];
     }
 }
@@ -33,11 +40,13 @@ void socket_hal_reset(struct socket_impl *state){
     state->buffer_rx_read_pos = 0;
 }
 
-bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport, void *user){    
+bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, enum mobile_addrtype addrtype, unsigned bindport, void *user){
+    (void)user; // lwIP callbacks are bound to `state` directly below, not to `user` (see socket_impl.h)
 
     if (state->tcp_pcb != NULL || state->udp_pcb != NULL) return false;
 
     state->buffer_rx_read_pos = 0;
+    state->connect_deadline_us = 0;
 
     switch (addrtype) {
         case MOBILE_ADDRTYPE_IPV4:
@@ -57,20 +66,20 @@ bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, 
             if(!state->tcp_pcb) return false;
             if(bindport != 0) state->tcp_pcb->local_port = bindport;
             
-            tcp_arg(state->tcp_pcb, user);
+            tcp_arg(state->tcp_pcb, state);
             //tcp_poll(state->tcp_pcb, NULL, 0);
             tcp_sent(state->tcp_pcb, socket_sent_tcp);
             tcp_recv(state->tcp_pcb, socket_recv_tcp);
             tcp_err(state->tcp_pcb, socket_err_tcp);
 
             break;
-        case MOBILE_SOCKTYPE_UDP: 
-            state->sock_type = SOCK_UDP;       
+        case MOBILE_SOCKTYPE_UDP:
+            state->sock_type = SOCK_UDP;
             state->udp_pcb = udp_new_ip_type(state->sock_addr);
-            if(!state->udp_pcb) return false;            
+            if(!state->udp_pcb) return false;
             if(bindport != 0) state->udp_pcb->local_port = bindport;
 
-            udp_recv(state->udp_pcb, socket_recv_udp, user);
+            udp_recv(state->udp_pcb, socket_recv_udp, state);
 
             break;
         default: 
@@ -89,7 +98,20 @@ void socket_impl_close(struct socket_impl *state){
     switch (state->sock_type) {
         case SOCK_TCP:
             if(state->tcp_pcb){
-                tcp_arg(state->tcp_pcb, NULL);
+                // arg is deliberately NOT cleared here (tcp_recv/tcp_sent/
+                // tcp_err below are also deliberately left registered,
+                // hence commented out rather than removed): tcp_close()
+                // only starts a graceful close - lwIP keeps this pcb alive
+                // internally (FIN_WAIT/CLOSING/TIME_WAIT) and can still
+                // invoke those callbacks after this function returns, once
+                // our own state->tcp_pcb below has already gone back to
+                // NULL. Nulling arg here previously left a live registered
+                // callback with arg==NULL, which every callback in
+                // picow_socket.c dereferences unconditionally - the next
+                // stray callback for this closing connection (observed on
+                // hardware right at the end of a P2P call) crashed with a
+                // NULL-pointer hardfault instead of harmlessly finding
+                // arg's mobile_user still valid.
                 // tcp_poll(state->tcp_pcb, NULL, 0);
                 // tcp_accept(state->tcp_pcb, NULL);
                 // tcp_sent(state->tcp_pcb, NULL);
@@ -141,13 +163,49 @@ int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *add
     memset(srv_ip,0x00,sizeof(srv_ip));
 
     //Check if is open
-    if(state->sock_type == SOCK_TCP && state->tcp_pcb->state != CLOSED){
+    if (state->sock_type == SOCK_TCP && state->tcp_pcb == NULL) {
+        // The pcb was already freed and cleared by socket_err_tcp() (a
+        // failed connect attempt - e.g. the peer isn't listening yet and
+        // TCP replies with an immediate RST - is reported through tcp_err,
+        // not socket_connected_tcp - see its comment).
+        //
+        // A real Mobile Adapter P2P call over a phone line doesn't get an
+        // instant "unreachable" back from one failed ring either: the
+        // other side may simply not have picked up *yet*. The reference
+        // Windows test client (libmobile-bgb) matches this by holding a
+        // P2P connect attempt open for a while instead of failing on the
+        // first refusal. Mirror that here, at the platform layer only (no
+        // dependences/libmobile change): silently open a fresh pcb and
+        // retry the same tcp_connect() instead of reporting failure, until
+        // TCP_CONNECT_RETRY_WINDOW_MS has elapsed since the first refusal.
+        // libmobile's own command_tel_ip() 60s "still connecting" timeout
+        // (which only counts down while this function keeps returning 0)
+        // remains the outer ceiling regardless.
+        if (state->connect_deadline_us == 0) {
+            state->connect_deadline_us = time_us_64() + MS(TCP_CONNECT_RETRY_WINDOW_MS);
+        }
+        if (time_us_64() >= state->connect_deadline_us) {
+            state->connect_deadline_us = 0;
+            state->socket_status = 0;
+            return -1;
+        }
+
+        state->tcp_pcb = tcp_new_ip_type(state->sock_addr);
+        if (!state->tcp_pcb) return 0; // transient allocation failure - try again next poll
+        tcp_arg(state->tcp_pcb, state);
+        tcp_sent(state->tcp_pcb, socket_sent_tcp);
+        tcp_recv(state->tcp_pcb, socket_recv_tcp);
+        tcp_err(state->tcp_pcb, socket_err_tcp);
+        // Falls through: tcp_pcb->state == CLOSED here, same as a freshly
+        // open()ed socket, so the tcp_connect() call below runs normally.
+    } else if(state->sock_type == SOCK_TCP && state->tcp_pcb->state != CLOSED){
         if (state->socket_status < 0){
             state->socket_status = 0;
             return -1;
-        } 
+        }
         switch (state->tcp_pcb->state){
             case ESTABLISHED:
+                state->connect_deadline_us = 0;
                 return 1;
                 break;
             case SYN_SENT:
@@ -349,6 +407,7 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
 }
 
 bool socket_impl_listen(struct socket_impl *state, void *user){
+    (void)user; // lwIP callbacks are bound to `state` directly (see socket_impl.h)
     err_t err = ERR_ABRT;
     if(state->sock_type == SOCK_TCP){
         if(state->tcp_pcb->state==CLOSED){
@@ -358,7 +417,7 @@ bool socket_impl_listen(struct socket_impl *state, void *user){
             if(err == ERR_OK){
                 state->client_status=false;
                 state->tcp_pcb = tcp_listen_with_backlog(state->tcp_pcb,1);
-                tcp_arg(state->tcp_pcb, user);
+                tcp_arg(state->tcp_pcb, state);
                 tcp_accept(state->tcp_pcb, socket_accept_tcp);
                 // printf("Client Listening!\n");
                 return true;
@@ -390,7 +449,20 @@ void socket_impl_close_commands(struct socket_impl *state){
     switch (state->sock_type) {
         case SOCK_TCP:
             if(state->tcp_pcb){
-                tcp_arg(state->tcp_pcb, NULL);
+                // arg is deliberately NOT cleared here (tcp_recv/tcp_sent/
+                // tcp_err below are also deliberately left registered,
+                // hence commented out rather than removed): tcp_close()
+                // only starts a graceful close - lwIP keeps this pcb alive
+                // internally (FIN_WAIT/CLOSING/TIME_WAIT) and can still
+                // invoke those callbacks after this function returns, once
+                // our own state->tcp_pcb below has already gone back to
+                // NULL. Nulling arg here previously left a live registered
+                // callback with arg==NULL, which every callback in
+                // picow_socket.c dereferences unconditionally - the next
+                // stray callback for this closing connection (observed on
+                // hardware right at the end of a P2P call) crashed with a
+                // NULL-pointer hardfault instead of harmlessly finding
+                // arg's mobile_user still valid.
                 // tcp_poll(state->tcp_pcb, NULL, 0);
                 // tcp_accept(state->tcp_pcb, NULL);
                 // tcp_sent(state->tcp_pcb, NULL);

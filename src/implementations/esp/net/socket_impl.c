@@ -63,6 +63,7 @@ bool socket_impl_open(struct socket_impl *state, enum mobile_socktype socktype, 
     state->connect_in_progress = false;
     state->remote_host[0] = '\0';
     state->remote_port = 0;
+    state->connect_deadline_us = 0;
     return true;
 }
 
@@ -101,10 +102,36 @@ int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *add
         state->remote_host[sizeof(state->remote_host) - 1] = '\0';
         state->remote_port = addr4->port;
         state->connect_in_progress = true;
+        state->connect_deadline_us = 0; // fresh dial sequence - see below
     }
 
     int rc = esp_at_tcp_connect(state->link_id, state->remote_host, (uint16_t)state->remote_port);
-    if (rc != 0) state->connect_in_progress = false;
+    if (rc < 0) {
+        // Mirror picow's P2P connect-retry behavior (net/socket_impl.c
+        // there, TCP_CONNECT_RETRY_WINDOW_MS) instead of failing on the
+        // first refusal: a real Mobile Adapter P2P peer may simply not be
+        // listening *yet*. See esp_config.h's ESP_TCP_CONNECT_RETRY_WINDOW_MS
+        // for why this stays comfortably inside dependences/libmobile's own
+        // 60s command_tel_ip() ceiling.
+        if (state->connect_deadline_us == 0) {
+            state->connect_deadline_us = time_us_64() + MS(ESP_TCP_CONNECT_RETRY_WINDOW_MS);
+        }
+        if (time_us_64() >= state->connect_deadline_us) {
+            state->connect_deadline_us = 0;
+            state->connect_in_progress = false;
+            return -1;
+        }
+        // A failed AT+CIPSTART leaves this link "dirty" on the module until
+        // explicitly closed (see esp_at_close()'s .in_use gate and its own
+        // comment) - retrying AT+CIPSTART on the same link_id without this
+        // would fail immediately every time, defeating the retry entirely.
+        esp_at_close(state->link_id);
+        return 0; // keep libmobile polling; retried on the next call
+    }
+    if (rc > 0) {
+        state->connect_deadline_us = 0;
+        state->connect_in_progress = false;
+    }
     return rc;
 }
 

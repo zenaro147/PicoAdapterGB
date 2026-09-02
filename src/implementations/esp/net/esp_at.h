@@ -29,6 +29,7 @@ enum esp_link_owner {
     ESP_LINK_OWNER_NONE = 0,
     ESP_LINK_OWNER_MOBILE,
     ESP_LINK_OWNER_WEB,
+    ESP_LINK_OWNER_DEVICE_AUTH, // see esp_device_auth_dns.c
 };
 
 typedef enum {

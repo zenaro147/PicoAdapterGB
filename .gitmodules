@@ -1,4 +1,4 @@
 [submodule "dependences/libmobile"]
 	path = dependences/libmobile
-	url = https://github.com/zenaror/libmobile.git
-	branch = dev
+	url = https://git.home.zsrv.com.br/zenaror/libmobile
+	branch = feature/full_server

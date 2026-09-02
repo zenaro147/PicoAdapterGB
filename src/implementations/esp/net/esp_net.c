@@ -4,6 +4,7 @@
 #include "net/net_hal.h"
 #include "esp_at.h"
 #include "esp_config.h"
+#include "esp_device_auth_dns.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -74,6 +75,7 @@ const char *net_wifi_ip_string(void){
 
 void net_poll(void){
     esp_at_poll();
+    esp_device_auth_dns_poll();
 }
 
 void net_service_pending_socket_closes(struct mobile_user *mobile){

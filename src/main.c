@@ -241,6 +241,7 @@ void main(){
 #endif
 
         net_service_pending_socket_closes(mobile);
+        adapter_bridge_service_device_auth(mobile);
 
         // Check if there is any new config to write on Flash
         if ((adapter_bridge_has_pending_config_write() && mobile->automatic_save) || mobile->force_save) {

@@ -23,3 +23,10 @@ extern bool isLinkCable32;
 bool adapter_bridge_has_pending_config_write(void);
 void adapter_bridge_clear_pending_config_write(void);
 user_time_t adapter_bridge_last_config_edit_time(void);
+
+// Must be called once per main-loop iteration (see main.c). Drives the
+// device-auth side channel's deferred DNS resolve + HTTP GET, one queued
+// mobile_func_update_device_auth() request at a time - see the comment on
+// impl_update_device_auth() in adapter_bridge.c for why this can't happen
+// inside the callback itself.
+void adapter_bridge_service_device_auth(struct mobile_user *mobile);

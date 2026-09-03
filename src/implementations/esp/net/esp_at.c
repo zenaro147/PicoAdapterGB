@@ -714,34 +714,31 @@ bool esp_at_udp_set_remote(int link_id, const char *host, uint16_t port){
 int esp_at_send(int link_id, const void *data, unsigned size){
     if (link_id < 0 || link_id >= ESP_LINK_COUNT || size == 0) return -1;
 
-    // Blocking by design, despite this function's own doc comment describing
-    // the non-blocking contract mobile.h's mobile_func_sock_send actually
-    // specifies (int: bytes sent, 0 is a valid "nothing sent *yet* this
-    // call" - the caller is supposed to call again). dependences/libmobile's
-    // relay.c (relay_handshake_send()) and dns.c both instead do
-    // `return mobile_cb_sock_send(...)` from a function returning bool,
-    // implicitly truncating that int to a bool - a legitimate 0 becomes
-    // false ("failed") instead of "call again", which broke every relay
-    // connection through this backend (confirmed on hardware: the module
-    // genuinely can't return a full AT+CIPSEND result on its first call -
-    // it always needs OK, then the '>' prompt, then SEND OK, spanning
-    // multiple polls - so this bug triggers unconditionally here, unlike on
-    // picow's lwIP-backed send, which usually finishes a small payload like
-    // the relay handshake in one synchronous call and never surfaces it).
-    // Fixing this properly belongs in the pinned libmobile submodule, not
-    // here (see CLAUDE.md's submodule rules) - reported to the user as a
-    // separate decision. Per their choice, this function instead blocks
-    // internally (bounded by ESP_AT_TIMEOUT_SEND_MS, same as before) so it
-    // never returns 0 to a caller that can't handle it - only a final byte
-    // count or -1. This applies to every esp_at_send() call, not just the
-    // relay handshake: ordinary Game Boy protocol sends and web response
-    // bytes (see web/web_http.c) can now also block the main loop for up to
-    // that long in the worst case.
-    uint64_t deadline = time_us_64() + MS(ESP_AT_TIMEOUT_SEND_MS);
-    while (at_busy) {
-        if (time_us_64() >= deadline) return -1;
-        esp_at_poll();
-        sleep_ms(5);
+    // Non-blocking, same tri-state shape as esp_at_tcp_connect(): an
+    // AT+CIPSEND round-trip genuinely can't finish on its first call (OK,
+    // then the '>' prompt, then SEND OK, spanning multiple polls), so a
+    // legitimate "nothing sent *yet*" is 0, not an error - matching
+    // mobile_func_sock_send()'s documented contract (mobile.h).
+    //
+    // This used to block internally instead (bounded by
+    // ESP_AT_TIMEOUT_SEND_MS), because dependences/libmobile's relay.c and
+    // dns.c both used to truncate mobile_cb_sock_send()'s int return to
+    // bool, misreading a legitimate 0 as failure - confirmed on hardware to
+    // break every relay connection through this backend. That's now fixed
+    // upstream (relay.c's relay_send()/dns.c's resend path properly retry
+    // on a partial/zero result instead of assuming atomicity - see the
+    // submodule's "relay/dns: respect the non-blocking sock_send contract
+    // instead of bool" commit), so the workaround is no longer needed. The
+    // callers already in this codebase (socket_impl_send(), web/web_http.c)
+    // were already written to tolerate a 0 return correctly - only this
+    // function itself needed to stop hiding it.
+    if (at_busy) {
+        if (at_kind == AT_CMD_CIPSEND && at_link == link_id) {
+            if (!at_done) return 0; // still in progress
+            at_busy = false;
+            return at_success ? at_result_code : -1;
+        }
+        return 0; // bus busy with something else; caller retries
     }
 
     if (size > ESP_AT_MAX_SEND_LEN) size = ESP_AT_MAX_SEND_LEN;
@@ -750,13 +747,7 @@ int esp_at_send(int link_id, const void *data, unsigned size){
     at_tx_payload = (const uint8_t *)data;
     at_tx_payload_len = size;
     at_write_line("AT+CIPSEND=%d,%u", link_id, size);
-
-    while (!at_done) {
-        esp_at_poll();
-        sleep_ms(5);
-    }
-    at_busy = false;
-    return at_success ? at_result_code : -1;
+    return 0;
 }
 
 int esp_at_recv(int link_id, void *data, unsigned size){

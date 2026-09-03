@@ -1,8 +1,9 @@
 // net/socket_hal.h implementation for the esp backend: translates libmobile's
-// socket contract into ESP-AT commands via esp_at.h. See esp_at.h for the
-// async-vs-bounded-blocking split this relies on, and README.md for the
-// ESP8266 ESP-AT limitations this has to work around (IPv4 only, one shared
-// CIPSERVER slot).
+// socket contract into ESP-AT commands via esp_at.h. See esp_at.h for which
+// calls are async (non-blocking, called repeatedly - connect/send/recv) vs.
+// bounded-blocking (setup/lifecycle calls: Wi-Fi join, server start/stop,
+// socket close), and README.md for the ESP8266 ESP-AT limitations this has
+// to work around (IPv4 only, one shared CIPSERVER slot).
 #include "socket_impl.h"
 #include "esp_at.h"
 #include "esp_config.h"

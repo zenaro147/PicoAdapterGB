@@ -168,16 +168,23 @@ assumed correct:
   ("IPV6 support is optional, and the implementation is allowed to fail with
   that"). ESP8266 ESP-AT 2.3.0.0's own IPv6 support is partial/version-
   dependent and unused by this project.
-- **Unsolicited event text.** `"WIFI CONNECTED"` and `"WIFI GOT IP"` were
-  confirmed verbatim from the ESP-AT Wi-Fi AT command documentation's own
-  example transcript. `"WIFI DISCONNECT"` and the `"<id>,CONNECT"`/
-  `"<id>,CLOSED"` link-event lines are long-standing, widely-used ESP-AT
-  conventions, but the specific documentation pages fetched while building
-  this backend did not include a verbatim example transcript containing
-  them. The parser (`net/esp_at.c`'s `process_line()`) matches these by
-  fixed prefix rather than depending on exact byte-for-byte formatting, but
-  this should be confirmed against a real module's serial output before
-  relying on it.
+- ~~Unsolicited event text unconfirmed~~ **Confirmed.** `"WIFI CONNECTED"` and
+  `"WIFI GOT IP"` were already confirmed verbatim from the ESP-AT Wi-Fi AT
+  command documentation's own example transcript. `"WIFI DISCONNECT"` and the
+  `"<id>,CONNECT"`/`"<id>,CLOSED"` link-event lines were extracted directly
+  from the exact strings baked into `components/at/lib/libesp8266_at_core.a`
+  in the `espressif/esp-at` repo, `release/v2.3.0.0_esp8266` branch (the
+  closed-source "AT core" binary this backend actually runs against - the
+  open `components/at/src/*.c` files in that repo only cover
+  factory/OTA/web-server/user commands, not Wi-Fi/TCP-IP, which are compiled
+  into that blob) via `strings` on the downloaded `.a` file: `WIFI CONNECTED`,
+  `WIFI DISCONNECT`, `WIFI GOT IP` (plus `WIFI GOT IPv6 GL`/`WIFI GOT IPv6 LL`,
+  unused here since IPv6 isn't implemented), and the `%d,CONNECT`/`%d,CLOSED`
+  format strings behind the link-event lines - all byte-for-byte matching
+  what `net/esp_at.c`'s `process_line()` already matches against. Stronger
+  evidence than documentation, since it's extracted from the exact binary
+  that ships on real modules, though still not a substitute for seeing it on
+  a real module's live serial output.
 - **Abandoning an in-flight connect/send via close().** libmobile is allowed
   to cancel a `sock_connect`/`sock_send` in progress by calling
   `sock_close()` instead of ever collecting the result (see `mobile.h`).
@@ -193,25 +200,22 @@ assumed correct:
   narrows the window but doesn't close it entirely (the module could still
   reply after that window). See the comment in `net/esp_at.c`'s
   `esp_at_close()`.
-- **`esp_at_send()` is bounded-blocking, not non-blocking** (up to
-  `ESP_AT_TIMEOUT_SEND_MS` in the worst case), unlike `mobile.h`'s documented
-  `sock_send()` contract ("non-blocking... called repeatedly until all of the
-  data is sent"). This is a deliberate workaround for a bug found in the
-  pinned `dependences/libmobile` submodule: `relay.c`'s `relay_handshake_send()`
-  and `dns.c` both do `return mobile_cb_sock_send(...)` from a `bool`-returning
-  function, implicitly truncating `sock_send()`'s documented `int` return (0
-  is a valid "nothing sent *yet* this call, call again" per the contract) to
-  a boolean - a legitimate 0 is misread as failure. This broke every relay
-  connection through this backend, because a real `AT+CIPSEND` round-trip
-  (`OK`, then the `>` prompt, then `SEND OK`) can never finish on its first
-  call, unlike picow's lwIP-backed send, which usually finishes a payload as
-  small as the relay handshake synchronously and never triggers the bug. The
-  correct fix belongs in the submodule (see `CLAUDE.md`'s submodule rules);
-  fixing it there was raised and explicitly deferred in favor of this
-  backend-local workaround. Practical effect: not just the relay handshake,
-  but *any* `esp_at_send()` call - ordinary Game Boy protocol sends, and web
-  config response bytes (`web/web_http.c`) - can block the main loop for up
-  to `ESP_AT_TIMEOUT_SEND_MS`.
+- ~~`esp_at_send()` is bounded-blocking, not non-blocking~~ **Fixed.**
+  `esp_at_send()` used to block internally for up to `ESP_AT_TIMEOUT_SEND_MS`
+  as a workaround for a bug in the pinned `dependences/libmobile` submodule:
+  `relay.c` and `dns.c` both truncated `sock_send()`'s documented `int`
+  return (0 is a valid "nothing sent *yet* this call, call again") to `bool`,
+  misreading a legitimate 0 as failure - breaking every relay connection
+  through this backend, since a real `AT+CIPSEND` round-trip (`OK`, then the
+  `>` prompt, then `SEND OK`) can never finish on its first call. The
+  submodule now properly retries a partial/zero `sock_send()` result instead
+  of assuming it's atomic (relay.c's `relay_send()`, dns.c's resend path -
+  see the submodule's "relay/dns: respect the non-blocking sock_send
+  contract instead of bool" commit), so `esp_at_send()` was reverted to the
+  same non-blocking tri-state shape as `esp_at_tcp_connect()` - see its
+  comment in `net/esp_at.c`. The callers in this codebase
+  (`socket_impl_send()`, `web/web_http.c`) already tolerated a 0 return
+  correctly and needed no changes.
 - **`AT+CIPSERVER` link ID for the web UI is not reserved in advance** (ESP-AT
   auto-assigns it from whatever's free), so a specific-but-unlikely ordering
   where a mobile socket is still open on the ID the server would otherwise

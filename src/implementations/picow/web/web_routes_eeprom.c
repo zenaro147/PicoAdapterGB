@@ -62,6 +62,17 @@ static void web_apply_uploaded_libmobile_block(struct mobile_user *mobile, const
     mobile_config_set_relay_token(mobile->adapter, lm[0x0b] ? lm + 0x50 : NULL);
 }
 
+// Mirrors config_device_auth_load()'s layout (private to libmobile/config.c):
+// 'D','A',0x00 header at 0x160, key at 0x165 (0x160+0x05). Only applied when
+// the header is present, so an older 512-byte backup predating this region
+// (all-zero/garbage bytes there) can't be mistaken for a real key - libmobile
+// itself gates the same way when loading this area from flash on boot.
+static void web_apply_uploaded_device_auth_block(struct mobile_user *mobile, const uint8_t *data){
+    const uint8_t *da = data + 0x160;
+    if (da[0] != 'D' || da[1] != 'A' || da[2] != 0) return;
+    mobile_config_set_device_auth_key(mobile->adapter, da + 0x05);
+}
+
 // Only updates the snapshot (config_eeprom + its standalone adapter->config),
 // never the live adapter. Nothing is written to flash here; the user must
 // press "Save & Reboot" to persist it.
@@ -102,6 +113,7 @@ void handle_post_eeprom(struct web_conn *c, const char *body, int content_length
     if (replace_libmobile){
         memcpy(mobile->config_eeprom, data, sizeof(mobile->config_eeprom));
         web_apply_uploaded_libmobile_block(mobile, data);
+        web_apply_uploaded_device_auth_block(mobile, data);
     } else {
         if (content_length < EEPROM_ORIGINAL_CONFIG_SIZE) {
             web_send_response(c, 400, "Bad Request", "application/json",

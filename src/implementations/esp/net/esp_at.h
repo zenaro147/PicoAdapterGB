@@ -87,16 +87,13 @@ bool esp_at_udp_open(int link_id, const char *host, uint16_t port, uint16_t loca
 // retarget per send()/recv() via their addr parameter).
 bool esp_at_udp_set_remote(int link_id, const char *host, uint16_t port);
 
-// Bounded-blocking (up to ESP_AT_TIMEOUT_SEND_MS), unlike mobile.h's own
-// documented non-blocking/called-repeatedly contract for sock_send() - see
-// the comment on this function's definition in esp_at.c for why: some
-// dependences/libmobile callers (relay.c, dns.c) truncate its int return to
-// bool and misread a legitimate 0 ("nothing sent yet, call again") as
-// failure, which this backend hits unconditionally since a real AT+CIPSEND
-// round-trip can never finish on its first call. Returns bytes actually
-// sent (confirmed by the module's own "SEND OK" - see socket_impl.c for why
-// that matters for libmobile's retry accounting) on success, -1 on error or
-// timeout. Never returns 0.
+// Non-blocking, same tri-state shape as esp_at_tcp_connect(): returns bytes
+// actually sent (confirmed by the module's own "SEND OK") on success, 0 if
+// the AT+CIPSEND round-trip (OK, then '>' prompt, then SEND OK) hasn't
+// completed yet - call again with the *same* data/size until it does -
+// or -1 on error/timeout. Matches mobile.h's own documented sock_send()
+// contract. See the comment on this function's definition in esp_at.c for
+// the history of why this used to block instead.
 int esp_at_send(int link_id, const void *data, unsigned size);
 
 // Non-blocking. Returns bytes read (>=0, 0 if nothing pending), -1 on error.

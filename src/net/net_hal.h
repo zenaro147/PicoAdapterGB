@@ -63,3 +63,21 @@ bool net_device_auth_resolve_done(void);
 // on failure/timeout (both DNS servers unreachable, no A record, malformed
 // response, etc).
 bool net_device_auth_resolve_result(unsigned char ip[4]);
+
+// One-shot outbound HTTP GET for the device-auth side channel (see
+// core/adapter_bridge.c) - independent of mobile->socket[], same reasoning
+// as net_device_auth_resolve_*() above (may run on the same dedicated
+// socket/link as the resolver; they never run concurrently). `request_line`
+// is the full first line already built by the caller (e.g.
+// "GET /api/...&sig=... HTTP/1.0"), sent together with a Host header built
+// from `ip` and `Connection: close`, then the response is read only far
+// enough to parse the status line - the body (if any) is discarded.
+// Starting a new request abandons one already in flight.
+void net_device_auth_http_get_start(const unsigned char ip[4], uint16_t port, const char *request_line);
+// True once the request started by net_device_auth_http_get_start() has
+// finished, successfully or not.
+bool net_device_auth_http_get_done(void);
+// Valid only once net_device_auth_http_get_done() is true. Returns the
+// parsed HTTP status code (e.g. 200, 400, 403) on success, or -1 on
+// transport failure/timeout/malformed response.
+int net_device_auth_http_get_result(void);

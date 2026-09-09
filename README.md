@@ -33,8 +33,37 @@ Refer to the [Wiki page](https://github.com/zenaror/PicoAdapterGB/tree/main/doc/
 * [Reddit post 1](https://www.reddit.com/r/Gameboy/comments/14scudy/just_dropping_this_mobile_adapter_gb_revival_wip/)
 * [Reddit post 2](https://www.reddit.com/r/Gameboy/comments/16ly811/first_mobile_reon_adapter_working_pretty_good_now/)
 
+## Licensing
+
+PicoAdapterGB is released under the **GNU General Public License v3** (see [LICENSE](LICENSE)).
+
+The firmware links [libmobile](https://github.com/REONTeam/libmobile), which is a separate
+work by the REON Team, released under the **GNU Lesser General Public License v3 or later**
+(`SPDX-License-Identifier: LGPL-3.0-or-later`). It is not copied into this tree: it is a git
+submodule under `dependences/libmobile`, and it carries its own license texts there
+(`COPYING` and `COPYING.LESSER`). The exact revision this firmware is built against is the
+commit pinned by the submodule, and the build fetches it from the URL declared in
+[.gitmodules](.gitmodules).
+
+Combining the two is explicitly permitted: the LGPLv3 is the GPLv3 plus a set of additional
+permissions, and GPLv3 §7 allows a recipient to drop those additional permissions, so
+LGPLv3 code may be conveyed as part of a GPLv3 work. The result — the firmware image — is
+therefore distributed under the GPLv3, while libmobile itself remains available to everyone
+under the LGPLv3.
+
+Practical consequences for anyone redistributing a built `.uf2`:
+
+* ship or offer the complete corresponding source for both this project and the exact
+  libmobile revision used;
+* keep the copyright and license notices intact, including libmobile's SPDX headers;
+* if you modify libmobile, publish those modifications — the upstream project asks for this
+  explicitly, and it is the reason the library is LGPL rather than permissive.
+
+libmobile's author also grants Nintendo and its subsidiaries use under the zero-clause BSD
+license; that exemption is theirs to give and applies to libmobile only, not to this project.
+
 ## Credits 
-* [REON Team](https://github.com/REONTeam/) - Mobile Adapter Library
+* [REON Team](https://github.com/REONTeam/) - Mobile Adapter Library (libmobile, LGPLv3)
 * [mid-kid](https://github.com/mid-kid/) - Help to structure the 32bits solution
 * [Lorenzooone](https://github.com/Lorenzooone/) - GB Link cable PIO solution and better eeprom save structure
 * [kabili207](https://github.com/kabili207/) - Better Stacksmashing build options 

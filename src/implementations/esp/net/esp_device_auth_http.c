@@ -18,6 +18,10 @@
 #define DEVICE_AUTH_HTTP_TIMEOUT_MS 5000
 #define DEVICE_AUTH_HTTP_REQUEST_MAX 512
 #define DEVICE_AUTH_HTTP_RESP_MAX 128
+// "<server> <local> <sig>": up to 20 digits + space + 20 digits + space +
+// 64 hex = 106; rounded up. ("blocked" in the first field is shorter than a
+// counter, so the numeric form is the worst case.)
+#define DEVICE_AUTH_HTTP_BODY_MAX 128
 
 enum device_auth_http_phase {
     DA_HTTP_IDLE,
@@ -40,6 +44,20 @@ struct device_auth_http_state {
     char resp[DEVICE_AUTH_HTTP_RESP_MAX];
     unsigned resp_len;
 
+    // Staging buffer every esp_at_recv() reads into, in both phases.
+    // Deliberately a struct field and not a stack buffer: esp_at_recv()'s
+    // contract (esp_at.h) requires the *same* buffer across repeated calls
+    // while an AT+CIPRECVDATA may still be in flight.
+    char rx[DEVICE_AUTH_HTTP_RESP_MAX];
+
+    // Response body, kept apart from the headers - see the picow backend for
+    // the full reasoning. "<counter> <sig>" is at most 85 bytes, so sizing
+    // for that beats buffering headers whose length the server controls.
+    char body[DEVICE_AUTH_HTTP_BODY_MAX];
+    unsigned body_len;
+    unsigned hdr_match;
+    bool body_started;
+
     uint64_t started_at_us;
 };
 
@@ -61,6 +79,34 @@ static void device_auth_http_finish(int result){
 // Parses "HTTP/1.x SSS <reason>" - scans for the first space rather than
 // assuming a fixed offset, so it doesn't care whether the server said
 // HTTP/1.0 or HTTP/1.1.
+// Splits the response stream into headers and body as it arrives; identical
+// in behaviour to the picow backend's own copy. Byte-at-a-time because the
+// "\r\n\r\n" separator can straddle two reads.
+static void device_auth_http_consume(const char *data, unsigned len){
+    for (unsigned i = 0; i < len; i++){
+        char c = data[i];
+
+        if (da_http.body_started){
+            if (da_http.body_len < sizeof(da_http.body)){
+                da_http.body[da_http.body_len++] = c;
+            }
+            continue;
+        }
+
+        if (da_http.resp_len < sizeof(da_http.resp)){
+            da_http.resp[da_http.resp_len++] = c;
+        }
+
+        static const char sep[4] = {'\r', '\n', '\r', '\n'};
+        if (c == sep[da_http.hdr_match]){
+            da_http.hdr_match++;
+            if (da_http.hdr_match == 4) da_http.body_started = true;
+        } else {
+            da_http.hdr_match = (c == '\r') ? 1 : 0;
+        }
+    }
+}
+
 static int parse_status_line(const char *buf, unsigned len){
     unsigned i = 0;
     while (i < len && buf[i] != ' ') i++;
@@ -143,6 +189,11 @@ int net_device_auth_http_get_result(void){
     return da_http.result;
 }
 
+const char *net_device_auth_http_get_body(unsigned *len){
+    *len = da_http.body_len;
+    return da_http.body;
+}
+
 // Called from esp_net.c's net_poll() on every main-loop iteration. Drives
 // the connect -> send -> recv sequence and enforces the overall timeout.
 void esp_device_auth_http_poll(void){
@@ -166,31 +217,31 @@ void esp_device_auth_http_poll(void){
             break;
         }
         case DA_HTTP_RECEIVING: {
-            if (da_http.resp_len < sizeof(da_http.resp)){
-                int rc = esp_at_recv(da_http.link_id, da_http.resp + da_http.resp_len,
-                    sizeof(da_http.resp) - da_http.resp_len);
-                if (rc > 0){
-                    da_http.resp_len += (unsigned)rc;
-                    try_parse_buffered_response(); // may switch phase to DA_HTTP_DRAINING
-                } else if (rc < 0){
-                    // Link closed by the remote before a full status line
-                    // ever arrived - parse whatever partial bytes we have,
-                    // if any (matches DA_HTTP_DRAINING's own finish path).
-                    device_auth_http_finish(da_http.resp_len > 0 ?
-                        parse_status_line(da_http.resp, da_http.resp_len) : -1);
-                    return;
-                }
+            int rc = esp_at_recv(da_http.link_id, da_http.rx, sizeof(da_http.rx));
+            if (rc > 0){
+                device_auth_http_consume(da_http.rx, (unsigned)rc);
+                try_parse_buffered_response(); // may switch phase to DA_HTTP_DRAINING
+            } else if (rc < 0){
+                // Link closed by the remote before a full status line ever
+                // arrived - parse whatever partial bytes we have, if any
+                // (matches DA_HTTP_DRAINING's own finish path).
+                device_auth_http_finish(da_http.resp_len > 0 ?
+                    parse_status_line(da_http.resp, da_http.resp_len) : -1);
+                return;
             }
             break;
         }
         case DA_HTTP_DRAINING: {
-            // Reuses da_http.resp as scratch space - its content no longer
-            // matters, but esp_at_recv()'s own contract requires passing the
-            // *same* buffer across repeated calls while a AT+CIPRECVDATA may
-            // still be in flight (see esp_at.h), so this can't be a fresh
-            // stack buffer each poll.
-            int rc = esp_at_recv(da_http.link_id, da_http.resp, sizeof(da_http.resp));
-            if (rc < 0){
+            // No longer discards: the body arrives during this phase and the
+            // device-auth counter query needs it, so keep feeding the same
+            // splitter. Reads land in da_http.rx because esp_at_recv()'s
+            // contract requires the *same* buffer across repeated calls while
+            // an AT+CIPRECVDATA may still be in flight (see esp_at.h), which
+            // rules out a fresh stack buffer each poll.
+            int rc = esp_at_recv(da_http.link_id, da_http.rx, sizeof(da_http.rx));
+            if (rc > 0){
+                device_auth_http_consume(da_http.rx, (unsigned)rc);
+            } else if (rc < 0){
                 // Remote closed - the normal end of a Connection: close
                 // response. Report the result already parsed above.
                 device_auth_http_finish(da_http.result);

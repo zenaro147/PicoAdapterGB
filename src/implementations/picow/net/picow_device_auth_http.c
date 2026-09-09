@@ -20,6 +20,10 @@
 #define DEVICE_AUTH_HTTP_TIMEOUT_MS 5000
 #define DEVICE_AUTH_HTTP_REQUEST_MAX 512
 #define DEVICE_AUTH_HTTP_RESP_MAX 128
+// "<server> <local> <sig>": up to 20 digits + space + 20 digits + space +
+// 64 hex = 106; rounded up. ("blocked" in the first field is shorter than a
+// counter, so the numeric form is the worst case.)
+#define DEVICE_AUTH_HTTP_BODY_MAX 128
 
 enum device_auth_http_phase {
     DA_HTTP_IDLE,
@@ -40,6 +44,19 @@ struct device_auth_http_state {
 
     char resp[DEVICE_AUTH_HTTP_RESP_MAX];
     unsigned resp_len;
+
+    // Response body, kept separately from the headers. The device-auth query
+    // answers "<counter> <sig>" - at most 20 digits, a space and 64 hex, so
+    // the real ceiling is 85 bytes. Buffering the whole response instead
+    // would mean sizing for headers the server controls and we don't bound;
+    // this way only what we actually need is stored, and anything longer is
+    // simply not a valid answer.
+    char body[DEVICE_AUTH_HTTP_BODY_MAX];
+    unsigned body_len;
+    // How much of the "\r\n\r\n" header/body separator has matched so far,
+    // tracked across reads because it can straddle two TCP segments.
+    unsigned hdr_match;
+    bool body_started;
 
     uint64_t started_at_us;
 };
@@ -79,6 +96,42 @@ static int parse_status_line(const char *buf, unsigned len){
     return (buf[i] - '0') * 100 + (buf[i + 1] - '0') * 10 + (buf[i + 2] - '0');
 }
 
+// Splits the response stream into headers and body as it arrives. Headers go
+// into resp[] (only as far as it fits - all we need from them is the status
+// line at the very front); everything after the "\r\n\r\n" separator goes
+// into body[]. Written byte-at-a-time on purpose: the separator can be split
+// across TCP segments, so matching it needs state that survives between
+// reads, and at these sizes the simplicity is worth more than the speed.
+static void device_auth_http_consume(const char *data, unsigned len){
+    for (unsigned i = 0; i < len; i++){
+        char c = data[i];
+
+        if (da_http.body_started){
+            if (da_http.body_len < sizeof(da_http.body)){
+                da_http.body[da_http.body_len++] = c;
+            }
+            // Past capacity the rest is dropped: a valid answer never
+            // reaches here, and an overlong one is rejected by libmobile's
+            // strict parse anyway.
+            continue;
+        }
+
+        if (da_http.resp_len < sizeof(da_http.resp)){
+            da_http.resp[da_http.resp_len++] = c;
+        }
+
+        // Match "\r\n\r\n" incrementally. A stray character resets the run,
+        // except that a '\r' always starts a fresh one.
+        static const char sep[4] = {'\r', '\n', '\r', '\n'};
+        if (c == sep[da_http.hdr_match]){
+            da_http.hdr_match++;
+            if (da_http.hdr_match == 4) da_http.body_started = true;
+        } else {
+            da_http.hdr_match = (c == '\r') ? 1 : 0;
+        }
+    }
+}
+
 static err_t on_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err){
     (void)arg; (void)err;
 
@@ -101,17 +154,18 @@ static err_t on_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
         return ERR_OK;
     }
 
-    if (da_http.phase == DA_HTTP_RECEIVING){
-        unsigned space = sizeof(da_http.resp) - da_http.resp_len;
-        unsigned copy_len = p->tot_len < space ? p->tot_len : space;
-        if (copy_len > 0){
-            pbuf_copy_partial(p, da_http.resp + da_http.resp_len, copy_len, 0);
-            da_http.resp_len += copy_len;
-        }
+    // Both phases feed the byte splitter now: the status line is parsed out
+    // of the header half while DA_HTTP_RECEIVING, but the body keeps
+    // arriving during DA_HTTP_DRAINING and the device-auth query needs it,
+    // so draining can no longer mean discarding.
+    for (unsigned off = 0; off < p->tot_len; ){
+        char chunk[128];
+        unsigned n = p->tot_len - off;
+        if (n > sizeof(chunk)) n = sizeof(chunk);
+        pbuf_copy_partial(p, chunk, n, off);
+        device_auth_http_consume(chunk, n);
+        off += n;
     }
-    // DA_HTTP_DRAINING: don't touch da_http.resp anymore, just keep acking
-    // below so the peer can flush whatever it still has queued and close
-    // on its own.
 
     tcp_recved(tpcb, p->tot_len);
     pbuf_free(p);
@@ -211,6 +265,11 @@ bool net_device_auth_http_get_done(void){
 
 int net_device_auth_http_get_result(void){
     return da_http.result;
+}
+
+const char *net_device_auth_http_get_body(unsigned *len){
+    *len = da_http.body_len;
+    return da_http.body;
 }
 
 // Called from picow_net.c's net_poll() on every main-loop iteration - only

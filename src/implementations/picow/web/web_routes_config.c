@@ -75,7 +75,19 @@ static void handle_get_config_impl(struct web_conn *c){
     char relay_number_esc[MOBILE_MAX_NUMBER_SIZE + 1] = {0};
     web_json_escape(live->number_user, relay_number_esc, sizeof(relay_number_esc));
 
-    char body[768];
+    // Also from the live adapter, and for the same kind of reason: the
+    // pairing code identifies this board, so it is never one of the user's
+    // editable settings and must not come from the snapshot. Empty when this
+    // build has no device identity - the page then hides the row rather than
+    // showing a blank code. Note this is unrelated to the "device" field
+    // below, which is the Mobile Adapter's colour/type.
+    char pairing_code[MOBILE_PAIRING_CODE_STR_SIZE];
+    if (!mobile_device_auth_get_pairing_code(live->adapter, pairing_code)) {
+        pairing_code[0] = '\0';
+    }
+
+    // 768 + room for the pairing_code field (27 bytes) and its margin.
+    char body[832];
     snprintf(body, sizeof(body),
         "{"
         "\"wifi_ssid\":\"%s\","
@@ -91,12 +103,13 @@ static void handle_get_config_impl(struct web_conn *c){
         "\"unmetered\":%s,"
         "\"redirect_mail\":%s,"
         "\"libmobile_version\":\"%u.%u.%u\","
-        "\"firmware_version\":\"%s\""
+        "\"firmware_version\":\"%s\","
+        "\"pairing_code\":\"%s\""
         "}",
         wifi_ssid_esc, wifi_pass_esc, dns1str, dns2str, dns_port, relaystr, token_hex, relay_number_esc, p2p_port,
         device_str, unmetered ? "true" : "false", redirect_mail ? "true" : "false",
         mobile_version_major, mobile_version_minor, mobile_version_patch,
-        PICO_ADAPTER_SOFTWARE);
+        PICO_ADAPTER_SOFTWARE, pairing_code);
 
     web_send_response(c, 200, "OK", "application/json", body);
 }

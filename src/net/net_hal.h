@@ -44,31 +44,15 @@ void net_poll(void);
 // a libmobile callback was executing (see socket_impl's pending_close).
 void net_service_pending_socket_closes(struct mobile_user *mobile);
 
-// Standalone DNS type-A lookup used only for the device-auth side channel's
-// own server hostname (see core/adapter_bridge.c) - never seen by libmobile,
-// and independent of mobile->socket[]/MOBILE_MAX_CONNECTIONS (which are
-// reserved for libmobile's own Mobile Adapter connections and must never be
-// borrowed for frontend-only traffic). Queries dns1 then dns2 directly - the
-// same servers already configured for the emulated game's own protocol DNS -
-// instead of any OS/public resolver, since these hostnames typically only
-// resolve on that private network. Starting a new lookup abandons one
-// already in flight. Serviced internally by each backend's net_poll(); no
-// separate poll call is needed.
-void net_device_auth_resolve_start(const char *hostname, const struct mobile_addr *dns1, const struct mobile_addr *dns2);
-// True once the lookup started by net_device_auth_resolve_start() has
-// finished, successfully or not.
-bool net_device_auth_resolve_done(void);
-// Valid only once net_device_auth_resolve_done() is true. On success, fills
-// ip[4] with the raw resolved IPv4 address and returns true; returns false
-// on failure/timeout (both DNS servers unreachable, no A record, malformed
-// response, etc).
-bool net_device_auth_resolve_result(unsigned char ip[4]);
-
 // One-shot outbound HTTP GET for the device-auth side channel (see
-// core/adapter_bridge.c) - independent of mobile->socket[], same reasoning
-// as net_device_auth_resolve_*() above (may run on the same dedicated
-// socket/link as the resolver; they never run concurrently). `request_line`
-// is the full first line already built by the caller (e.g.
+// core/adapter_bridge.c) - independent of mobile->socket[]/
+// MOBILE_MAX_CONNECTIONS (reserved for libmobile's own Mobile Adapter
+// connections, never to be borrowed for frontend-only traffic). libmobile
+// itself now resolves the server's address before this call ever happens
+// (through the session's own configured DNS1/DNS2), so this backend only
+// ever needs to open a plain TCP connection to an already-known IP - no DNS
+// step of our own. `request_line` is the full first line already built by
+// the caller (e.g.
 // "GET /api/...&sig=... HTTP/1.0"), sent together with a Host header built
 // from `ip` and `Connection: close`, then the response is read only far
 // enough to parse the status line - the body (if any) is discarded.
@@ -81,3 +65,12 @@ bool net_device_auth_http_get_done(void);
 // parsed HTTP status code (e.g. 200, 400, 403) on success, or -1 on
 // transport failure/timeout/malformed response.
 int net_device_auth_http_get_result(void);
+// Valid only once net_device_auth_http_get_done() is true. Returns the
+// response body exactly as received, with *len set to its length; the
+// pointer stays valid until the next net_device_auth_http_get_start().
+// Used by the device-auth counter query, whose answer is "<counter> <sig>".
+// Hand it to libmobile untouched: it verifies the signature and parses
+// strictly itself, so a backend must not validate, trim or reinterpret it.
+// The body is captured up to a fixed ceiling sized for that answer, so a
+// longer one arrives truncated - which libmobile then rejects, as it should.
+const char *net_device_auth_http_get_body(unsigned *len);

@@ -133,9 +133,20 @@ void main(){
     adapter_bridge_register_callbacks(mobile->adapter);
     mobile_config_load(mobile->adapter);
 
-    printf("-------------------------\nSoftware Version:\nLibmobile: %i.%i.%i\nPicoAdapterGB: %s-%s %s\n-------------------------\n",
+    // Printed after adapter_bridge_register_callbacks(), which is what
+    // registers the device-identity callback - the getter derives the id on
+    // demand, so it answers here without a session or any device-auth event
+    // having happened. Shows the pairing code and not the full id on purpose:
+    // it's what the user matches against the account's device list on the
+    // site, and offering two renderings of the same thing invites comparing
+    // the wrong one.
+    char pairing_code[MOBILE_PAIRING_CODE_STR_SIZE];
+    bool has_pairing_code = mobile_device_auth_get_pairing_code(mobile->adapter, pairing_code);
+
+    printf("-------------------------\nSoftware Version:\nLibmobile: %i.%i.%i\nPicoAdapterGB: %s-%s %s\nPairing code: %s\n-------------------------\n",
         mobile_version_major, mobile_version_minor, mobile_version_patch,
-        PICO_ADAPTER_HARDWARE, PICO_ADAPTER_PINOUT, PICO_ADAPTER_SOFTWARE);
+        PICO_ADAPTER_HARDWARE, PICO_ADAPTER_PINOUT, PICO_ADAPTER_SOFTWARE,
+        has_pairing_code ? pairing_code : "(none)");
 
     bool isConnectedWiFi = net_wifi_connect(mobile->wifiSSID, mobile->wifiPASS, WIFI_CONNECT_TIMEOUT_MS);
 

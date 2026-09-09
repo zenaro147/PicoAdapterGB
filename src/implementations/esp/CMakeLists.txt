@@ -64,7 +64,7 @@ target_include_directories(${ProjTargetName} PRIVATE
 
 # No cyw43/lwIP: connectivity is UART + ESP-AT, so networking here only needs
 # the Pico SDK's own UART driver on top of pico_stdlib.
-target_link_libraries(${ProjTargetName} libmobile_static pico_stdlib hardware_pio hardware_flash hardware_watchdog hardware_uart)
+target_link_libraries(${ProjTargetName} libmobile_static pico_stdlib pico_unique_id hardware_pio hardware_flash hardware_watchdog hardware_uart)
 
 # disable usb output, enable uart output
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")

@@ -10,7 +10,6 @@
 
 #include "globals.h"
 #include "socket_impl.h"
-#include "picow_device_auth_dns.h"
 #include "picow_device_auth_http.h"
 
 #define WIFI_CONNECT_MAX_ATTEMPTS 5
@@ -239,7 +238,6 @@ const char *net_wifi_ip_string(void){
 
 void net_poll(void){
     cyw43_arch_poll();
-    picow_device_auth_dns_poll();
     picow_device_auth_http_poll();
 }
 

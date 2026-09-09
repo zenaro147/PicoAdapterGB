@@ -6,10 +6,12 @@
 
 #include <string.h>
 
-// How long socket_impl_connect() keeps silently retrying a P2P TCP connect
-// after an immediate refusal (RST) before finally reporting failure - see
-// its comment. Comfortably inside dependences/libmobile's own 60s
-// command_tel_ip() ceiling.
+// How long socket_impl_connect() used to keep silently retrying a P2P TCP
+// connect after an immediate refusal (RST) before finally reporting failure.
+// Currently unused - see the TEMPORARILY DISABLED comment in
+// socket_impl_connect() itself for why. Left defined so the value isn't
+// lost if this is reinstated (scoped to real P2P connections, once
+// dependences/libmobile can signal that) rather than removed entirely.
 #define TCP_CONNECT_RETRY_WINDOW_MS 20000
 
 // Static storage for every connection's handle: MOBILE_MAX_CONNECTIONS is a
@@ -127,10 +129,15 @@ void socket_impl_close(struct socket_impl *state){
                 state->tcp_pcb = NULL;
             }
             break;
-        case SOCK_UDP:             
-            udp_remove(state->udp_pcb);
+        case SOCK_UDP:
+            // Order matters: udp_remove() ends in memp_free(), so the pcb is
+            // gone once it returns - calling udp_recv()/udp_disconnect()
+            // after it wrote into freed pool memory (they both dereference
+            // pcb unconditionally). Unregister the callback and drop the
+            // remote peer first, free last.
             udp_recv(state->udp_pcb, NULL, NULL);
             udp_disconnect(state->udp_pcb);
+            udp_remove(state->udp_pcb);
             state->udp_pcb = NULL;
             break;
         default: 
@@ -169,35 +176,27 @@ int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *add
         // TCP replies with an immediate RST - is reported through tcp_err,
         // not socket_connected_tcp - see its comment).
         //
-        // A real Mobile Adapter P2P call over a phone line doesn't get an
-        // instant "unreachable" back from one failed ring either: the
-        // other side may simply not have picked up *yet*. The reference
-        // Windows test client (libmobile-bgb) matches this by holding a
-        // P2P connect attempt open for a while instead of failing on the
-        // first refusal. Mirror that here, at the platform layer only (no
-        // dependences/libmobile change): silently open a fresh pcb and
-        // retry the same tcp_connect() instead of reporting failure, until
-        // TCP_CONNECT_RETRY_WINDOW_MS has elapsed since the first refusal.
-        // libmobile's own command_tel_ip() 60s "still connecting" timeout
-        // (which only counts down while this function keeps returning 0)
-        // remains the outer ceiling regardless.
-        if (state->connect_deadline_us == 0) {
-            state->connect_deadline_us = time_us_64() + MS(TCP_CONNECT_RETRY_WINDOW_MS);
-        }
-        if (time_us_64() >= state->connect_deadline_us) {
-            state->connect_deadline_us = 0;
-            state->socket_status = 0;
-            return -1;
-        }
-
-        state->tcp_pcb = tcp_new_ip_type(state->sock_addr);
-        if (!state->tcp_pcb) return 0; // transient allocation failure - try again next poll
-        tcp_arg(state->tcp_pcb, state);
-        tcp_sent(state->tcp_pcb, socket_sent_tcp);
-        tcp_recv(state->tcp_pcb, socket_recv_tcp);
-        tcp_err(state->tcp_pcb, socket_err_tcp);
-        // Falls through: tcp_pcb->state == CLOSED here, same as a freshly
-        // open()ed socket, so the tcp_connect() call below runs normally.
+        // TEMPORARILY DISABLED (see TCP_CONNECT_RETRY_WINDOW_MS's own
+        // comment above): this used to silently reopen a fresh pcb and
+        // retry here for up to TCP_CONNECT_RETRY_WINDOW_MS, to mirror a
+        // real Mobile Adapter P2P call not getting an instant "unreachable"
+        // on one failed ring. Pulled out while investigating a 2026-09
+        // hardware report of a generic (non-P2P) TCP relay connect hanging
+        // for ~20s before the whole session timed out: `conn` here is
+        // shared between P2P (always dependences/libmobile's hardcoded
+        // p2p_conn == 0) and generic TCP_CONNECT (connection_new() picks
+        // the first free slot, which is *also* 0 whenever P2P isn't
+        // active) - there's no reliable signal at this layer to scope the
+        // retry to P2P only, so it was removed here entirely to test
+        // whether it explains the hang, rather than guess with a heuristic
+        // that could just as easily apply to the wrong case either way.
+        // If this turns out unrelated, and P2P connects need the grace
+        // period back, that requires libmobile exposing a real "this is
+        // P2P" signal through the callback rather than reintroducing this
+        // guess.
+        state->connect_deadline_us = 0;
+        state->socket_status = 0;
+        return -1;
     } else if(state->sock_type == SOCK_TCP && state->tcp_pcb->state != CLOSED){
         if (state->socket_status < 0){
             state->socket_status = 0;
@@ -268,11 +267,18 @@ int socket_impl_connect(struct socket_impl *state, const struct mobile_addr *add
 
 int socket_impl_send(struct socket_impl *state, const void *data, const unsigned size, const struct mobile_addr *addr){
     //Check if everything is OK to send
-    if( 
-        (state->sock_type == SOCK_TCP && (!state->tcp_pcb || state->tcp_pcb->state != ESTABLISHED)) || 
-        (state->sock_type == SOCK_UDP && (!state->udp_pcb && !addr) ||
-        (addr && (addr->type == MOBILE_ADDRTYPE_IPV4 && state->sock_addr == IPADDR_TYPE_V6) || 
-        (addr->type == MOBILE_ADDRTYPE_IPV6 && state->sock_addr == IPADDR_TYPE_V4)))){
+    // The address-family check has to stay *inside* the `addr &&` guard.
+    // It used to sit outside it - the guard only covered the IPv4 arm, so
+    // the IPv6 arm dereferenced addr unconditionally - and addr is NULL for
+    // every TCP send (see mobile.h's sock_send). It never showed up because
+    // on RP2040 address 0 is the bootrom: the read returns a byte that
+    // happens not to be MOBILE_ADDRTYPE_IPV6 instead of faulting. Nothing
+    // guarantees that on RP2350.
+    if(
+        (state->sock_type == SOCK_TCP && (!state->tcp_pcb || state->tcp_pcb->state != ESTABLISHED)) ||
+        (state->sock_type == SOCK_UDP && !state->udp_pcb && !addr) ||
+        (addr && ((addr->type == MOBILE_ADDRTYPE_IPV4 && state->sock_addr == IPADDR_TYPE_V6) ||
+                  (addr->type == MOBILE_ADDRTYPE_IPV6 && state->sock_addr == IPADDR_TYPE_V4)))){
         return -1;
     }
 
@@ -282,7 +288,23 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
     if(state->sock_type == SOCK_TCP){
         cyw43_arch_lwip_begin();
         err = tcp_write(state->tcp_pcb,data,size,TCP_WRITE_FLAG_COPY);
-        if (err == ERR_OK) state->buffer_tx_len = size;
+        if (err == ERR_OK) {
+            state->buffer_tx_len = size;
+            // tcp_write() only *enqueues*; it never calls tcp_output()
+            // itself (verified in the SDK's tcp_out.c). Without this, the
+            // segment waits for whatever else happens to flush the pcb -
+            // and for a request/response protocol nothing does, because the
+            // peer cannot reply to a request it has not received yet, so it
+            // falls to a retransmission-timer path measured in hundreds of
+            // milliseconds. Every send here is one whole Mobile Adapter
+            // transfer, so that delay lands once per transfer. The two other
+            // lwIP users in this firmware (web_http.c, picow_device_auth_http.c)
+            // already call it; this path was the one that didn't.
+            // Its return is deliberately ignored: the data is queued either
+            // way, and ERR_MEM here only means "couldn't push it out this
+            // instant", which is not a send failure.
+            tcp_output(state->tcp_pcb);
+        }
         cyw43_arch_lwip_end();
     }else if(state->sock_type == SOCK_UDP) {
         //Set a new IP/Port if receive an addr parameter
@@ -305,6 +327,15 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
         }
         
         struct pbuf * p = pbuf_alloc(PBUF_TRANSPORT,size,PBUF_RAM);
+        if(!p){
+            // Out of pbufs at this instant - transient, exactly like the
+            // ERR_MEM case below, so report "sent nothing yet" rather than a
+            // hard error. Unchecked, `p->payload` read a word of the
+            // bootrom (RP2040 maps it at address 0, so no fault to catch the
+            // mistake) and the memcpy below wrote the caller's data through
+            // that word as if it were a pointer.
+            return 0;
+        }
         uint8_t *pt = (uint8_t *) p->payload;
         memcpy(pt,data,size);
         
@@ -316,10 +347,24 @@ int socket_impl_send(struct socket_impl *state, const void *data, const unsigned
     }else{
         return -1;
     }
+    if(err == ERR_MEM){
+        // Backpressure, not failure. lwIP's own tcp_write() doc says it
+        // returns ERR_MEM when the data exceeds the send buffer or the
+        // segment queue is full, that it does "not change anything in pcb"
+        // in that case (so nothing was queued), and that the application
+        // should wait for the peer to ack and try again. mobile.h's
+        // sock_send is non-blocking and "will be called repeatedly until all
+        // of the data is sent", with 0 meaning no bytes went out this time.
+        // Returning -1 here instead reported a fatal socket error, and
+        // libmobile bails out of the whole transfer on rc < 0 (relay.c:98,
+        // pop3_auth.c:96) - killing a connection over a condition that
+        // clears itself on the next poll.
+        return 0;
+    }
     if(err != ERR_OK){
         // printf("Send failed %d\n", err);
         return -1;
-    } 
+    }
 
     // cyw43_arch_poll();
 
@@ -384,20 +429,36 @@ int socket_impl_recv(struct socket_impl *state, void *data, unsigned size, struc
         }
         
         uint16_t tmpsize = state->buffer_rx_len - state->buffer_rx_read_pos;
-        if(tmpsize > MOBILE_MAX_TRANSFER_SIZE){
-            recvd_buff = MOBILE_MAX_TRANSFER_SIZE;
+        if(state->sock_type == SOCK_UDP){
+            // A datagram is one whole message, not a stream. mobile.h's
+            // sock_recv requires an oversized one to be truncated with the
+            // remainder discarded, because libmobile parses each result as a
+            // complete message - slicing it the way the TCP branch does
+            // would hand it the first MOBILE_MAX_TRANSFER_SIZE bytes of a
+            // DNS response as if that were the entire packet.
+            recvd_buff = tmpsize > size ? size : tmpsize;
         }else{
-            recvd_buff = tmpsize;
-        }        
-        if (recvd_buff > size) recvd_buff = size;
+            // TCP has no message boundaries, so slicing is both correct and
+            // required here: libmobile reads at most MOBILE_MAX_TRANSFER_SIZE
+            // per call and keeps calling until the stream is drained.
+            if(tmpsize > MOBILE_MAX_TRANSFER_SIZE){
+                recvd_buff = MOBILE_MAX_TRANSFER_SIZE;
+            }else{
+                recvd_buff = tmpsize;
+            }
+            if (recvd_buff > size) recvd_buff = size;
+        }
 
         // printf("copied %d bytes\n",recvd_buff);
         memcpy(data,state->buffer_rx + state->buffer_rx_read_pos,recvd_buff);
         state->buffer_rx_read_pos = state->buffer_rx_read_pos + recvd_buff;
-        if(state->buffer_rx_read_pos >= state->buffer_rx_len){
+        // UDP always consumes the whole datagram, even when it didn't fit:
+        // whatever was truncated is discarded, never held back for a second
+        // call that would look like a new packet.
+        if(state->sock_type == SOCK_UDP || state->buffer_rx_read_pos >= state->buffer_rx_len){
             state->buffer_rx_read_pos = 0;
             state->buffer_rx_len = 0;
-        } 
+        }
     }else if(state->buffer_rx_len <= 0){
         return 0;
     }  
@@ -478,10 +539,15 @@ void socket_impl_close_commands(struct socket_impl *state){
                 state->tcp_pcb = NULL;
             }
             break;
-        case SOCK_UDP:             
-            udp_remove(state->udp_pcb);
+        case SOCK_UDP:
+            // Order matters: udp_remove() ends in memp_free(), so the pcb is
+            // gone once it returns - calling udp_recv()/udp_disconnect()
+            // after it wrote into freed pool memory (they both dereference
+            // pcb unconditionally). Unregister the callback and drop the
+            // remote peer first, free last.
             udp_recv(state->udp_pcb, NULL, NULL);
             udp_disconnect(state->udp_pcb);
+            udp_remove(state->udp_pcb);
             state->udp_pcb = NULL;
             break;
         default: 

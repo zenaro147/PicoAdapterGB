@@ -60,7 +60,7 @@ target_include_directories(${ProjTargetName} PRIVATE
 )
 
 # Pull in our pico_stdlib which pulls in commonly used features
-target_link_libraries(${ProjTargetName} libmobile_static pico_stdlib pico_multicore hardware_pio hardware_flash hardware_watchdog pico_cyw43_arch_lwip_poll)
+target_link_libraries(${ProjTargetName} libmobile_static pico_stdlib pico_multicore pico_unique_id hardware_pio hardware_flash hardware_watchdog pico_cyw43_arch_lwip_poll)
 
 # disable usb output, enable uart output
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")

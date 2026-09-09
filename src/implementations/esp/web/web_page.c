@@ -46,6 +46,7 @@ const char WEB_CONFIG_HTML[] =
 "<button type=\"button\" id=\"fmt\">Format EEPROM</button>"
 "</form>"
 "<div id=\"msg\"></div>"
+"<div id=\"pair\"></div>"
 "<div id=\"ver\"></div>"
 "<script>"
 "async function load(){"
@@ -61,6 +62,17 @@ const char WEB_CONFIG_HTML[] =
 "device.value=j.device;unmetered.checked=j.unmetered;redirect_mail.checked=j.redirect_mail;"
 "if(!j.relay){relay_number.textContent='No relay server configured';}"
 "else{relay_number.textContent=j.relay_number?j.relay_number:'Not available';}"
+// Hidden rather than shown blank when the build has no device identity: an
+// empty code next to a label reads as "yours is missing", while no row at
+// all reads as "this build doesn't have one".
+// Rendered in <code>, matching how the site renders the same value. The
+// code's only job is to be compared by eye against the account's device
+// list, and identical shapes on both sides make that comparison easier -
+// the value is built by the library, and the element is created rather than
+// assigned as HTML so nothing here can inject markup.
+"if(j.pairing_code){pair.textContent='Pairing code: ';"
+"const cd=document.createElement('code');cd.textContent=j.pairing_code;pair.appendChild(cd);}"
+"else{pair.textContent='';}"
 "ver.textContent='libmobile '+j.libmobile_version+' / '+j.firmware_version;"
 "msg.textContent='Loaded current config.';"
 "}catch(err){"

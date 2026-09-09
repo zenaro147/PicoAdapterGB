@@ -31,19 +31,22 @@ void socket_recv_udp(void * arg, struct udp_pcb *pcb, struct pbuf *p, const ip_a
         state->udp_remote_ip[3] = (addr->addr >> 24) & 0xff;
         state->udp_remote_port = port;
 
-        // Receive the buffer
-        state->buffer_rx_len = pbuf_copy_partial(p, &state->buffer_rx, p->tot_len, 0);
-        int copiedBytes = 0;
-        int remainingBytes = p->tot_len;
-
-        while (copiedBytes < p->tot_len) {
-            remainingBytes -= copiedBytes;
-            int recvsize = pbuf_copy_partial(p, state->buffer_rx, remainingBytes <= 512 ? remainingBytes : 512, copiedBytes);
-            copiedBytes += recvsize;
-            state->buffer_rx_len = recvsize;
-            while (state->buffer_rx_len > 0) {
-                mobile_loop(state->mobile->adapter);
-            }
+        // One datagram, one message: copy what buffer_rx can hold and discard
+        // the rest, rather than looping over the pbuf and handing libmobile
+        // each slice as though it were a separate packet - mobile.h's
+        // sock_recv is explicit that an oversized datagram must be truncated
+        // with the remainder dropped, since each result is parsed as one
+        // complete message. The clamp is also what keeps a datagram larger
+        // than BUFF_SIZE (they can reach the link MTU, and beyond it with IP
+        // reassembly) from overflowing buffer_rx into the rest of this
+        // socket_impl and the next entry of socket_storage[].
+        // libmobile only ever opens UDP sockets for DNS, and asks for
+        // MOBILE_DNS_PACKET_SIZE (512) - which is what this buffer is sized
+        // to hold.
+        int recvsize = pbuf_copy_partial(p, state->buffer_rx, p->tot_len <= 512 ? p->tot_len : 512, 0);
+        state->buffer_rx_len = recvsize;
+        while (state->buffer_rx_len > 0) {
+            mobile_loop(state->mobile->adapter);
         }
     }
     pbuf_free(p);
@@ -123,13 +126,15 @@ err_t socket_recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
     if(p){
         if (p->tot_len > 0) {
             int copiedBytes = 0;
-            int remainingBytes = p->tot_len;
             // uint8_t tmpbuff[BUFF_SIZE] ={0};
             // printf("reading %d bytes\n", p->tot_len);
             // Receive the buffer
 
             while (copiedBytes < p->tot_len) {
-                remainingBytes -= copiedBytes;
+                // See socket_recv_udp(): recomputed, not decremented by the
+                // running total, or it goes negative from the third chunk on
+                // and the 512 clamp below stops applying.
+                int remainingBytes = p->tot_len - copiedBytes;
                 int recvsize = pbuf_copy_partial(p, state->buffer_rx, remainingBytes <= 512 ? remainingBytes : 512, copiedBytes);
                 copiedBytes += recvsize;
                 state->buffer_rx_len = recvsize;

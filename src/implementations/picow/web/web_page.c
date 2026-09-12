@@ -47,6 +47,7 @@ const char WEB_CONFIG_HTML[] =
 "</form>"
 "<div id=\"msg\"></div>"
 "<div id=\"device_summary\"></div>"
+"<div id=\"mail_key_warning\"></div>"
 "<div id=\"pair\"></div>"
 "<div id=\"ver\"></div>"
 "<script>"
@@ -79,6 +80,14 @@ const char WEB_CONFIG_HTML[] =
 "if(j.pairing_code){pair.textContent='Pairing code: ';"
 "const cd=document.createElement('code');cd.textContent=j.pairing_code;pair.appendChild(cd);}"
 "else{pair.textContent='';}"
+// Only warn when this build actually has the device-auth feature (a
+// pairing code exists) but this specific board hasn't been provisioned
+// with a key yet - the two are independent (pairing code comes from
+// device identity alone), so a normal-looking pairing code does not
+// imply mail is ready. Silent otherwise, matching the pairing code row.
+"if(j.pairing_code&&!j.mail_key_provisioned){"
+"mail_key_warning.textContent='No mail auth key yet - download mobile_config.bin from your account and upload it above to enable POP3/SMTP mail.';"
+"}else{mail_key_warning.textContent='';}"
 "ver.textContent='libmobile '+j.libmobile_version+' / '+j.firmware_version;"
 "msg.textContent='Loaded current config.';"
 "}catch(err){"

@@ -86,8 +86,17 @@ static void handle_get_config_impl(struct web_conn *c){
         pairing_code[0] = '\0';
     }
 
-    // 768 + room for the pairing_code field (27 bytes) and its margin.
-    char body[832];
+    // The pairing code above comes from device identity alone, not from
+    // whether a mail key is provisioned - a board can show a perfectly
+    // normal pairing code and still have no device_auth_key, since the two
+    // are independent. Surfaced separately so the page can tell the two
+    // apart instead of a working-looking pairing code implying mail is
+    // ready too. Discards the key bytes themselves; only presence matters.
+    unsigned char device_auth_key[MOBILE_DEVICE_AUTH_KEY_SIZE];
+    bool mail_key_provisioned = mobile_config_get_device_auth_key(live->adapter, device_auth_key);
+
+    // 832 + room for the mail_key_provisioned field (26 bytes) and its margin.
+    char body[880];
     snprintf(body, sizeof(body),
         "{"
         "\"wifi_ssid\":\"%s\","
@@ -104,12 +113,13 @@ static void handle_get_config_impl(struct web_conn *c){
         "\"redirect_mail\":%s,"
         "\"libmobile_version\":\"%u.%u.%u\","
         "\"firmware_version\":\"%s\","
-        "\"pairing_code\":\"%s\""
+        "\"pairing_code\":\"%s\","
+        "\"mail_key_provisioned\":%s"
         "}",
         wifi_ssid_esc, wifi_pass_esc, dns1str, dns2str, dns_port, relaystr, token_hex, relay_number_esc, p2p_port,
         device_str, unmetered ? "true" : "false", redirect_mail ? "true" : "false",
         mobile_version_major, mobile_version_minor, mobile_version_patch,
-        PICO_ADAPTER_SOFTWARE, pairing_code);
+        PICO_ADAPTER_SOFTWARE, pairing_code, mail_key_provisioned ? "true" : "false");
 
     web_send_response(c, 200, "OK", "application/json", body);
 }

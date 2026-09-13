@@ -94,9 +94,14 @@ static void handle_get_config_impl(struct web_conn *c){
     // ready too. Only the presence of a key matters here, never its value -
     // the buffer is cleared immediately after the call so the secret
     // doesn't linger on the stack any longer than the getter requires.
+    // Cleared through a volatile pointer rather than plain memset(): a
+    // buffer nothing reads afterward is exactly the dead store an optimizer
+    // is entitled to remove, and explicit_bzero()/memset_s() aren't
+    // available on this toolchain.
     unsigned char device_auth_key[MOBILE_DEVICE_AUTH_KEY_SIZE];
     bool mail_key_provisioned = mobile_config_get_device_auth_key(live->adapter, device_auth_key);
-    memset(device_auth_key, 0, sizeof(device_auth_key));
+    volatile unsigned char *device_auth_key_wipe = device_auth_key;
+    for (size_t i = 0; i < sizeof(device_auth_key); i++) device_auth_key_wipe[i] = 0;
 
     // 832 + room for the mail_key_provisioned field (26 bytes) and its margin.
     char body[880];

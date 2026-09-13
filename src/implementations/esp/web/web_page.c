@@ -86,7 +86,7 @@ const char WEB_CONFIG_HTML[] =
 // device identity alone), so a normal-looking pairing code does not
 // imply mail is ready. Silent otherwise, matching the pairing code row.
 "if(j.pairing_code&&!j.mail_key_provisioned){"
-"mail_key_warning.textContent='No mail auth key yet - download mobile_config.bin from your account and upload it above to enable POP3/SMTP mail.';"
+"mail_key_warning.textContent='No mail key yet - download mobile_config.bin from your account. Upload it above; mail will not work until then.';"
 "}else{mail_key_warning.textContent='';}"
 "ver.textContent='libmobile '+j.libmobile_version+' / '+j.firmware_version;"
 "msg.textContent='Loaded current config.';"

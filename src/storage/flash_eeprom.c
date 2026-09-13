@@ -131,8 +131,22 @@ static bool save_single_config(uint8_t mirror, uint16_t position, uint16_t progr
     }
     else {
         prepare_data_unit(NULL, tmp_data.config_eeprom, EEPROM_SIZE, save_key_strings[KEY_CONFIG_INDEX], tmp_data.config_key);
-        prepare_data_unit((uint8_t*)WIFI_DEFAULT_SSID, tmp_data.wifiSSID, SSID_LENGHT, save_key_strings[KEY_WIFISSID_INDEX], tmp_data.config_wifissid_key);
-        prepare_data_unit((uint8_t*)WIFI_DEFAULT_PASS, tmp_data.wifiPASS, PASS_LENGHT, save_key_strings[KEY_WIFIPASS_INDEX], tmp_data.config_wifipass_key);
+
+        // prepare_data_unit() always memcpy()s exactly `size` bytes from
+        // `src` - correct when src is itself a SSID_LENGHT/PASS_LENGHT
+        // buffer, but WIFI_DEFAULT_SSID/PASS are much shorter string
+        // literals, so passing them directly used to read well past their
+        // end (confirmed by -Wall: 20 and 55 bytes over, respectively).
+        // Copy each default into a zero-padded buffer of the exact
+        // expected size first, matching what a real save_ptrs->wifiSSID/
+        // wifiPASS buffer already looks like.
+        uint8_t default_ssid[SSID_LENGHT] = {0};
+        uint8_t default_pass[PASS_LENGHT] = {0};
+        strncpy((char*)default_ssid, WIFI_DEFAULT_SSID, sizeof(default_ssid) - 1);
+        strncpy((char*)default_pass, WIFI_DEFAULT_PASS, sizeof(default_pass) - 1);
+
+        prepare_data_unit(default_ssid, tmp_data.wifiSSID, SSID_LENGHT, save_key_strings[KEY_WIFISSID_INDEX], tmp_data.config_wifissid_key);
+        prepare_data_unit(default_pass, tmp_data.wifiPASS, PASS_LENGHT, save_key_strings[KEY_WIFIPASS_INDEX], tmp_data.config_wifipass_key);
     }
     
     memcpy(tmp_data.unused, unused_data, FLASH_DATA_SIZE - FINAL_FLASH_MIN_SIZE);

@@ -54,8 +54,10 @@ struct device_auth_request {
     // entirely rather than send it blank.
     char device[MOBILE_DEVICE_ID_STR_SIZE];
     // A counter query rather than an authorize/deauthorize: same server, same
-    // shape of request, but it carries no counter and its answer has to be
-    // handed back to libmobile instead of merely logged.
+    // shape of request, and its answer has to be handed back to libmobile
+    // instead of merely logged. It does carry its own counter (see
+    // impl_device_auth_query() below) - this field only distinguishes the
+    // request kind, not whether a counter is sent.
     bool is_query;
 };
 

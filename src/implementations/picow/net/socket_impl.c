@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 #include "socket_impl.h"
 #include "picow_socket.h"
 #include "globals.h"

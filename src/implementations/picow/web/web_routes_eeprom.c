@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 // /api/eeprom: raw 512-byte EEPROM upload/download for the Mobile Adapter
 // GB config blob (MA block: original adapter data, LM block: libmobile data;
 // see dependences/libmobile/config.c for the on-disk layout this mirrors).

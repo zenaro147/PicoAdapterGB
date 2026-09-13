@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 #include "flash_eeprom.h"
 
 #include <stdio.h>

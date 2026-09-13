@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 // Standalone, non-blocking one-shot HTTP GET implementing net_hal.h's
 // net_device_auth_http_get_*() for this backend. Used only for the
 // device-auth side channel (see core/adapter_bridge.c) - never seen by

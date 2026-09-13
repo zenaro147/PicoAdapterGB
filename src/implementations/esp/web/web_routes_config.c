@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 // /api/config: reads and writes the libmobile-facing settings (Wi-Fi, DNS,
 // relay, device, etc.). Reachable only while the setup web server is alive.
 #include "web_routes.h"

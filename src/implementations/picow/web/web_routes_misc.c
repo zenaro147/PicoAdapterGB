@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 // /api/format and /api/reboot: destructive/administrative actions, kept apart
 // from the regular config read/write routes.
 #include "web_routes.h"

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 // libmobile <-> firmware glue: implements every mobile_impl_*() callback and
 // registers them on the adapter. This is the only place that should touch
 // mobile->config_eeprom, the per-socket state array, and the link-cable mode

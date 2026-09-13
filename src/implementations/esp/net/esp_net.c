@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 // ESP-AT (UART + ESP8266EX) implementation of the board-agnostic net_hal.h
 // interface. All protocol/command detail lives in esp_at.h/.c; this file only
 // adapts that to the net_hal.h contract.

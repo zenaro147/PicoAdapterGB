@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 // net/socket_hal.h implementation for the esp backend: translates libmobile's
 // socket contract into ESP-AT commands via esp_at.h. See esp_at.h for which
 // calls are async (non-blocking, called repeatedly - connect/send/recv) vs.

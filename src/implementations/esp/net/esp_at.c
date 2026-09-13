@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 #include "esp_at.h"
 #include "esp_config.h"
 #include "esp_uart.h"

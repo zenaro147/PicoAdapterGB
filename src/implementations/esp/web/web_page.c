@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 #include "web_page.h"
 
 const char WEB_CONFIG_HTML[] =

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 // core/led_hal.h backend for the picow implementation: the Pico W/Pico 2 W's
 // single LED is wired to the CYW43 Wi-Fi chip, not to an RP2040/RP2350 GPIO
 // directly, so it can only be driven through the cyw43_arch calls below.

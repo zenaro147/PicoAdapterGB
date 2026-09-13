@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 // Plain-GPIO implementation of core/led_hal.h. Unlike picow (whose LED is a
 // pin on the CYW43 radio, reachable only through cyw43_arch_gpio_*()), a
 // bare pico/pico2 board has its status LED on a normal RP2040/RP2350 GPIO,

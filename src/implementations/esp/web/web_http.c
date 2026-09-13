@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 // HTTP engine for the config server: connection lifecycle, request parsing,
 // response framing and dispatch to web_routes.h handlers. No knowledge of
 // what any given route actually does lives here.

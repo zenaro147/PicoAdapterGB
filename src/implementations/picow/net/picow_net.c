@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 // cyw43+lwIP implementation of the board-agnostic net_hal.h interface.
 #include "net/net_hal.h"
 #include "picow_net.h"
